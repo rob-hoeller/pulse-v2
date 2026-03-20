@@ -34,3 +34,23 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Supabase
+.supabase/
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Editor
+.vscode/
+.cursor/
