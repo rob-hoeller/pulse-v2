@@ -1,17 +1,4 @@
-"use client";
-
-import { useState, useEffect } from "react";
 import Link from "next/link";
-
-interface ActivityItem {
-  type: string;
-  icon: string;
-  color: string;
-  label: string;
-  detail: string;
-  time: string;
-  tag: string;
-}
 
 type Status = "online" | "ready" | "standby" | "planned";
 type Tier = "control" | "active" | "role" | "planned";
@@ -220,16 +207,65 @@ function GBRCard() {
   );
 }
 
-export default function Page() {
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [activityLoading, setActivityLoading] = useState(true);
+export default async function Page() {
+  // Fetch activity server-side
+  interface ActivityItem {
+    type: string; icon: string; color: string;
+    label: string; detail: string; time: string; tag: string;
+  }
 
-  useEffect(() => {
-    fetch("/api/activity")
-      .then(r => r.json())
-      .then(d => { setActivity(d.activity ?? []); setActivityLoading(false); })
-      .catch(() => setActivityLoading(false));
-  }, []);
+  let activity: ActivityItem[] = [];
+  try {
+    const [ghRes, vRes] = await Promise.allSettled([
+      fetch("https://api.github.com/repos/rob-hoeller/pulse-v2/commits?per_page=15", {
+        headers: {
+          Authorization: `Bearer ${process.env.GITHUB_PAT}`,
+          Accept: "application/vnd.github+json",
+        },
+        next: { revalidate: 60 },
+      }),
+      fetch("https://api.vercel.com/v6/deployments?limit=10", {
+        headers: { Authorization: `Bearer ${process.env.VERCEL_TOKEN}` },
+        next: { revalidate: 60 },
+      }),
+    ]);
+
+    const ghItems: ActivityItem[] = [];
+    if (ghRes.status === "fulfilled" && ghRes.value.ok) {
+      const commits = await ghRes.value.json();
+      for (const c of commits) {
+        ghItems.push({
+          type: "commit", icon: "⊞", color: "#0070f3",
+          label: (c.commit.message.split("\n")[0] ?? "").slice(0, 72),
+          detail: `${c.commit.author.name} · ${c.sha.slice(0, 7)}`,
+          time: c.commit.author.date,
+          tag: "GitHub",
+        });
+      }
+    }
+
+    const vItems: ActivityItem[] = [];
+    if (vRes.status === "fulfilled" && vRes.value.ok) {
+      const data = await vRes.value.json();
+      for (const d of (data.deployments ?? [])) {
+        if (d.state === "READY") {
+          vItems.push({
+            type: "deploy", icon: "✓", color: "#00c853",
+            label: `Deployed: ${d.url}`,
+            detail: `${d.name} · ${d.state}`,
+            time: new Date(d.createdAt).toISOString(),
+            tag: "Vercel",
+          });
+        }
+      }
+    }
+
+    activity = [...ghItems, ...vItems]
+      .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+      .slice(0, 15);
+  } catch {
+    // silently fail — show empty state
+  }
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {
@@ -397,10 +433,8 @@ export default function Page() {
           <div>
             <h2 className="text-[14px] font-semibold text-[#ededed] mb-3">Recent Activity</h2>
             <div className="rounded-lg border border-[#1f1f1f] bg-[#111111] divide-y divide-[#1a1a1a]">
-              {activityLoading ? (
-                <div className="py-8 text-center text-[11px] text-[#444]">Loading activity...</div>
-              ) : activity.length === 0 ? (
-                <div className="py-8 text-center text-[11px] text-[#444]">No activity yet</div>
+              {activity.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2"><div className="text-[11px] text-[#444]">No activity yet</div></div>
               ) : (
                 activity.map((item, i) => (
                   <div key={i} className="flex items-start gap-3 px-4 py-3 hover:bg-[#141414] transition-colors">
