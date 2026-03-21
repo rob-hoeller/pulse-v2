@@ -1,6 +1,17 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
+
+interface ActivityItem {
+  type: string;
+  icon: string;
+  color: string;
+  label: string;
+  detail: string;
+  time: string;
+  tag: string;
+}
 
 type Status = "online" | "ready" | "standby" | "planned";
 type Tier = "control" | "active" | "role" | "planned";
@@ -210,6 +221,16 @@ function GBRCard() {
 }
 
 export default function Page() {
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/activity")
+      .then(r => r.json())
+      .then(d => { setActivity(d.activity ?? []); setActivityLoading(false); })
+      .catch(() => setActivityLoading(false));
+  }, []);
+
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {
     weekday: "short", month: "short", day: "numeric", year: "numeric",
@@ -376,31 +397,30 @@ export default function Page() {
           <div>
             <h2 className="text-[14px] font-semibold text-[#ededed] mb-3">Recent Activity</h2>
             <div className="rounded-lg border border-[#1f1f1f] bg-[#111111] divide-y divide-[#1a1a1a]">
-              {[
-                { icon: "✓", color: "#00c853", label: "Communities page deployed", detail: "Card view, table view, slide-over panel — 50 communities live", time: "Today 3:15 PM", tag: "GBR" },
-                { icon: "✓", color: "#00c853", label: "Divisions page deployed", detail: "4-division cards with stats, comparison table, auto-filter nav", time: "Today 3:04 PM", tag: "GBR" },
-                { icon: "✓", color: "#00c853", label: "Communities + Divisions seeded to Supabase", detail: "50 communities, 4 divisions — utilities, amenities, pricing, timezones", time: "Today 1:10 PM", tag: "Schellie" },
-                { icon: "✓", color: "#00c853", label: "communities.sql schema deployed", detail: "FK relationship, tsvector amenities search, public read RLS", time: "Today 1:05 PM", tag: "Schellie" },
-                { icon: "✓", color: "#00c853", label: "Status page deployed", detail: "Infrastructure status — DGX Spark, Supabase, Vercel, GBR", time: "Today 12:16 PM", tag: "GBR" },
-                { icon: "✓", color: "#00c853", label: "Nav fix merged to main", detail: "GBR Test 1 complete — full pipeline proven end to end", time: "Today 12:14 PM", tag: "GBR" },
-                { icon: "⊞", color: "#0070f3", label: "Community data merged from 2 CSVs", detail: "50 communities, GUIDs assigned, utilities joined", time: "Today 12:00 PM", tag: "Schellie" },
-                { icon: "⊞", color: "#0070f3", label: "GBR pipeline initialized", detail: "openshell-gbr connected, qwen2.5-coder:32b on DGX Spark confirmed", time: "Today 11:30 AM", tag: "Schellie" },
-              ].map((item, i) => (
-                <div key={i} className="flex items-start gap-3 px-4 py-3 hover:bg-[#141414] transition-colors">
-                  <div className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[11px]"
-                    style={{ backgroundColor: item.color + "22", color: item.color }}>
-                    {item.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-medium text-[#ededed]">{item.label}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]">{item.tag}</span>
+              {activityLoading ? (
+                <div className="py-8 text-center text-[11px] text-[#444]">Loading activity...</div>
+              ) : activity.length === 0 ? (
+                <div className="py-8 text-center text-[11px] text-[#444]">No activity yet</div>
+              ) : (
+                activity.map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 px-4 py-3 hover:bg-[#141414] transition-colors">
+                    <div className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[11px]"
+                      style={{ backgroundColor: item.color + "22", color: item.color }}>
+                      {item.icon}
                     </div>
-                    <div className="text-[11px] text-[#555] mt-0.5">{item.detail}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-medium text-[#ededed]">{item.label}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]">{item.tag}</span>
+                      </div>
+                      <div className="text-[11px] text-[#555] mt-0.5">{item.detail}</div>
+                    </div>
+                    <div className="text-[11px] text-[#444] whitespace-nowrap flex-shrink-0">
+                      {new Date(item.time).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[#444] whitespace-nowrap flex-shrink-0">{item.time}</div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
