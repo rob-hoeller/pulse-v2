@@ -1,7 +1,7 @@
 "use client";
 
 type Status = "online" | "ready" | "standby" | "planned";
-type Tier = "control" | "active" | "planned";
+type Tier = "control" | "active" | "role" | "planned";
 
 interface Agent {
   emoji: string;
@@ -11,6 +11,7 @@ interface Agent {
   tags: string[];
   status: Status;
   tier: Tier;
+  poweredBy?: string;
 }
 
 const agents: Agent[] = [
@@ -26,20 +27,21 @@ const agents: Agent[] = [
   {
     emoji: "🐟",
     name: "Nemo",
-    role: "Pv1 Discovery",
-    description: "Reads legacy Pv1 code and database read-only. Produces schema inventories, domain groupings, and dependency maps.",
-    tags: ["Discovery", "Read-Only", "Pv1"],
+    role: "Analysis Sandbox",
+    description: "The active execution environment for all analysis work. Reads legacy Pv1 code and database read-only. Runs discovery, workflow mapping, data normalization, and domain modeling missions as directed by Schellie.",
+    tags: ["OpenShell", "NemoClaw", "Read-Only", "Analysis"],
     status: "ready",
     tier: "active",
   },
+];
+
+const roles = [
   {
     emoji: "🐠",
     name: "Gill",
     role: "Workflow & Rules",
     description: "Maps business processes. Extracts funnel stages, state transitions, and business rules from Pv1.",
     tags: ["Workflow", "Rules", "Logic"],
-    status: "standby",
-    tier: "active",
   },
   {
     emoji: "🐡",
@@ -47,8 +49,6 @@ const agents: Agent[] = [
     role: "Memory & Normalization",
     description: "Maintains system consistency. Produces canonical definitions, entity mappings, and terminology alignment.",
     tags: ["Memory", "Canonical", "Mapping"],
-    status: "standby",
-    tier: "active",
   },
   {
     emoji: "🦀",
@@ -56,8 +56,6 @@ const agents: Agent[] = [
     role: "Data Normalization",
     description: "Structures external data sources — Rilla, Zoom, Outlook, Twilio — into a unified event and engagement model.",
     tags: ["Data", "Events", "Ingestion"],
-    status: "standby",
-    tier: "active",
   },
   {
     emoji: "🐬",
@@ -65,8 +63,6 @@ const agents: Agent[] = [
     role: "AI Layer Design",
     description: "Defines intelligence capabilities: lead scoring models, automation triggers, buying signal detection, recommendations.",
     tags: ["AI Design", "Scoring", "Signals"],
-    status: "planned",
-    tier: "planned",
   },
   {
     emoji: "🐙",
@@ -74,8 +70,6 @@ const agents: Agent[] = [
     role: "Execution Planning",
     description: "Converts strategy into build steps. Produces MVP scope, backlog, and build sequence for GBR.",
     tags: ["Planning", "Backlog", "MVP"],
-    status: "planned",
-    tier: "planned",
   },
 ];
 
@@ -116,31 +110,26 @@ const stats = [
 
 const execModel = [
   { step: "1", label: "Mission defined" },
-  { step: "2", label: "Agent(s) assigned" },
-  { step: "3", label: "Outputs collected" },
-  { step: "4", label: "Findings synthesized" },
+  { step: "2", label: "Role assigned" },
+  { step: "3", label: "Nemo executes" },
+  { step: "4", label: "Outputs collected" },
   { step: "5", label: "SPEC written" },
   { step: "6", label: "SPEC → GBR" },
-  { step: "7", label: "GBR executes" },
+  { step: "7", label: "GBR builds" },
   { step: "8", label: "Review + iterate" },
 ];
 
 function AgentCard({ agent }: { agent: Agent }) {
   const s = statusMap[agent.status];
-  const isPlanned = agent.status === "planned";
   return (
-    <div className={`rounded-lg border p-4 flex flex-col gap-3 transition-colors ${
-      isPlanned
-        ? "border-[#1f1f1f] bg-[#0d0d0d]"
-        : "border-[#1f1f1f] bg-[#111111] hover:border-[#2a2a2a]"
-    }`}>
+    <div className="rounded-lg border border-[#1f1f1f] bg-[#111111] p-4 flex flex-col gap-3 hover:border-[#2a2a2a] transition-colors">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2.5">
-          <div className={`w-9 h-9 rounded-md flex items-center justify-center text-lg ${isPlanned ? "bg-[#161616]" : "bg-[#1a1a1a]"}`}>
+          <div className="w-9 h-9 rounded-md bg-[#1a1a1a] flex items-center justify-center text-lg">
             {agent.emoji}
           </div>
           <div>
-            <div className={`font-medium text-[13px] ${isPlanned ? "text-[#666]" : "text-[#ededed]"}`}>{agent.name}</div>
+            <div className="font-medium text-[13px] text-[#ededed]">{agent.name}</div>
             <div className="text-[11px] text-[#666]">{agent.role}</div>
           </div>
         </div>
@@ -149,16 +138,34 @@ function AgentCard({ agent }: { agent: Agent }) {
           {s.label}
         </div>
       </div>
-      <p className={`text-[12px] leading-relaxed ${isPlanned ? "text-[#444]" : "text-[#a1a1a1]"}`}>
-        {agent.description}
-      </p>
+      <p className="text-[12px] text-[#a1a1a1] leading-relaxed">{agent.description}</p>
       <div className="flex flex-wrap gap-1.5">
         {agent.tags.map((tag) => (
-          <span key={tag} className={`text-[11px] px-2 py-0.5 rounded-md border ${
-            isPlanned
-              ? "border-[#1f1f1f] text-[#444] bg-transparent"
-              : "border-[#2a2a2a] text-[#888] bg-[#161616]"
-          }`}>
+          <span key={tag} className="text-[11px] px-2 py-0.5 rounded-md border border-[#2a2a2a] text-[#888] bg-[#161616]">
+            {tag}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RoleCard({ role }: { role: typeof roles[0] }) {
+  return (
+    <div className="rounded-lg border border-[#1a1a1a] bg-[#0d0d0d] p-4 flex flex-col gap-3">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-md bg-[#141414] flex items-center justify-center text-base">
+          {role.emoji}
+        </div>
+        <div>
+          <div className="font-medium text-[12px] text-[#888]">{role.name}</div>
+          <div className="text-[11px] text-[#444]">{role.role}</div>
+        </div>
+      </div>
+      <p className="text-[11px] text-[#555] leading-relaxed">{role.description}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {role.tags.map((tag) => (
+          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded border border-[#1a1a1a] text-[#444]">
             {tag}
           </span>
         ))}
@@ -203,10 +210,6 @@ export default function Page() {
   const dateStr = now.toLocaleDateString("en-US", {
     weekday: "short", month: "short", day: "numeric", year: "numeric",
   });
-
-  const controlAgents = agents.filter((a) => a.tier === "control");
-  const activeAgents = agents.filter((a) => a.tier === "active");
-  const plannedAgents = agents.filter((a) => a.tier === "planned");
 
   return (
     <div className="flex h-screen bg-[#0a0a0a] overflow-hidden">
@@ -283,7 +286,7 @@ export default function Page() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <h2 className="text-[13px] font-semibold text-[#ededed]">Execution Model</h2>
-              <span className="text-[11px] text-[#555]">SPEC → GBR → Build → Commit</span>
+              <span className="text-[11px] text-[#555]">Mission → Role → Nemo → SPEC → GBR → Build</span>
             </div>
             <div className="flex items-center gap-0 overflow-x-auto pb-1">
               {execModel.map((step, i) => (
@@ -300,12 +303,12 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Agent Roster */}
+          {/* Infrastructure */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-[14px] font-semibold text-[#ededed]">Agent Roster</h2>
-                <p className="text-[12px] text-[#555] mt-0.5">7 agents + GBR execution layer · OpenShell sandboxed</p>
+                <h2 className="text-[14px] font-semibold text-[#ededed]">Infrastructure</h2>
+                <p className="text-[12px] text-[#555] mt-0.5">2 live sandboxes · Schellie orchestrates · Nemo analyzes · GBR builds</p>
               </div>
             </div>
 
@@ -316,9 +319,7 @@ export default function Page() {
                 <div className="flex-1 h-px bg-[#1f1f1f]" />
               </div>
               <div className="grid grid-cols-4 gap-3">
-                <div className="col-span-1">
-                  <AgentCard agent={controlAgents[0]} />
-                </div>
+                <AgentCard agent={agents[0]} />
               </div>
             </div>
 
@@ -326,14 +327,14 @@ export default function Page() {
               <div className="w-px h-4 bg-[#2a2a2a]" />
             </div>
 
-            {/* Active Agents */}
+            {/* Analysis Sandbox */}
             <div className="mb-1">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-medium text-[#444] uppercase tracking-widest">Analysis Agents</span>
+                <span className="text-[10px] font-medium text-[#444] uppercase tracking-widest">Analysis Sandbox</span>
                 <div className="flex-1 h-px bg-[#1f1f1f]" />
               </div>
               <div className="grid grid-cols-4 gap-3">
-                {activeAgents.map((a) => <AgentCard key={a.name} agent={a} />)}
+                <AgentCard agent={agents[1]} />
               </div>
             </div>
 
@@ -341,28 +342,28 @@ export default function Page() {
               <div className="w-px h-4 bg-[#2a2a2a]" />
             </div>
 
-            {/* Planned Agents */}
-            <div className="mb-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-medium text-[#444] uppercase tracking-widest">Planned Agents</span>
-                <div className="flex-1 h-px bg-[#1f1f1f]" />
-              </div>
-              <div className="grid grid-cols-4 gap-3">
-                {plannedAgents.map((a) => <AgentCard key={a.name} agent={a} />)}
-              </div>
-            </div>
-
-            <div className="flex justify-start pl-[52px] py-1">
-              <div className="w-px h-4 bg-[#2a2a2a]" />
-            </div>
-
-            {/* GBR */}
+            {/* Execution Layer */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-[10px] font-medium text-[#444] uppercase tracking-widest">Execution Layer</span>
                 <div className="flex-1 h-px bg-[#1f1f1f]" />
               </div>
               <GBRCard />
+            </div>
+          </div>
+
+          {/* Mission Roles */}
+          <div>
+            <div className="mb-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-[14px] font-semibold text-[#ededed]">Mission Roles</h2>
+              </div>
+              <p className="text-[12px] text-[#555] mb-4">
+                Named roles that define <em>how</em> Nemo is tasked — not separate sandboxes. Each role is a mission type with its own domain, constraints, and output format. Dedicated sandboxes added only when a role needs a distinct security boundary.
+              </p>
+            </div>
+            <div className="grid grid-cols-5 gap-3">
+              {roles.map((r) => <RoleCard key={r.name} role={r} />)}
             </div>
           </div>
 
