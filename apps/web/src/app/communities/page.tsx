@@ -517,6 +517,7 @@ export default function CommunitiesPage() {
               <table
                 style={{
                   width: "100%",
+                  minWidth: 1400,
                   fontSize: 12,
                   borderCollapse: "collapse",
                 }}
@@ -533,7 +534,13 @@ export default function CommunitiesPage() {
                         { label: "HOA",        col: "hoa_fee"    },
                         { label: "55+",        col: null         },
                         { label: "Model",      col: null         },
-                        { label: "Amenities",  col: null         },
+                        { label: "Amenities",     col: null         },
+                        { label: "Nat. Gas",      col: null         },
+                        { label: "Electric",      col: null         },
+                        { label: "Water",         col: null         },
+                        { label: "Sewer",         col: null         },
+                        { label: "Cable/Internet",col: null         },
+                        { label: "Trash",         col: null         },
                       ] as { label: string; col: SortCol | null }[]
                     ).map(({ label, col }, i) => (
                       <th
@@ -626,8 +633,26 @@ export default function CommunitiesPage() {
                         <td style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "#a1a1a1" }}>
                           {c.has_model ? "Yes" : "—"}
                         </td>
-                        <td style={{ padding: "10px 16px", color: "#a1a1a1" }}>
+                        <td style={{ padding: "10px 16px", color: "#a1a1a1", whiteSpace: "nowrap" }}>
                           {amenityStr}
+                        </td>
+                        <td style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "#a1a1a1" }}>
+                          {c.natural_gas ?? "—"}
+                        </td>
+                        <td style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "#a1a1a1" }}>
+                          {c.electric ?? "—"}
+                        </td>
+                        <td style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "#a1a1a1" }}>
+                          {c.water ?? "—"}
+                        </td>
+                        <td style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "#a1a1a1" }}>
+                          {c.sewer ?? "—"}
+                        </td>
+                        <td style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "#a1a1a1" }}>
+                          {c.cable_internet ?? "—"}
+                        </td>
+                        <td style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "#a1a1a1" }}>
+                          {c.trash ?? "—"}
                         </td>
                       </tr>
                     );
