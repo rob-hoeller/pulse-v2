@@ -261,12 +261,7 @@ export default function DocsClient({ docs }: Props) {
         {/* Top bar */}
         <div className="sticky top-0 z-10 bg-[#0a0a0a]/80 backdrop-blur-sm border-b border-[#1f1f1f] px-6 py-3 flex items-center justify-between">
           <h1 className="text-[14px] font-semibold text-[#ededed]">Docs</h1>
-          <button
-            onClick={() => setShowNewDoc(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-[#ededed] text-[#0a0a0a] hover:bg-white transition-colors"
-          >
-            + New Document
-          </button>
+          <span className="text-[11px] text-[#555]">{docs.length} documents</span>
         </div>
 
         {/* Filter tabs + search bar */}
@@ -293,11 +288,17 @@ export default function DocsClient({ docs }: Props) {
             placeholder="Search docs..."
             className="bg-[#111111] border border-[#2a2a2a] rounded-md px-3 py-1.5 text-[12px] text-[#a1a1a1] placeholder-[#444] outline-none focus:border-[#3a3a3a] w-[200px]"
           />
+          <button
+            onClick={() => setShowNewDoc(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-[#ededed] text-[#0a0a0a] hover:bg-white transition-colors whitespace-nowrap"
+          >
+            + New Document
+          </button>
         </div>
 
         {/* Doc count */}
-        <div className="px-6 py-3">
-          <span className="text-[12px] text-[#555]">{filtered.length} documents</span>
+        <div className="px-6 pt-3 pb-1">
+          <span className="text-[11px] text-[#555]">{filtered.length} documents</span>
         </div>
 
         {/* Document list */}
