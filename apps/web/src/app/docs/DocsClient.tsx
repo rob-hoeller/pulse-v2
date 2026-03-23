@@ -27,6 +27,7 @@ const CATEGORIES = [
   { key: "data",      label: "Data" },
   { key: "technical", label: "Technical" },
   { key: "processes", label: "Processes" },
+  { key: "agent-os",  label: "Agent OS"  },
 ];
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
