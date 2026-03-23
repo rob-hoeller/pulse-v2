@@ -33,16 +33,14 @@ const navItems = [
   { icon: "📄", label: "Docs",          href: "/docs"        },
 ];
 
-const CAT_LABELS: Record<string, string> = {
-  company:   "Company",
-  platform:  "Platform",
-  data:      "Data",
-  technical: "Technical",
-  processes: "Processes",
-  general:   "General",
-};
-
-const CAT_ORDER = ["company", "platform", "data", "technical", "processes", "general"];
+const CATEGORIES = [
+  { key: "all",       label: "All" },
+  { key: "company",   label: "Company" },
+  { key: "platform",  label: "Platform" },
+  { key: "data",      label: "Data" },
+  { key: "technical", label: "Technical" },
+  { key: "processes", label: "Processes" },
+];
 
 function renderMarkdown(content: string): string {
   return content
@@ -116,27 +114,54 @@ function renderMarkdown(content: string): string {
     .replace(/^\s*$/gm, "");
 }
 
-export default function DocsClient({ docs, initialSlug }: Props) {
-  const [activeSlug, setActiveSlug] = useState(
-    initialSlug ?? docs[0]?.slug ?? ""
-  );
+export default function DocsClient({ docs }: Props) {
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [selectedDoc, setSelectedDoc] = useState<Doc | null>(null);
+  const [showNewDoc, setShowNewDoc] = useState(false);
 
-  const activeDoc = docs.find((d) => d.slug === activeSlug) ?? docs[0];
+  // New doc form state
+  const [newTitle, setNewTitle] = useState("");
+  const [newCategory, setNewCategory] = useState("company");
+  const [newContent, setNewContent] = useState("# Document Title\n\nWrite your content here...");
+  const [saving, setSaving] = useState(false);
 
-  // Group docs by category, preserving canonical order
-  const grouped = CAT_ORDER.reduce<Record<string, Doc[]>>((acc, cat) => {
-    const items = docs.filter((d) => d.category === cat);
-    if (items.length > 0) acc[cat] = items;
-    return acc;
-  }, {});
+  const filtered = docs
+    .filter((d) => categoryFilter === "all" || d.category === categoryFilter)
+    .filter((d) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return d.title.toLowerCase().includes(q) || d.content.toLowerCase().includes(q);
+    });
 
-  // Also catch any categories not in CAT_ORDER
-  docs.forEach((d) => {
-    if (!CAT_ORDER.includes(d.category)) {
-      if (!grouped[d.category]) grouped[d.category] = [];
-      if (!grouped[d.category].includes(d)) grouped[d.category].push(d);
+  async function handleCreateDoc() {
+    if (!newTitle.trim()) return;
+    setSaving(true);
+    try {
+      const slug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const res = await fetch("/api/docs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: `${slug}-${Date.now()}`,
+          title: newTitle,
+          category: newCategory,
+          content: newContent,
+          sort_order: 99,
+        }),
+      });
+      if (res.ok) {
+        setShowNewDoc(false);
+        setNewTitle("");
+        setNewContent("# Document Title\n\nWrite your content here...");
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
     }
-  });
+  }
 
   return (
     <div className="flex h-screen bg-[#0a0a0a] overflow-hidden">
@@ -188,50 +213,125 @@ export default function DocsClient({ docs, initialSlug }: Props) {
         </div>
       </aside>
 
-      {/* Docs sidebar — doc navigation */}
-      <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-[#1f1f1f] bg-[#080808] h-screen sticky top-0 overflow-y-auto">
-        {Object.entries(grouped).map(([cat, catDocs]) => (
-          <div key={cat}>
-            <div className="text-[10px] font-medium text-[#444] uppercase tracking-widest px-3 pt-4 pb-1">
-              {CAT_LABELS[cat] ?? cat}
-            </div>
-            {catDocs.map((doc) => (
-              <button
-                key={doc.slug}
-                onClick={() => setActiveSlug(doc.slug)}
-                className={`w-full text-left text-[12px] px-3 py-1.5 cursor-pointer rounded mx-1 transition-colors ${
-                  activeSlug === doc.slug
-                    ? "bg-[#1a1a1a] text-[#ededed]"
-                    : "text-[#666] hover:text-[#a1a1a1] hover:bg-[#111111]"
-                }`}
-                style={{ width: "calc(100% - 8px)" }}
-              >
-                {doc.title}
-              </button>
-            ))}
-          </div>
-        ))}
-      </aside>
-
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         {/* Top bar */}
         <div className="sticky top-0 z-10 bg-[#0a0a0a]/80 backdrop-blur-sm border-b border-[#1f1f1f] px-6 py-3 flex items-center justify-between">
           <h1 className="text-[14px] font-semibold text-[#ededed]">Docs</h1>
-          <span className="text-[11px] text-[#555]">{docs.length} documents</span>
+          <button
+            onClick={() => setShowNewDoc(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-[#ededed] text-[#0a0a0a] hover:bg-white transition-colors"
+          >
+            + New Document
+          </button>
         </div>
 
-        {/* Doc content */}
-        {activeDoc ? (
-          <div>
+        {/* Filter tabs + search bar */}
+        <div className="px-6 pt-4 pb-2 flex items-center gap-3 border-b border-[#1f1f1f]">
+          <div className="flex items-center gap-1 flex-1">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => setCategoryFilter(cat.key)}
+                className={`text-[12px] px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                  categoryFilter === cat.key
+                    ? "bg-[#1a1a1a] text-[#ededed] border border-[#2a2a2a]"
+                    : "text-[#555] hover:text-[#a1a1a1]"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search docs..."
+            className="bg-[#111111] border border-[#2a2a2a] rounded-md px-3 py-1.5 text-[12px] text-[#a1a1a1] placeholder-[#444] outline-none focus:border-[#3a3a3a] w-[200px]"
+          />
+        </div>
+
+        {/* Doc count */}
+        <div className="px-6 py-3">
+          <span className="text-[12px] text-[#555]">{filtered.length} documents</span>
+        </div>
+
+        {/* Document list */}
+        <div className="px-6 pb-6 space-y-2">
+          {filtered.length === 0 ? (
+            <div className="text-[13px] text-[#444] py-8 text-center">No documents found.</div>
+          ) : (
+            filtered.map((d) => (
+              <div
+                key={d.id}
+                onClick={() => setSelectedDoc(d)}
+                className="rounded-lg border border-[#1f1f1f] bg-[#111111] px-5 py-4 cursor-pointer hover:border-[#2a2a2a] transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-medium text-[#ededed]">{d.title}</div>
+                    <div className="text-[12px] text-[#555] mt-1 line-clamp-2">
+                      {d.content.replace(/[#*`]/g, "").trim().slice(0, 120)}...
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-[#1a1a1a] border border-[#2a2a2a] text-[#555] whitespace-nowrap flex-shrink-0">
+                    {d.category}
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#444] mt-3">
+                  Updated{" "}
+                  {new Date(d.updated_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </main>
+
+      {/* Doc reader slide-over */}
+      {selectedDoc !== null && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setSelectedDoc(null)}
+          />
+          <div className="fixed right-0 top-0 h-full w-[600px] bg-[#0f0f0f] border-l border-[#1f1f1f] overflow-y-auto z-50 flex flex-col">
+            {/* Header */}
+            <div className="px-8 py-5 border-b border-[#1f1f1f] flex items-start justify-between gap-4 sticky top-0 bg-[#0f0f0f] z-10">
+              <div className="flex-1 min-w-0">
+                <div className="text-[16px] font-semibold text-[#ededed] leading-snug">
+                  {selectedDoc.title}
+                </div>
+                <div className="mt-1">
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]">
+                    {selectedDoc.category}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedDoc(null)}
+                className="text-[#555] hover:text-[#ededed] text-[22px] leading-none flex-shrink-0"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
             <div
-              className="px-8 py-6 max-w-[800px]"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(activeDoc.content) }}
+              className="px-8 py-6 flex-1"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedDoc.content) }}
             />
-            <div className="px-8 max-w-[800px]">
-              <div className="text-[11px] text-[#444] mt-8 pt-4 border-t border-[#1a1a1a]">
+
+            {/* Footer */}
+            <div className="px-8 py-4 border-t border-[#1f1f1f]">
+              <div className="text-[11px] text-[#444]">
                 Last updated:{" "}
-                {new Date(activeDoc.updated_at).toLocaleDateString("en-US", {
+                {new Date(selectedDoc.updated_at).toLocaleDateString("en-US", {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
@@ -239,10 +339,97 @@ export default function DocsClient({ docs, initialSlug }: Props) {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="px-8 py-6 text-[13px] text-[#444]">No documents found.</div>
-        )}
-      </main>
+        </>
+      )}
+
+      {/* New Document slide-over */}
+      {showNewDoc && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setShowNewDoc(false)}
+          />
+          <div className="fixed right-0 top-0 h-full w-[520px] bg-[#0f0f0f] border-l border-[#1f1f1f] z-50 flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-[#1f1f1f] flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[18px]">
+                  📄
+                </div>
+                <div>
+                  <div className="text-[14px] font-semibold text-[#ededed]">New Document</div>
+                  <div className="text-[11px] text-[#555]">Saved to Knowledge Base</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowNewDoc(false)}
+                className="text-[#555] hover:text-[#ededed] text-[20px] leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Form body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+              {/* Title */}
+              <div>
+                <label className="text-[11px] text-[#555] uppercase tracking-widest mb-2 block">
+                  Title
+                </label>
+                <input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="Document title..."
+                  className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-4 py-3 text-[13px] text-[#ededed] placeholder-[#444] outline-none focus:border-[#3a3a3a]"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="text-[11px] text-[#555] uppercase tracking-widest mb-2 block">
+                  Category
+                </label>
+                <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-4 py-3 text-[13px] text-[#a1a1a1] outline-none"
+                >
+                  <option value="company">Company</option>
+                  <option value="platform">Platform</option>
+                  <option value="data">Data</option>
+                  <option value="technical">Technical</option>
+                  <option value="processes">Processes</option>
+                  <option value="general">General</option>
+                </select>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1">
+                <label className="text-[11px] text-[#555] uppercase tracking-widest mb-2 block">
+                  Content (Markdown)
+                </label>
+                <textarea
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  rows={18}
+                  className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-4 py-3 text-[12px] text-[#a1a1a1] font-mono placeholder-[#444] outline-none focus:border-[#3a3a3a] resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-[#1f1f1f]">
+              <button
+                onClick={handleCreateDoc}
+                disabled={!newTitle.trim() || saving}
+                className="w-full flex items-center justify-center gap-2 bg-[#ededed] text-[#0a0a0a] rounded-lg py-3 text-[13px] font-semibold hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {saving ? "Creating..." : "+ Create Document"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
