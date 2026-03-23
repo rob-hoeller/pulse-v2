@@ -43,6 +43,27 @@ interface Community {
   division_name: string;
   region: string;
   timezone: string;
+  // New Heartbeat fields
+  heartbeat_community_id: number | null;
+  abbr: string | null;
+  sales_phone: string | null;
+  sales_center_address: string | null;
+  zip: string | null;
+  priced_from: number | null;
+  short_description: string | null;
+  school_district: string | null;
+  school_elementary: string | null;
+  school_middle: string | null;
+  school_high: string | null;
+  logo_image_url: string | null;
+  brochure_url: string | null;
+  lot_map_url: string | null;
+  page_url: string | null;
+  flickr_set_id: string | null;
+  marketing_video_url: string | null;
+  is_lotworks: boolean | null;
+  model_homes: string | null;   // JSON string
+  spec_homes: string | null;    // JSON string
 }
 
 interface Props {
@@ -586,13 +607,74 @@ function CommunitiesInner(props: Props) {
                 value={getStatusAndTag(selected.status).tag}
               />
             )}
+            {selected.short_description && (
+              <div style={{ fontSize: 12, color: "#666", fontStyle: "italic", marginTop: 6, lineHeight: 1.5 }}>
+                {selected.short_description}
+              </div>
+            )}
           </Section>
 
           <Section title="Pricing">
             <Row label="Price From" value={formatPrice(selected.price_from)} />
             <Row label="Price To"   value={formatPrice(selected.price_to)} />
             <Row label="HOA"        value={selected.hoa_fee != null ? formatHoa(selected.hoa_fee, selected.hoa_period) : null} />
+            <Row label="Priced From" value={selected.priced_from ? `$${selected.priced_from.toLocaleString()}` : null} />
           </Section>
+
+          {selected.school_district && (
+            <Section title="Schools">
+              <Row label="District"   value={selected.school_district} />
+              <Row label="Elementary" value={selected.school_elementary} />
+              <Row label="Middle"     value={selected.school_middle} />
+              <Row label="High"       value={selected.school_high} />
+            </Section>
+          )}
+
+          {(selected.sales_phone || selected.sales_center_address) && (
+            <Section title="Sales">
+              <Row label="Phone"   value={selected.sales_phone} />
+              <Row label="Address" value={selected.sales_center_address} />
+            </Section>
+          )}
+
+          {(selected.brochure_url || selected.lot_map_url || selected.page_url || selected.marketing_video_url) && (
+            <Section title="Resources">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                {selected.brochure_url && (
+                  <a href={selected.brochure_url} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
+                      backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
+                      color: "#a1a1a1", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                    ⬇ Brochure
+                  </a>
+                )}
+                {selected.lot_map_url && (
+                  <a href={selected.lot_map_url} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
+                      backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
+                      color: "#a1a1a1", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                    ◫ Lot Map
+                  </a>
+                )}
+                {selected.page_url && (
+                  <a href={`https://schellbrothers.com${selected.page_url}`} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
+                      backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
+                      color: "#a1a1a1", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                    ↗ Website
+                  </a>
+                )}
+                {selected.marketing_video_url && (
+                  <a href={selected.marketing_video_url} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
+                      backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
+                      color: "#0070f3", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                    ▶ Video
+                  </a>
+                )}
+              </div>
+            </Section>
+          )}
 
           <Section title="Features">
             <Row label="Model Home"  value={selected.has_model  ? "Yes" : "No"} />

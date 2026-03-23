@@ -104,7 +104,8 @@ export default async function CommunitiesPage() {
 
   return (
     <CommunitiesClient
-      communities={flatCommunities}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      communities={flatCommunities as any[]}
       divisions={divisions ?? []}
     />
   );
