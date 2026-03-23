@@ -29,6 +29,34 @@ const CATEGORIES = [
   { key: "processes", label: "Processes" },
 ];
 
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  company:   { bg: "#1a2a1a", text: "#00c853", border: "#1f3f1f" },
+  platform:  { bg: "#1a1f2e", text: "#0070f3", border: "#1a2a3f" },
+  data:      { bg: "#2a2a1a", text: "#f5a623", border: "#3f3a1f" },
+  technical: { bg: "#1f1a2e", text: "#a855f7", border: "#2a1f3f" },
+  processes: { bg: "#2a1a1a", text: "#ff6b6b", border: "#3f1f1f" },
+  general:   { bg: "#1a1a1a", text: "#666",    border: "#2a2a2a" },
+};
+
+function CategoryBadge({ category }: { category: string }) {
+  const s = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.general;
+  return (
+    <span style={{
+      fontSize: 10,
+      padding: "1px 6px",
+      borderRadius: 3,
+      backgroundColor: s.bg,
+      color: s.text,
+      border: `1px solid ${s.border}`,
+      fontWeight: 500,
+      textTransform: "capitalize" as const,
+      flexShrink: 0,
+    }}>
+      {category}
+    </span>
+  );
+}
+
 function renderMarkdown(content: string): string {
   return content
     // Code blocks (must come before inline code)
@@ -160,6 +188,7 @@ export default function DocsClient({ docs }: Props) {
       setSaving(false);
     }
   }
+
   async function handleEditDoc() {
     if (!editingDoc || !editTitle.trim()) return;
     setEditSaving(true);
@@ -197,7 +226,7 @@ export default function DocsClient({ docs }: Props) {
       <Sidebar activeHref="/docs" />
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
         <div className="sticky top-0 z-10 bg-[#0a0a0a]/80 backdrop-blur-sm border-b border-[#1f1f1f] px-6 py-3 flex items-center justify-between">
           <h1 className="text-[14px] font-semibold text-[#ededed]">Docs</h1>
@@ -205,22 +234,46 @@ export default function DocsClient({ docs }: Props) {
         </div>
 
         {/* Filter tabs + search bar */}
-        <div className="px-6 pt-4 pb-2 flex items-center gap-3 border-b border-[#1f1f1f]">
+        <div className="px-6 py-2 flex items-center gap-3 border-b border-[#1f1f1f]">
           <div className="flex items-center gap-1 flex-1">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.key}
                 onClick={() => setCategoryFilter(cat.key)}
-                className={`text-[12px] px-3 py-1 rounded-md transition-colors cursor-pointer ${
-                  categoryFilter === cat.key
-                    ? "bg-[#1a1a1a] text-[#ededed] border border-[#2a2a2a]"
-                    : "text-[#555] hover:text-[#a1a1a1]"
-                }`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  border: "none",
+                  transition: "all 0.1s",
+                  backgroundColor: categoryFilter === cat.key ? "#1a1a1a" : "transparent",
+                  color: categoryFilter === cat.key ? "#ededed" : "#555",
+                  outline: categoryFilter === cat.key ? "1px solid #2a2a2a" : "none",
+                }}
               >
+                {cat.key !== "all" && CATEGORY_COLORS[cat.key] && (
+                  <span style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    backgroundColor: CATEGORY_COLORS[cat.key].text,
+                    flexShrink: 0,
+                  }} />
+                )}
                 {cat.label}
+                <span style={{ fontSize: 10, color: "#444", marginLeft: 2 }}>
+                  {cat.key === "all" ? docs.length : docs.filter(d => d.category === cat.key).length}
+                </span>
               </button>
             ))}
           </div>
+          <span className="text-[11px] text-[#444] whitespace-nowrap">
+            {filtered.length} of {docs.length} docs
+          </span>
           <input
             type="text"
             value={search}
@@ -236,43 +289,51 @@ export default function DocsClient({ docs }: Props) {
           </button>
         </div>
 
-        {/* Doc count */}
-        <div className="px-6 pt-3 pb-1">
-          <span className="text-[11px] text-[#555]">{filtered.length} documents</span>
-        </div>
-
         {/* Document list */}
-        <div className="px-6 pb-6 space-y-2">
+        <div style={{ flex: 1, overflowY: "auto" }}>
           {filtered.length === 0 ? (
-            <div className="text-[13px] text-[#444] py-8 text-center">No documents found.</div>
+            <div style={{ padding: "48px 24px", textAlign: "center", color: "#444", fontSize: 12 }}>
+              No documents found
+            </div>
           ) : (
-            filtered.map((d) => (
-              <div
-                key={d.id}
-                onClick={() => setSelectedDoc(d)}
-                className="rounded-lg border border-[#1f1f1f] bg-[#111111] px-5 py-4 cursor-pointer hover:border-[#2a2a2a] transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-medium text-[#ededed]">{d.title}</div>
-                    <div className="text-[12px] text-[#555] mt-1 line-clamp-2">
-                      {d.content.replace(/[#*`]/g, "").trim().slice(0, 120)}...
+            <div style={{ borderRadius: 8, border: "1px solid #1f1f1f", margin: "16px 24px 24px" }}>
+              {filtered.map((d) => (
+                <div
+                  key={d.id}
+                  onClick={() => setSelectedDoc(d)}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 12,
+                    padding: "10px 16px",
+                    borderBottom: "1px solid #1a1a1a",
+                    cursor: "pointer",
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#111111")}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                >
+                  {/* Doc icon */}
+                  <span style={{ color: "#444", fontSize: 13, marginTop: 2, flexShrink: 0 }}>◧</span>
+
+                  {/* Main content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: "#ededed" }}>{d.title}</span>
+                      <CategoryBadge category={d.category} />
+                    </div>
+                    <div style={{ fontSize: 11, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {d.content.replace(/[#*`\n]/g, " ").trim().slice(0, 100)}
                     </div>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-[#1a1a1a] border border-[#2a2a2a] text-[#555] whitespace-nowrap flex-shrink-0">
-                    {d.category}
-                  </span>
+
+                  {/* Date */}
+                  <div style={{ fontSize: 11, color: "#444", flexShrink: 0, marginTop: 2 }}>
+                    {new Date(d.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </div>
                 </div>
-                <div className="text-[11px] text-[#444] mt-3">
-                  Updated{" "}
-                  {new Date(d.updated_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </main>
@@ -292,9 +353,7 @@ export default function DocsClient({ docs }: Props) {
                   {selectedDoc.title}
                 </div>
                 <div className="mt-1">
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]">
-                    {selectedDoc.category}
-                  </span>
+                  <CategoryBadge category={selectedDoc.category} />
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -334,7 +393,6 @@ export default function DocsClient({ docs }: Props) {
         </>
       )}
 
-      {/* New Document slide-over */}
       {/* Edit Document Slide-over */}
       {editingDoc && (
         <>
@@ -344,7 +402,7 @@ export default function DocsClient({ docs }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="text-[16px] font-semibold text-[#ededed] truncate">{editTitle || editingDoc.title}</div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]">{editCategory}</span>
+                  <CategoryBadge category={editCategory} />
                   <span className="text-[11px] text-[#555]">Editing</span>
                 </div>
               </div>
@@ -384,6 +442,7 @@ export default function DocsClient({ docs }: Props) {
         </>
       )}
 
+      {/* New Document slide-over */}
       {showNewDoc && (
         <>
           <div
