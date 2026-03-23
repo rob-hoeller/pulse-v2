@@ -36,6 +36,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
   technical: { bg: "#1f1a2e", text: "#a855f7", border: "#2a1f3f" },
   processes: { bg: "#2a1a1a", text: "#ff6b6b", border: "#3f1f1f" },
   general:   { bg: "#1a1a1a", text: "#666",    border: "#2a2a2a" },
+  "agent-os": { bg: "#1a2a2a", text: "#00b4d8", border: "#1f3f3f" },
 };
 
 function CategoryBadge({ category }: { category: string }) {
