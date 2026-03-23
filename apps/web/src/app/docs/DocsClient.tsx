@@ -132,6 +132,7 @@ function renderMarkdown(content: string): string {
 }
 
 export default function DocsClient({ docs }: Props) {
+  const [localDocs, setLocalDocs] = useState(docs);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<Doc | null>(null);
@@ -149,7 +150,7 @@ export default function DocsClient({ docs }: Props) {
   const [editContent, setEditContent] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
-  const filtered = docs
+  const filtered = localDocs
     .filter((d) => categoryFilter === "all" || d.category === categoryFilter)
     .filter((d) => {
       if (!search) return true;
@@ -177,10 +178,18 @@ export default function DocsClient({ docs }: Props) {
         sort_order: 99,
       }]);
       if (!error) {
+        // Re-fetch docs from Supabase to get the new doc with its id
+        const supabase2 = getSupabase();
+        const { data: freshDocs } = await supabase2
+          .from("docs")
+          .select("id, slug, title, category, content, sort_order, updated_at")
+          .eq("is_published", true)
+          .order("category")
+          .order("sort_order");
+        if (freshDocs) setLocalDocs(freshDocs as typeof docs);
         setShowNewDoc(false);
         setNewTitle("");
         setNewContent("# Document Title\n\nWrite your content here...");
-        window.location.reload();
       } else {
         console.error("Create error:", error);
       }
@@ -201,9 +210,11 @@ export default function DocsClient({ docs }: Props) {
         .update({ title: editTitle, category: editCategory, content: editContent, updated_at: new Date().toISOString() })
         .eq("id", editingDoc.id);
       if (!error) {
+        // Update local state immediately — no page reload needed
+        const updated = { ...editingDoc!, title: editTitle, category: editCategory, content: editContent, updated_at: new Date().toISOString() };
+        setLocalDocs(prev => prev.map(d => d.id === editingDoc!.id ? updated : d));
+        setSelectedDoc(updated);
         setEditingDoc(null);
-        setSelectedDoc(null);
-        window.location.reload();
       } else {
         console.error("Edit error:", error);
       }
@@ -232,7 +243,7 @@ export default function DocsClient({ docs }: Props) {
         {/* Top bar */}
         <div className="sticky top-0 z-10 bg-[#0a0a0a]/80 backdrop-blur-sm border-b border-[#1f1f1f] px-6 py-3 flex items-center justify-between">
           <h1 className="text-[14px] font-semibold text-[#ededed]">Docs</h1>
-          <span className="text-[11px] text-[#555]">{docs.length} documents</span>
+          <span className="text-[11px] text-[#555]">{localDocs.length} documents</span>
         </div>
 
         {/* Filter tabs + search bar */}
@@ -268,13 +279,13 @@ export default function DocsClient({ docs }: Props) {
                 )}
                 {cat.label}
                 <span style={{ fontSize: 10, color: "#444", marginLeft: 2 }}>
-                  {cat.key === "all" ? docs.length : docs.filter(d => d.category === cat.key).length}
+                  {cat.key === "all" ? docs.length : localDocs.filter(d => d.category === cat.key).length}
                 </span>
               </button>
             ))}
           </div>
           <span className="text-[11px] text-[#444] whitespace-nowrap">
-            {filtered.length} of {docs.length} docs
+            {filtered.length} of {localDocs.length} docs
           </span>
           <input
             type="text"
