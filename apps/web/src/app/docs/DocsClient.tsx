@@ -1,5 +1,6 @@
 "use client";
 
+import { createClient } from "@supabase/supabase-js";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -30,7 +31,7 @@ const navItems = [
   { icon: "◉", label: "Notifications", href: "#"            },
   { icon: "⚙", label: "Settings",      href: "#"            },
   { icon: "◈", label: "Status",        href: "/status"      },
-  { icon: "◧", label: "Docs",          href: "/docs"        },
+  { icon: "📄", label: "Docs",          href: "/docs"        },
 ];
 
 const CATEGORIES = [
@@ -140,27 +141,33 @@ export default function DocsClient({ docs }: Props) {
       return d.title.toLowerCase().includes(q) || d.content.toLowerCase().includes(q);
     });
 
+  function getSupabase() {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+    );
+  }
+
   async function handleCreateDoc() {
     if (!newTitle.trim()) return;
     setSaving(true);
     try {
       const slug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      const res = await fetch("/api/docs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug: `${slug}-${Date.now()}`,
-          title: newTitle,
-          category: newCategory,
-          content: newContent,
-          sort_order: 99,
-        }),
-      });
-      if (res.ok) {
+      const supabase = getSupabase();
+      const { error } = await supabase.from("docs").insert([{
+        slug: `${slug}-${Date.now()}`,
+        title: newTitle,
+        category: newCategory,
+        content: newContent,
+        sort_order: 99,
+      }]);
+      if (!error) {
         setShowNewDoc(false);
         setNewTitle("");
         setNewContent("# Document Title\n\nWrite your content here...");
         window.location.reload();
+      } else {
+        console.error("Create error:", error);
       }
     } catch (e) {
       console.error(e);
@@ -168,20 +175,21 @@ export default function DocsClient({ docs }: Props) {
       setSaving(false);
     }
   }
-
   async function handleEditDoc() {
     if (!editingDoc || !editTitle.trim()) return;
     setEditSaving(true);
     try {
-      const res = await fetch(`/api/docs/${editingDoc.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: editTitle, category: editCategory, content: editContent }),
-      });
-      if (res.ok) {
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from("docs")
+        .update({ title: editTitle, category: editCategory, content: editContent, updated_at: new Date().toISOString() })
+        .eq("id", editingDoc.id);
+      if (!error) {
         setEditingDoc(null);
         setSelectedDoc(null);
         window.location.reload();
+      } else {
+        console.error("Edit error:", error);
       }
     } catch (e) {
       console.error(e);
