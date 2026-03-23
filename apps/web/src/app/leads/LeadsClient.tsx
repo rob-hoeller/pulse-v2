@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Sidebar from "@/components/Sidebar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,20 +40,6 @@ interface Props {
 }
 
 // ─── Nav ──────────────────────────────────────────────────────────────────────
-
-const navItems = [
-  { icon: "▤", label: "Overview",      href: "/"            },
-  { icon: "⊡", label: "Agents",        href: "#"            },
-  { icon: "✓", label: "Tasks",         href: "#"            },
-  { icon: "⊕", label: "Leads",         href: "/leads"       },
-  { icon: "⌂", label: "Communities",   href: "/communities" },
-  { icon: "◫", label: "Lots",          href: "/lots"        },
-    { icon: "⊞", label: "Divisions",     href: "/divisions"   },
-  { icon: "◷", label: "Calendar",      href: "#"            },
-  { icon: "◉", label: "Notifications", href: "#"            },
-  { icon: "⚙", label: "Settings",      href: "#"            },
-  { icon: "◈", label: "Status",        href: "/status"      },
-];
 
 // ─── Stage config ─────────────────────────────────────────────────────────────
 
@@ -828,96 +815,7 @@ export default function LeadsClient({ leads, communities }: Props) {
   return (
     <div style={{ display: "flex", height: "100vh", backgroundColor: "#0a0a0a", color: "#ededed" }}>
       {/* ── Sidebar ── */}
-      <aside
-        style={{
-          width: 220,
-          backgroundColor: "#0a0a0a",
-          borderRight: "1px solid #1f1f1f",
-          height: "100vh",
-          position: "sticky",
-          top: 0,
-          display: "flex",
-          flexDirection: "column",
-          flexShrink: 0,
-        }}
-      >
-        {/* Brand */}
-        <div
-          style={{
-            padding: "20px 16px 16px",
-            borderBottom: "1px solid #1a1a1a",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 18 }}>🦞</span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#ededed", lineHeight: 1.2 }}>
-                Pulse v2
-              </div>
-              <div style={{ fontSize: 10, color: "#444" }}>HBx AI Factory</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
-          {navItems.map((item) => {
-            const isActive = item.href === "/leads";
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "7px 16px",
-                  fontSize: 12,
-                  color: isActive ? "#ededed" : "#555",
-                  backgroundColor: isActive ? "#111111" : "transparent",
-                  textDecoration: "none",
-                  transition: "color 0.15s, background-color 0.15s",
-                  borderLeft: isActive ? "2px solid #ededed" : "2px solid transparent",
-                }}
-              >
-                <span style={{ fontSize: 14, width: 18, textAlign: "center" }}>{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div
-          style={{
-            padding: "12px 16px",
-            borderTop: "1px solid #1a1a1a",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <div style={{ position: "relative" }}>
-            <span style={{ fontSize: 20 }}>🦞</span>
-            <span
-              style={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                width: 8,
-                height: 8,
-                backgroundColor: "#00c853",
-                borderRadius: "50%",
-                border: "1.5px solid #0a0a0a",
-              }}
-            />
-          </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: "#ededed" }}>Schellie</div>
-            <div style={{ fontSize: 10, color: "#444" }}>Orchestrator · Online</div>
-          </div>
-        </div>
-      </aside>
+      <Sidebar activeHref="/leads" />
 
       {/* ── Main ── */}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
