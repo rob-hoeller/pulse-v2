@@ -94,9 +94,13 @@ export default async function DivisionsPage() {
       state_codes:      d.state_codes ?? [],
       is_active:        d.is_active,
       community_count:  comms.length,
-      active_count:     comms.filter((c: CommunityRef) => c.status === "active").length,
+      // Active = active | now-selling | last-chance
+      active_count: comms.filter((c: CommunityRef) =>
+        ["active", "now-selling", "last-chance"].includes(c.status ?? "")
+      ).length,
+      // Coming Soon = not active, still being marketed
       coming_soon_count: comms.filter((c: CommunityRef) => c.status === "coming-soon").length,
-      sold_out_count:   comms.filter((c: CommunityRef) => c.status === "sold-out").length,
+      sold_out_count: comms.filter((c: CommunityRef) => c.status === "sold-out").length,
       price_min:        prices.length ? Math.min(...prices) : null,
       price_max:        prices.length ? Math.max(...prices) : null,
     };
