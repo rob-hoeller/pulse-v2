@@ -569,7 +569,7 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
                     {/* Plan image */}
                     {p.featured_image_url ? (
                       <div
-                        style={{ height: 130, overflow: "hidden", backgroundColor: "#111" }}
+                        style={{ height: 180, overflow: "hidden", backgroundColor: "#111" }}
                       >
                         <img
                           src={p.featured_image_url}
@@ -578,6 +578,7 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
                             width: "100%",
                             height: "100%",
                             objectFit: "cover",
+                            objectPosition: "center top",
                             display: "block",
                           }}
                           loading="lazy"
@@ -586,7 +587,7 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
                     ) : (
                       <div
                         style={{
-                          height: 130,
+                          height: 180,
                           backgroundColor: "#111",
                           display: "flex",
                           alignItems: "center",
