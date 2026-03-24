@@ -945,7 +945,7 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
                   )}
                   {selectedPlan.page_url && (
                     <a
-                      href={`https://schellbrothers.com${selectedPlan.page_url}`}
+                      href={`https://schellbrothers.com${selectedPlan.page_url}#plan`}
                       target="_blank"
                       rel="noreferrer"
                       style={{
@@ -1022,7 +1022,7 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
                       )}
                       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                         {selectedPlan.page_url && (
-                          <a href={`https://schellbrothers.com${selectedPlan.page_url}`}
+                          <a href={`https://schellbrothers.com${selectedPlan.page_url}#plan`}
                             target="_blank" rel="noreferrer"
                             style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
                               padding: "7px 0", borderRadius: 6, fontSize: 11, fontWeight: 500,
