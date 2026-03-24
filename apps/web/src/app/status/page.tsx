@@ -23,10 +23,11 @@ const statusMap: Record<SystemStatus, { label: string; dot: string; text: string
 };
 
 const SYNC_SCHEDULE: Record<string, { label: string; times: string[]; freq: string }> = {
-  "lots":        { label: "Lots Explorer", times: ["8:00 AM", "1:00 PM", "6:30 PM"], freq: "3× daily" },
-  "model_homes": { label: "Model Homes",   times: ["8:00 AM", "6:30 PM"],            freq: "2× daily" },
-  "zillow":      { label: "Zillow Feed",   times: ["2:00 AM"],                        freq: "Nightly"  },
-  "floor_plans": { label: "Floor Plans",   times: ["2:00 AM"],                        freq: "Nightly"  },
+  "lots":           { label: "Lots Explorer",          times: ["8:00 AM", "1:00 PM", "6:30 PM"], freq: "3× daily" },
+  "model_homes":    { label: "Model Homes",             times: ["8:00 AM", "6:30 PM"],            freq: "2× daily" },
+  "floor_plans":    { label: "Floor Plans (Heartbeat)", times: ["8:00 AM", "1:00 PM", "6:30 PM"], freq: "3× daily" },
+  "zillow":         { label: "Community Enrichment",   times: ["2:00 AM"],                        freq: "Nightly"  },
+  "communities":    { label: "Community Data",          times: ["2:00 AM"],                        freq: "Nightly"  },
 };
 
 function nextRun(times: string[]): string {
