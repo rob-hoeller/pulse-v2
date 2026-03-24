@@ -981,38 +981,65 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
               {/* Panel body */}
               <div style={{ padding: 20, display: "flex", flexDirection: "column", flex: 1 }}>
 
-                {/* ── Elevation Gallery ── */}
+                                {/* ── Elevation Gallery 3×2 grid ── */}
                 {(() => {
                   const elevs = selectedPlan.elevations
                     ? (typeof selectedPlan.elevations === "string"
                         ? JSON.parse(selectedPlan.elevations)
-                        : selectedPlan.elevations) as Array<{ kova_name: string; image_path: string; is_thumbnail: number | null }>
+                        : selectedPlan.elevations) as Array<{kova_name: string; image_path: string; is_thumbnail: number | null}>
                     : [];
-                  if (elevs.length === 0) return null;
                   return (
                     <div style={{ marginBottom: 16 }}>
                       <div style={{ fontSize: 10, fontWeight: 600, color: "#444", textTransform: "uppercase",
-                        letterSpacing: "0.07em", marginBottom: 8 }}>Elevations</div>
-                      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
-                        {elevs.map((e, i) => (
-                          <div key={i} style={{ flexShrink: 0, width: 140, borderRadius: 6,
-                            overflow: "hidden", border: "1px solid #2a2a2a", backgroundColor: "#0d0d0d",
-                            cursor: "pointer" }}
-                            onClick={() => window.open(s3ToHttps(e.image_path), "_blank")}
-                            title={e.kova_name}>
-                            <img
-                              src={s3ToHttps(e.image_path)}
-                              alt={e.kova_name}
-                              style={{ width: "100%", height: 90, objectFit: "contain",
-                                backgroundColor: "#0a0a0a", display: "block" }}
-                              loading="lazy"
-                            />
-                            <div style={{ padding: "4px 6px", fontSize: 9, color: "#555", textAlign: "center",
-                              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {e.kova_name}
+                        letterSpacing: "0.07em", marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid #1a1a1a" }}>
+                        Elevations {elevs.length > 0 ? `(${elevs.length} styles)` : ""}
+                      </div>
+                      {elevs.length > 0 ? (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                          {elevs.map((e, i) => (
+                            <div key={i}
+                              onClick={() => window.open(s3ToHttps(e.image_path), "_blank")}
+                              style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #1f1f1f",
+                                backgroundColor: "#0d0d0d", cursor: "pointer" }}
+                              title={e.kova_name}>
+                              <img
+                                src={s3ToHttps(e.image_path)}
+                                alt={e.kova_name}
+                                style={{ width: "100%", height: 95, objectFit: "contain",
+                                  backgroundColor: "#0a0a0a", display: "block" }}
+                                loading="lazy"
+                              />
+                              <div style={{ padding: "3px 6px", fontSize: 9, color: "#555",
+                                textAlign: "center", whiteSpace: "nowrap", overflow: "hidden",
+                                textOverflow: "ellipsis" }}>
+                                {e.kova_name.replace("Schell Style ", "Style ")}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: "#444" }}>No elevation images</div>
+                      )}
+                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                        {selectedPlan.page_url && (
+                          <a href={`https://schellbrothers.com${selectedPlan.page_url}`}
+                            target="_blank" rel="noreferrer"
+                            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                              padding: "7px 0", borderRadius: 6, fontSize: 11, fontWeight: 500,
+                              backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
+                              color: "#a1a1a1", textDecoration: "none" }}>
+                            ◱ View Floor Plans
+                          </a>
+                        )}
+                        {selectedPlan.pdf_url && (
+                          <a href={selectedPlan.pdf_url} target="_blank" rel="noreferrer"
+                            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                              padding: "7px 0", borderRadius: 6, fontSize: 11, fontWeight: 500,
+                              backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
+                              color: "#a1a1a1", textDecoration: "none" }}>
+                            ⬇ Download PDF
+                          </a>
+                        )}
                       </div>
                     </div>
                   );
