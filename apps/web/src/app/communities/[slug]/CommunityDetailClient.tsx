@@ -155,11 +155,15 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
       label: "Available Lots",
       value: lotStats.available.toString(),
       color: "#00c853",
+      clickable: true,
+      lotFilter: "Available Homesite",
     },
     {
       label: "Total Lots",
       value: lotStats.total.toString(),
       color: "#666",
+      clickable: true,
+      lotFilter: "all",
     },
     {
       label: "Floor Plans",
@@ -175,6 +179,8 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
       label: "Sold",
       value: lotStats.sold.toString(),
       color: "#555",
+      clickable: true,
+      lotFilter: "Sold",
     },
   ];
 
