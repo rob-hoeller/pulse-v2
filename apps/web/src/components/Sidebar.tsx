@@ -7,7 +7,7 @@ import Link from "next/link";
 export const NAV_ITEMS = [
   { icon: "▤", label: "Overview",      href: "/"            },
   { icon: "⊡", label: "Agents",        href: "#"            },
-  { icon: "✓", label: "Tasks",         href: "#"            },
+  { icon: "✓", label: "Tasks",         href: "/tasks"       },
   { icon: "⊕", label: "Leads",         href: "/leads"       },
   { icon: "⌂", label: "Communities",   href: "/communities" },
   { icon: "◫", label: "Lots",          href: "/lots"        },
