@@ -1084,6 +1084,96 @@ export default function CommunityDetailClient({ community, plans, lots }: Props)
 
           </div>
         </div>
+
+        {/* Map + Floor Plan Cards — full width below the charts */}
+        {(community.lot_map_url || plans.some(p => p.featured_image_url)) && (
+          <div style={{ padding: "0 24px 24px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: community.lot_map_url ? "1fr 1fr" : "1fr", gap: 20 }}>
+
+              {/* LEFT: LotWorks embedded map */}
+              {community.lot_map_url && (
+                <div style={{ borderRadius: 8, border: "1px solid #1f1f1f", overflow: "hidden" }}>
+                  <div style={{ padding: "10px 14px", borderBottom: "1px solid #1f1f1f", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 11, fontWeight: 500, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>Site Map & Lots</span>
+                    <a href={community.lot_map_url} target="_blank" rel="noreferrer"
+                      style={{ fontSize: 11, color: "#555", textDecoration: "none" }}>Open Full Map ↗</a>
+                  </div>
+                  <iframe
+                    src={community.lot_map_url}
+                    style={{ width: "100%", height: 480, border: "none", display: "block" }}
+                    title="Lot Map"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+
+              {/* RIGHT: Floor Plan Image Cards */}
+              {plans.some(p => p.featured_image_url) && (
+                <div style={{ borderRadius: 8, border: "1px solid #1f1f1f", overflow: "hidden" }}>
+                  <div style={{ padding: "10px 14px", borderBottom: "1px solid #1f1f1f", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 11, fontWeight: 500, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>Floor Plans</span>
+                    <span style={{ fontSize: 11, color: "#444" }}>{plans.length} plans</span>
+                  </div>
+                  <div style={{ height: 480, overflowY: "auto", padding: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      {plans.map(p => (
+                        <div
+                          key={p.id}
+                          style={{ borderRadius: 6, border: "1px solid #1f1f1f", backgroundColor: "#0d0d0d", overflow: "hidden", cursor: "pointer", transition: "border-color 0.15s" }}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = "#2a2a2a")}
+                          onMouseLeave={e => (e.currentTarget.style.borderColor = "#1f1f1f")}
+                          onClick={() => p.virtual_tour_url ? window.open(p.virtual_tour_url, "_blank") : p.page_url ? window.open(`https://schellbrothers.com${p.page_url}`, "_blank") : null}
+                        >
+                          {/* Elevation image */}
+                          {p.featured_image_url ? (
+                            <div style={{ height: 140, overflow: "hidden", backgroundColor: "#111" }}>
+                              <img
+                                src={p.featured_image_url}
+                                alt={p.plan_name}
+                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                loading="lazy"
+                              />
+                            </div>
+                          ) : (
+                            <div style={{ height: 140, backgroundColor: "#111", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <span style={{ color: "#333", fontSize: 24 }}>⌂</span>
+                            </div>
+                          )}
+                          {/* Plan info */}
+                          <div style={{ padding: "8px 10px" }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#ededed", marginBottom: 3 }}>{p.plan_name}</div>
+                            <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>
+                              {p.min_bedrooms === p.max_bedrooms ? p.min_bedrooms : `${p.min_bedrooms}–${p.max_bedrooms}`} bd
+                              {" · "}
+                              {p.min_bathrooms === p.max_bathrooms ? p.min_bathrooms : `${p.min_bathrooms}–${p.max_bathrooms}`} ba
+                              {p.min_heated_sqft && ` · ${p.min_heated_sqft?.toLocaleString()}+ sf`}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#00c853" }}>
+                                {p.net_price ? `$${p.net_price.toLocaleString()}` : "—"}
+                              </span>
+                              {(p.style_filters ?? []).length > 0 && (
+                                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 3,
+                                  backgroundColor: "#1a1f2e", color: "#0070f3", border: "1px solid #1a2a3f" }}>
+                                  {(p.style_filters ?? [])[0]}
+                                </span>
+                              )}
+                            </div>
+                            {p.incentive_amount && p.incentive_amount > 0 && (
+                              <div style={{ fontSize: 10, color: "#444", marginTop: 2 }}>
+                                Base ${p.base_price?.toLocaleString()} − ${p.incentive_amount?.toLocaleString()} incentive
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
