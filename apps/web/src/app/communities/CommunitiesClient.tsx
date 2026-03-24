@@ -337,7 +337,7 @@ function CommunitiesInner(props: Props) {
         return (
           <div
             key={c.id}
-            onClick={() => setSelected(c)}
+            onClick={() => c.slug ? window.location.href = `/communities/${c.slug}` : setSelected(c)}
             style={{
               background: "#111", border: "1px solid #1f1f1f", borderRadius: 12,
               padding: 12, cursor: "pointer", transition: "border-color 0.15s",
@@ -491,7 +491,7 @@ function CommunitiesInner(props: Props) {
           {rows.map(c => (
             <tr
               key={c.id}
-              onClick={() => setSelected(c)}
+              onClick={() => c.slug ? window.location.href = `/communities/${c.slug}` : setSelected(c)}
               style={{ cursor: "pointer" }}
               onMouseEnter={e => (e.currentTarget.style.background = "#161616")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
@@ -578,6 +578,17 @@ function CommunitiesInner(props: Props) {
               )}
             </h2>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {selected?.slug && (
+              <a
+                href={`/communities/${selected.slug}`}
+                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
+                  backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
+                  color: "#a1a1a1", textDecoration: "none", whiteSpace: "nowrap" }}
+              >
+                View Dashboard →
+              </a>
+            )}
           <button
             onClick={() => setSelected(null)}
             style={{
@@ -588,6 +599,7 @@ function CommunitiesInner(props: Props) {
           >
             ×
           </button>
+          </div>
         </div>
 
         {/* Body */}
