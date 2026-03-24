@@ -55,11 +55,25 @@ export default function TasksPage() {
   async function handleCreate() {
     if (!newName.trim()) return;
     setCreating(true);
-    await fetch("/api/tasks", {
+    const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newName, description: newDesc || null, task_type: newType }),
     });
+    const task = await res.json();
+    // Notify Schellie — triggers automatic planning workflow
+    if (task?.id) {
+      fetch("/api/tasks/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_id: task.id,
+          task_name: newName,
+          task_type: newType,
+          description: newDesc || null,
+        }),
+      }).catch(() => {}); // fire-and-forget
+    }
     setNewName(""); setNewDesc(""); setNewType("feature");
     setShowNew(false); setCreating(false);
     fetchTasks();
