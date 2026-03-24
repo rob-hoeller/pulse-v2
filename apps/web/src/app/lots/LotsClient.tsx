@@ -33,6 +33,7 @@ interface Lot {
   is_hide_from_marketing: boolean;
   address: string | null;
   lot_premium: number;
+  can_basement: boolean | null;
 }
 
 interface Props {
@@ -108,6 +109,7 @@ export default function LotsClient({ lots, divisions, communities }: Props) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [constructionFilter, setConstructionFilter] = useState("all");
   const [availableOnly, setAvailableOnly] = useState(false);
+  const [basementOnly, setBasementOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState("division_raw");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -514,6 +516,14 @@ export default function LotsClient({ lots, divisions, communities }: Props) {
                       <td style={tdStyle}>
                         {lot.is_available ? (
                           <span style={{ color: "#00c853", fontWeight: 500 }}>Yes</span>
+                        ) : (
+                          <span style={{ color: "#333" }}>—</span>
+                        )}
+                      </td>
+                      {/* Basement */}
+                      <td style={tdStyle}>
+                        {lot.can_basement === true ? (
+                          <span style={{ color: "#a855f7", fontWeight: 500 }}>✓</span>
                         ) : (
                           <span style={{ color: "#333" }}>—</span>
                         )}
