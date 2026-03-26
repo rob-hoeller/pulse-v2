@@ -501,25 +501,7 @@ export default function LotsClient({ lots, divisions, communities }: Props) {
 
         {/* Top bar */}
         <div className="sticky top-0 z-10 bg-[#0a0a0a]/80 backdrop-blur-sm border-b border-[#1f1f1f] px-6 py-3 flex items-center justify-between">
-          {/* Title + count */}
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <h1 style={{ color: "#ededed", fontSize: "16px", fontWeight: 600, margin: 0 }}>
-              Lots
-            </h1>
-            <span
-              style={{
-                backgroundColor: "#1a1a1a",
-                color: "#666",
-                border: "1px solid #2a2a2a",
-                borderRadius: "12px",
-                padding: "2px 9px",
-                fontSize: "12px",
-                fontWeight: 500,
-              }}
-            >
-              {rows.length}
-            </span>
-          </div>
+          <h1 className="text-[14px] font-semibold text-[#ededed]">Lots</h1>
 
           {/* Controls */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -542,25 +524,10 @@ export default function LotsClient({ lots, divisions, communities }: Props) {
               }}
             />
 
-            {/* Division filter */}
-            <FilterSelect value={divisionFilter} onChange={setDivisionFilter}>
-              <option value="all">All Divisions</option>
-              {divisions.map((d) => (
-                <option key={d.id} value={d.slug}>
-                  {DIV_LABELS[d.slug] ?? d.name}
-                </option>
-              ))}
-            </FilterSelect>
+            
 
             {/* Community filter */}
-            <FilterSelect value={communityFilter} onChange={setCommunityFilter}>
-              <option value="all">All Communities</option>
-              {filteredCommunities.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </FilterSelect>
+            
           </div>
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
