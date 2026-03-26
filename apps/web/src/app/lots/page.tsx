@@ -36,10 +36,6 @@ export default async function LotsPage() {
   const lots = allLots;
 
   return (
-    <LotsClient
-      lots={lots ?? []}
-      divisions={divisions ?? []}
-      communities={communities ?? []}
-    />
+    <LotsClient lots={lots ?? []} />
   );
 }
