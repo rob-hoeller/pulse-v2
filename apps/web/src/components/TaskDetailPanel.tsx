@@ -20,6 +20,8 @@ export default function TaskDetailPanel({ taskId, onClose }: Props) {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "docs" | "history">("overview");
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!taskId) { setTask(null); return; }
@@ -37,6 +39,31 @@ export default function TaskDetailPanel({ taskId, onClose }: Props) {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [taskId]);
+
+  async function submitComment() {
+    if (!task || !comment.trim()) return;
+    setSubmitting(true);
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_XGwL4p2FD0Af58_sidErwg_In1FU_9o"
+    );
+    const prevStatus = task.status;
+    // Move back to needs_review with the comment
+    await supabase.from("hbx_tasks").update({ status: "needs_review" }).eq("id", task.id);
+    await supabase.from("hbx_task_history").insert([{
+      task_id: task.id, previous_status: prevStatus,
+      new_status: "needs_review", changed_by: "lance",
+      note: `Revision requested: ${comment.trim()}`,
+    }]);
+    // Refresh
+    const { data } = await supabase.from("hbx_tasks").select("*").eq("id", task.id).single();
+    const { data: documents } = await supabase.from("hbx_task_documents").select("*").eq("task_id", task.id).order("created_at");
+    const { data: history } = await supabase.from("hbx_task_history").select("*").eq("task_id", task.id).order("changed_at");
+    if (data) setTask({ ...data, documents: documents ?? [], history: history ?? [] });
+    setComment("");
+    setSubmitting(false);
+    setActiveTab("history");
+  }
 
   async function approveTask() {
     if (!task) return;
@@ -109,13 +136,32 @@ export default function TaskDetailPanel({ taskId, onClose }: Props) {
           {!task && !loading && <div className="text-[12px] text-[#555]">Task not found.</div>}
           {task && activeTab === "overview" && (
             <div className="space-y-5">
-              {task.status === "needs_review" && (
-                <div className="mb-4">
+              {(task.status === "needs_review" || task.status === "preview") && (
+                <div className="mb-4 space-y-2">
                   <button onClick={approveTask}
                     className="w-full flex items-center justify-center gap-2 bg-[#00843d] text-white rounded-lg py-2.5 text-[13px] font-semibold hover:bg-[#006630] transition-colors">
-                    ✓ Approve — Send to Build
+                    ✓ {task.status === "preview" ? "Approve — Merge to Main" : "Approve — Send to Build"}
                   </button>
-                  <div className="text-[10px] text-[#555] text-center mt-1.5">Moves task to Approved status</div>
+                  <div className="text-[10px] text-[#555] text-center">
+                    {task.status === "preview" ? "Merges PR and marks task completed" : "Moves task to Approved status"}
+                  </div>
+                  {/* Comment / Revision request */}
+                  <div style={{ marginTop: 8, borderTop: "1px solid #1f1f1f", paddingTop: 8 }}>
+                    <div className="text-[10px] text-[#555] uppercase tracking-widest mb-2">Request Revision</div>
+                    <textarea
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                      placeholder="Describe what needs to change before approving..."
+                      rows={3}
+                      className="w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-3 py-2 text-[12px] text-[#a1a1a1] placeholder:text-[#444] outline-none focus:border-[#3a3a3a] resize-none"
+                    />
+                    <button
+                      onClick={submitComment}
+                      disabled={!comment.trim() || submitting}
+                      className="mt-2 w-full flex items-center justify-center bg-[#2a1a1a] border border-[#3f1f1f] text-[#ff6b6b] rounded-lg py-2 text-[12px] font-medium hover:bg-[#3f1f1f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                      {submitting ? "Sending..." : "↩ Request Revision"}
+                    </button>
+                  </div>
                 </div>
               )}
               {task.description && (
