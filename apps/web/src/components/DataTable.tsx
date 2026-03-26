@@ -349,13 +349,17 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
                     else e.currentTarget.style.backgroundColor = "#1a1a2e";
                   }}
                 >
-                  <input
-                    type="checkbox"
+                  <div
                     data-dropdown
-                    checked={activeFilters.includes(val)}
-                    onChange={() => toggleFilter(colKey, val)}
-                    style={{ accentColor: "#0070f3", cursor: "pointer" }}
-                  />
+                    onClick={(e) => { e.stopPropagation(); toggleFilter(colKey, val); }}
+                    style={{
+                      width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                      border: `1px solid ${activeFilters.includes(val) ? "#0070f3" : "#444"}`,
+                      backgroundColor: activeFilters.includes(val) ? "#1a3a5c" : "#2a2a2a",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      cursor: "pointer", fontSize: 9, color: "#0070f3", lineHeight: "1",
+                    }}
+                  >{activeFilters.includes(val) ? "✓" : ""}</div>
                   <span data-dropdown>{val}</span>
                 </label>
               ))

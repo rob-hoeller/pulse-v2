@@ -398,26 +398,12 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
         flexShrink: 0,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <h1 style={{ color: "#ededed", fontSize: 14, fontWeight: 600, margin: 0 }}>
-          Floor Plans
-        </h1>
-        <span
-          style={{
-            background: "#1a1a1a",
-            border: "1px solid #2a2a2a",
-            color: "#666",
-            borderRadius: 12,
-            fontSize: 11,
-            fontWeight: 600,
-            padding: "1px 8px",
-          }}
-        >
-          {rows.length}
-        </span>
-      </div>
+      <h1 style={{ color: "#ededed", fontSize: 14, fontWeight: 600, margin: 0 }}>Floor Plans</h1>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#1a1a1a", borderRadius: 8, padding: 3, border: "1px solid #2a2a2a" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="text" placeholder="Search plans..." value={search} onChange={(e) => setSearch(e.target.value)}
+          style={{ background: "#111", border: "1px solid #2a2a2a", color: "#a1a1a1", borderRadius: 6, padding: "5px 12px", fontSize: 12, outline: "none", width: 180 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#1a1a1a", borderRadius: 8, padding: 3, border: "1px solid #2a2a2a" }}>
         {(["card", "table"] as const).map((v, i) => (
           <button
             key={v}
@@ -436,6 +422,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
             {i === 0 ? "⊞" : "≡"}
           </button>
         ))}
+        </div>
       </div>
     </div>
   );
@@ -964,7 +951,6 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
         {topBar}
         {/* Stats bar shown in card view; DataTable renders its own ribbon in table view */}
         {view === "card" && statsBar}
-        {filtersBar}
         <div style={{ flex: 1, overflow: "auto" }}>
           {view === "table" ? tableView : cardView}
         </div>
