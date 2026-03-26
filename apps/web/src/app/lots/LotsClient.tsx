@@ -502,9 +502,9 @@ export default function LotsClient({ lots, divisions, communities }: Props) {
         {/* Top bar */}
         <div className="sticky top-0 z-10 bg-[#0a0a0a]/80 backdrop-blur-sm border-b border-[#1f1f1f] px-6 py-3 flex items-center justify-between">
           <h1 className="text-[14px] font-semibold text-[#ededed]">Lots</h1>
-
-          {/* Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "auto" }}>
+          <div style={{ flex: 1 }} />
+          {/* Controls — right justified */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {/* Search */}
             <input
               type="text"
@@ -530,32 +530,27 @@ export default function LotsClient({ lots, divisions, communities }: Props) {
             
           </div>
 
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 11, color: "#555" }}>
-              {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, rows.length)} of {rows.length}
-            </span>
-            <select
-              value={pageSize}
-              onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              style={{ background: "#111", border: "1px solid #2a2a2a", color: "#a1a1a1", fontSize: 11, borderRadius: 4, padding: "3px 8px", outline: "none" }}
-            >
-              <option value={100}>100 / page</option>
-              <option value={250}>250 / page</option>
-              <option value={500}>500 / page</option>
-              <option value={9999}>All</option>
-            </select>
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              style={{ background: "#111", border: "1px solid #2a2a2a", color: currentPage === 1 ? "#333" : "#a1a1a1", fontSize: 12, borderRadius: 4, padding: "3px 8px", cursor: currentPage === 1 ? "default" : "pointer" }}
-            >←</button>
-            <span style={{ fontSize: 11, color: "#555" }}>{currentPage}/{totalPages}</span>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              style={{ background: "#111", border: "1px solid #2a2a2a", color: currentPage === totalPages ? "#333" : "#a1a1a1", fontSize: 12, borderRadius: 4, padding: "3px 8px", cursor: currentPage === totalPages ? "default" : "pointer" }}
-            >→</button>
-          </div>
+
+        </div>
+
+        {/* Stats ribbon */}
+        <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "6px 24px",
+          backgroundColor: "#0d0d0d", borderBottom: "1px solid #1a1a1a", flexShrink: 0 }}>
+          <StatItem label="Total lots" value={stats.total} color="#666" />
+          <StatItem label="Available" value={stats.available} color="#00c853" />
+          <StatItem label="Quick Delivery" value={stats.quickDelivery} color="#0070f3" />
+          <StatItem label="Future" value={stats.future} color="#f5a623" />
+          <StatItem label="Sold" value={stats.sold} color="#444" />
+          {hasColumnFilters && (
+            <button onClick={() => setColumnFilters({})}
+              style={{ marginLeft: "auto", fontSize: 11, color: "#ff6b6b", background: "none",
+                border: "1px solid #3f1f1f", borderRadius: 4, padding: "2px 8px", cursor: "pointer" }}>
+              × Clear filters
+            </button>
+          )}
+          <span style={{ marginLeft: hasColumnFilters ? 0 : "auto", fontSize: 11, color: "#444" }}>
+            {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, rows.length)} of {rows.length}
+          </span>
         </div>
 
         {/* Table */}
