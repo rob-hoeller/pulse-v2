@@ -561,73 +561,7 @@ export default function LotsClient({ lots, divisions, communities }: Props) {
                 </option>
               ))}
             </FilterSelect>
-
-            {/* Status filter */}
-            <FilterSelect value={statusFilter} onChange={setStatusFilter}>
-              <option value="all">All Statuses</option>
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </FilterSelect>
-
-            {/* Available Only toggle */}
-            <button
-              onClick={() => setAvailableOnly((v) => !v)}
-              style={{
-                backgroundColor: availableOnly ? "#1a2a1a" : "#111",
-                color: availableOnly ? "#00c853" : "#555",
-                border: `1px solid ${availableOnly ? "#1f3f1f" : "#2a2a2a"}`,
-                borderRadius: "6px",
-                padding: "6px 12px",
-                fontSize: "12px",
-                cursor: "pointer",
-                height: "32px",
-                whiteSpace: "nowrap",
-                transition: "background 0.15s, color 0.15s, border-color 0.15s",
-              }}
-            >
-              Available Only
-            </button>
           </div>
-        </div>
-
-        {/* Stats bar */}
-        <div
-          style={{
-            padding: "8px 20px",
-            borderBottom: "1px solid #1a1a1a",
-            display: "flex",
-            alignItems: "center",
-            gap: "20px",
-            backgroundColor: "#0d0d0d",
-            flexShrink: 0,
-          }}
-        >
-          <StatItem label="Total lots" value={stats.total} color="#666" />
-          <StatItem label="Available" value={stats.available} color="#00c853" />
-          <StatItem label="Quick Delivery" value={stats.quickDelivery} color="#0070f3" />
-          <StatItem label="Future" value={stats.future} color="#f5a623" />
-          <StatItem label="Sold" value={stats.sold} color="#444" />
-
-          {/* ── New: clear column filters button ── */}
-          {hasColumnFilters && (
-            <button
-              onClick={() => setColumnFilters({})}
-              style={{
-                fontSize: 11,
-                color: "#ff6b6b",
-                background: "none",
-                border: "1px solid #3f1f1f",
-                borderRadius: 4,
-                padding: "2px 8px",
-                cursor: "pointer",
-              }}
-            >
-              × Clear filters
-            </button>
-          )}
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 11, color: "#555" }}>
