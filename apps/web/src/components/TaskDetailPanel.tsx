@@ -11,6 +11,7 @@ const STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; border: stri
   blocked:      { bg: "#2a1a1a", text: "#ff6b6b", border: "#3f1f1f" },
   preview:      { bg: "#1f1a2e", text: "#a855f7", border: "#2a1f3f" },
   completed:    { bg: "#1a2a1a", text: "#00c853", border: "#1f3f1f" },
+  merging:      { bg: "#1a1f2e", text: "#a855f7", border: "#2a1f3f" },
   cancelled:    { bg: "#1a1a1a", text: "#555",    border: "#2a2a2a" },
 };
 
@@ -71,11 +72,15 @@ export default function TaskDetailPanel({ taskId, onClose }: Props) {
       process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_XGwL4p2FD0Af58_sidErwg_In1FU_9o"
     );
-    await supabase.from("hbx_tasks").update({ status: "approved" }).eq("id", task.id);
+    // At preview gate: move to 'merging' so Schellie can do the actual merge+prune
+    // At needs_review gate: move to 'approved' for build dispatch
+    const nextStatus = task.status === "preview" ? "merging" : "approved";
+    const noteText = task.status === "preview" ? "Merge approved — Schellie will merge, prune, and deploy" : "Approved via task board";
+    await supabase.from("hbx_tasks").update({ status: nextStatus }).eq("id", task.id);
     await supabase.from("hbx_task_history").insert([{
       task_id: task.id, previous_status: task.status,
-      new_status: "approved", changed_by: "lance",
-      note: "Approved via task board",
+      new_status: nextStatus, changed_by: "lance",
+      note: noteText,
     }]);
     // Refresh task
     const { data } = await supabase.from("hbx_tasks").select("*").eq("id", task.id).single();
@@ -136,11 +141,17 @@ export default function TaskDetailPanel({ taskId, onClose }: Props) {
           {!task && !loading && <div className="text-[12px] text-[#555]">Task not found.</div>}
           {task && activeTab === "overview" && (
             <div className="space-y-5">
+              {task.status === "merging" && (
+                <div className="mb-4 p-3 rounded-lg border border-[#2a1f3f] bg-[#1a1f2e]">
+                  <div className="text-[12px] font-medium text-[#a855f7] mb-1">⟳ Merging in progress</div>
+                  <div className="text-[11px] text-[#555]">Schellie is merging the PR, pruning branches, and verifying the deploy. Task will move to Completed when done.</div>
+                </div>
+              )}
               {(task.status === "needs_review" || task.status === "preview") && (
                 <div className="mb-4 space-y-2">
                   <button onClick={approveTask}
                     className="w-full flex items-center justify-center gap-2 bg-[#00843d] text-white rounded-lg py-2.5 text-[13px] font-semibold hover:bg-[#006630] transition-colors">
-                    ✓ {task.status === "preview" ? "Approve — Merge to Main" : "Approve — Send to Build"}
+                    ✓ {task.status === "preview" ? "Approve Merge ↗" : "Approve — Send to Build"}
                   </button>
                   <div className="text-[10px] text-[#555] text-center">
                     {task.status === "preview" ? "Merges PR and marks task completed" : "Moves task to Approved status"}

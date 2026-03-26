@@ -13,10 +13,11 @@ const STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; border: stri
   blocked:      { bg: "#2a1a1a", text: "#ff6b6b", border: "#3f1f1f", label: "Blocked" },
   preview:      { bg: "#1f1a2e", text: "#a855f7", border: "#2a1f3f", label: "Preview" },
   completed:    { bg: "#1a2a1a", text: "#00c853", border: "#1f3f1f", label: "Completed" },
+  merging:      { bg: "#1a1f2e", text: "#a855f7", border: "#2a1f3f", label: "Merging" },
   cancelled:    { bg: "#1a1a1a", text: "#555",    border: "#2a2a2a", label: "Cancelled" },
 };
 
-const COLUMN_ORDER: TaskStatus[] = ["planning", "needs_review", "approved", "in_process", "blocked", "preview", "completed", "cancelled"];
+const COLUMN_ORDER: TaskStatus[] = ["planning", "needs_review", "approved", "in_process", "blocked", "preview", "merging", "completed", "cancelled"];
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);

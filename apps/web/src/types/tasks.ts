@@ -1,5 +1,5 @@
 // src/types/tasks.ts
-export type TaskStatus = "planning" | "needs_review" | "approved" | "in_process" | "blocked" | "preview" | "completed" | "cancelled";
+export type TaskStatus = "planning" | "needs_review" | "approved" | "in_process" | "blocked" | "preview" | "merging" | "completed" | "cancelled";
 export type TaskType = "feature" | "bugfix";
 
 export interface Task {
