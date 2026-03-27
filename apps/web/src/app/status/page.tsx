@@ -32,15 +32,22 @@ function nextRun(times: string[]): string {
   const et = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", hour12: false }).format(new Date());
   const [hStr, mStr] = et.split(":");
   const nowMins = parseInt(hStr) * 60 + parseInt(mStr);
+
+  const fmtDate = (offsetDays: number, label: string) => {
+    const d = new Date(Date.now() + offsetDays * 86400000);
+    const datePart = d.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
+    return `${datePart}, ${label} EDT`;
+  };
+
   for (const t of times) {
     const [time, ampm] = t.split(" ");
     const [h, m] = time.split(":").map(Number);
     let hours = h;
     if (ampm === "PM" && h !== 12) hours += 12;
     if (ampm === "AM" && h === 12) hours = 0;
-    if (hours * 60 + (m ?? 0) > nowMins) return t + " EDT";
+    if (hours * 60 + (m ?? 0) > nowMins) return fmtDate(0, t);
   }
-  return times[0] + " EDT tomorrow";
+  return fmtDate(1, times[0]);
 }
 
 
