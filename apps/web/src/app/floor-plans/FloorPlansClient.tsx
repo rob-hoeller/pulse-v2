@@ -619,8 +619,16 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
           >
             {/* Left: content */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#ededed", marginBottom: 2 }}>
-                {p.plan_name}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "#ededed" }}>{p.plan_name}</span>
+                {isModelHome(p) && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+                    padding: "2px 6px", borderRadius: 3,
+                    backgroundColor: "#1e2a1e", color: "#6b9e6b",
+                    border: "1px solid #2a3f2a", textTransform: "uppercase" as const,
+                  }}>Model</span>
+                )}
               </div>
               <div style={{ fontSize: 12, color: "#555", marginBottom: 12 }}>{commName}</div>
 
