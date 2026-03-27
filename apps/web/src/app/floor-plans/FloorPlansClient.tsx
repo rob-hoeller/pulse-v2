@@ -97,8 +97,8 @@ function s3ToHttps(path: string | null | undefined): string | null {
 
 function popularityColor(pop: number | null): string {
   if (pop == null) return "#444";
-  if (pop > 10) return "#f5a623";
-  if (pop >= 5) return "#f5a623";
+  if (pop > 10) return "#888";
+  if (pop >= 5) return "#666";
   return "#555";
 }
 
@@ -336,7 +336,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
       label: "Net Price",
       render: (_val, row) =>
         row.net_price != null ? (
-          <span style={{ color: "#00c853", fontWeight: 700 }}>
+          <span style={{ color: "#c8c8c8", fontWeight: 600 }}>
             {formatCurrency(row.net_price)}
           </span>
         ) : (
@@ -380,7 +380,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            style={{ color: "#a855f7", textDecoration: "none", fontSize: 14 }}
+            style={{ color: "#777", textDecoration: "none", fontSize: 14 }}
           >
             ◉
           </a>
@@ -568,7 +568,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
   // ── Card view ─────────────────────────────────────────────────────────────────
 
   const cardView = (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, padding: "16px" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12, padding: "16px" }}>
       {rows.map((p) => {
         const commName = getCommunityName(p);
         const imgUrl = p.featured_image_url;
@@ -600,7 +600,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
 
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
                 {p.net_price != null && (
-                  <span style={{ fontSize: 18, fontWeight: 700, color: "#00c853" }}>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: "#c8c8c8" }}>
                     {formatCurrency(p.net_price)}
                   </span>
                 )}
@@ -615,8 +615,8 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
                 <div style={{ marginBottom: 10 }}>
                   <span style={{
                     fontSize: 11, padding: "2px 8px", borderRadius: 4,
-                    backgroundColor: "#2a2a1a", color: "#f5a623",
-                    border: "1px solid #3f3a1f", fontWeight: 500,
+                    backgroundColor: "#2a2a1a", color: "#888",
+                    border: "1px solid #2a2a2a", fontWeight: 500,
                   }}>
                     -{formatCurrency(p.incentive_amount)}
                   </span>
@@ -639,14 +639,14 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
                   {p.virtual_tour_url && (
                     <a href={p.virtual_tour_url} target="_blank" rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      style={{ color: "#a855f7", fontSize: 13, textDecoration: "none" }}>
+                      style={{ color: "#777", fontSize: 13, textDecoration: "none" }}>
                       ◉ Tour
                     </a>
                   )}
                   {p.pdf_url && (
                     <a href={p.pdf_url} target="_blank" rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      style={{ color: "#0070f3", fontSize: 13, textDecoration: "none" }}>
+                      style={{ color: "#777", fontSize: 13, textDecoration: "none" }}>
                       ⬇ PDF
                     </a>
                   )}
@@ -753,7 +753,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
             {selectedPlan.net_price != null && (
               <div style={{ marginBottom: 8 }}>
                 <span
-                  style={{ fontSize: 22, fontWeight: 700, color: "#00c853" }}
+                  style={{ fontSize: 22, fontWeight: 700, color: "#c8c8c8" }}
                 >
                   {formatCurrency(selectedPlan.net_price)}
                 </span>
@@ -766,7 +766,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
               value={
                 selectedPlan.incentive_amount != null
                   ? (
-                      <span style={{ color: "#f5a623" }}>
+                      <span style={{ color: "#888" }}>
                         -${selectedPlan.incentive_amount.toLocaleString()}
                       </span>
                     )
@@ -838,7 +838,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
                       borderRadius: 6,
                       border: "1px solid #2a1f3f",
                       backgroundColor: "#1f1a2e",
-                      color: "#a855f7",
+                      color: "#777",
                       fontSize: 13,
                       textDecoration: "none",
                       fontWeight: 500,
@@ -860,7 +860,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
                       borderRadius: 6,
                       border: "1px solid #1a2a3f",
                       backgroundColor: "#1a1f2e",
-                      color: "#0070f3",
+                      color: "#777",
                       fontSize: 13,
                       textDecoration: "none",
                       fontWeight: 500,
