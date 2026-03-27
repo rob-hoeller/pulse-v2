@@ -15,7 +15,7 @@ interface Column<T> {
   filterValues?: string[];
 }
 
-// Stat item for the ribbon
+// Stat item for the ribbon (static — parent pre-computes value)
 interface StatItem {
   label: string;
   value: number | string;
@@ -23,10 +23,25 @@ interface StatItem {
   isString?: boolean;
 }
 
+// Dynamic stat config — DataTable computes value from its internal filtered rows
+interface StatConfigItem<T> {
+  label: string;
+  color: string;
+  isString?: boolean;
+  getValue: (rows: T[]) => number | string;
+}
+
 interface DataTableProps<T extends Record<string, unknown>> {
   columns: Column<T>[];
   rows: T[];
+  /** Static stats — parent pre-computes the values (not filter-aware). */
   stats?: StatItem[];
+  /**
+   * Dynamic stats — DataTable computes values from its internal `filtered` array.
+   * Whenever column filters / search / sort changes, these update automatically.
+   * Takes precedence over `stats` when both are provided.
+   */
+  statConfig?: StatConfigItem<T>[];
   defaultPageSize?: number;
   stickyFirstColumn?: boolean;
   emptyMessage?: string;
@@ -35,7 +50,8 @@ interface DataTableProps<T extends Record<string, unknown>> {
   searchKeys?: (keyof T)[];
   showSearch?: boolean;
   onRowClick?: (row: T) => void;
-  onFilteredRowsChange?: (rows: T[]) => void;  // called whenever filtered set changes
+  /** @deprecated — use statConfig instead for filter-reactive stats */
+  onFilteredRowsChange?: (rows: T[]) => void;
 }
 
 const thStyle = {
@@ -108,6 +124,22 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
     return data;
   }, [props.rows, search, columnFilters, sortCol, sortDir, props.searchKeys]);
 
+  // Compute dynamic ribbon stats from filtered rows (Approach D).
+  // This is derived directly from `filtered` via useMemo — no useEffect, no callbacks,
+  // no stale closures. Stats are always in sync with the visible filtered set.
+  const ribbonStats = useMemo<StatItem[] | null>(() => {
+    if (!props.statConfig || props.statConfig.length === 0) return null;
+    return props.statConfig.map((s) => ({
+      label: s.label,
+      color: s.color,
+      isString: s.isString,
+      value: s.getValue(filtered),
+    }));
+  }, [filtered, props.statConfig]);
+
+  // The stats to render: dynamic (ribbonStats) takes precedence over static (props.stats)
+  const activeStats = ribbonStats ?? props.stats;
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / (pageSize === 9999 ? filtered.length || 1 : pageSize)));
   const effectivePageSize = pageSize === 9999 ? filtered.length || 1 : pageSize;
   const paged = filtered.slice(
@@ -120,7 +152,7 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
     setCurrentPage(1);
   }, [columnFilters, search, sortCol]);
 
-  // Notify parent whenever filtered set changes (for reactive stats)
+  // Legacy callback support (deprecated — prefer statConfig)
   useEffect(() => {
     if (props.onFilteredRowsChange) {
       props.onFilteredRowsChange(filtered);
@@ -465,10 +497,10 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
           flexWrap: "wrap",
         }}
       >
-        {/* Stats */}
-        {props.stats && props.stats.length > 0 && (
+        {/* Stats — rendered from ribbonStats (dynamic) or props.stats (static) */}
+        {activeStats && activeStats.length > 0 && (
           <>
-            {props.stats.map((s) => (
+            {activeStats.map((s) => (
               <div
                 key={s.label}
                 style={{ display: "flex", alignItems: "center", gap: 6 }}
@@ -494,7 +526,7 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
               setSearch("");
             }}
             style={{
-              marginLeft: props.stats && props.stats.length > 0 ? 0 : "auto",
+              marginLeft: activeStats && activeStats.length > 0 ? 0 : "auto",
               fontSize: 11,
               color: "#ff6b6b",
               background: "none",
@@ -675,4 +707,4 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
 }
 
 export default DataTable;
-export type { Column, StatItem, DataTableProps };
+export type { Column, StatItem, StatConfigItem, DataTableProps };
