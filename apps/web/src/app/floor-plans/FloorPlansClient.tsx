@@ -932,6 +932,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
         }}
       >
         {topBar}
+        {filtersBar}
         {/* Stats bar shown in card view; DataTable renders its own ribbon in table view */}
         {view === "card" && statsBar}
         <div style={{ flex: 1, overflow: "auto" }}>
