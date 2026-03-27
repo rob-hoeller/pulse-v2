@@ -12,6 +12,7 @@ export const NAV_ITEMS = [
   { icon: "⌂", label: "Communities",   href: "/communities" },
   { icon: "◫", label: "Lots",          href: "/lots"        },
   { icon: "◱", label: "Floor Plans",    href: "/floor-plans"  },
+  { icon: "⌂", label: "Model Homes",    href: "/model-homes"  },
   { icon: "⊞", label: "Divisions",     href: "/divisions"   },
   { icon: "◷", label: "Calendar",      href: "#"            },
   { icon: "◉", label: "Notifications", href: "#"            },
