@@ -38,6 +38,7 @@ interface FloorPlan {
   virtual_tour_url: string | null;
   page_url: string | null;
   pdf_url: string | null;
+  elevations: { kova_name?: string; image_path?: string; is_hidden?: boolean | null; index?: number }[] | null;
 }
 
 // Augmented row type for DataTable (adds computed/display fields)
@@ -62,10 +63,10 @@ interface Props {
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const STYLE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  "Ranch":             { bg: "#1a2a1a", text: "#00c853", border: "#1f3f1f" },
-  "First Floor Suite": { bg: "#1a1f2e", text: "#0070f3", border: "#1a2a3f" },
-  "2-Story":           { bg: "#2a2a1a", text: "#f5a623", border: "#3f3a1f" },
-  "3-Story":           { bg: "#1f1a2e", text: "#a855f7", border: "#2a1f3f" },
+  "Ranch":             { bg: "#161616", text: "#6b9e6b", border: "#222" },
+  "First Floor Suite": { bg: "#161616", text: "#5b80a0", border: "#222" },
+  "2-Story":           { bg: "#161616", text: "#8a7a5a", border: "#222" },
+  "3-Story":           { bg: "#161616", text: "#7a6a8a", border: "#222" },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -88,10 +89,16 @@ function formatSqft(min: number | null, max: number | null): string {
   return `${min.toLocaleString()} – ${max.toLocaleString()}`;
 }
 
+function s3ToHttps(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  return path.replace("s3://heartbeat-page-designer-production/", "https://heartbeat-page-designer-production.s3.amazonaws.com/");
+}
+
 function popularityColor(pop: number | null): string {
-  if (pop == null) return "#444";
-  if (pop > 10) return "#00c853";
-  if (pop >= 5) return "#f5a623";
+  if (pop == null) return "#333";
+  if (pop > 10) return "#6b9e6b";
+  if (pop >= 5) return "#8a7a5a";
   return "#555";
 }
 
@@ -271,10 +278,10 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
 
   const dataTableStats: DataTableStatItem[] = [
     { label: "Total",          value: stats.total,     color: "#666" },
-    { label: "Avg Net Price",  value: "$" + Math.round(stats.avgPrice / 1000) + "k", color: "#a1a1a1", isString: true },
-    { label: "Ranch",          value: stats.ranch,     color: "#00c853" },
-    { label: "1st Floor Suite",value: stats.firstFloor, color: "#0070f3" },
-    { label: "w/ Tour",        value: stats.withTour,  color: "#a855f7" },
+    { label: "Avg Net Price",  value: "$" + Math.round(stats.avgPrice / 1000) + "k", color: "#777", isString: true },
+    { label: "Ranch",          value: stats.ranch,     color: "#666" },
+    { label: "1st Floor Suite",value: stats.firstFloor, color: "#666" },
+    { label: "w/ Tour",        value: stats.withTour,  color: "#666" },
   ];
 
   // DataTable column definitions
@@ -329,7 +336,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
       label: "Net Price",
       render: (_val, row) =>
         row.net_price != null ? (
-          <span style={{ color: "#00c853", fontWeight: 700 }}>
+          <span style={{ color: "#c8c8c8", fontWeight: 600 }}>
             {formatCurrency(row.net_price)}
           </span>
         ) : (
@@ -346,7 +353,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
       label: "Incentive",
       render: (_val, row) =>
         row.incentive_amount != null ? (
-          <span style={{ color: "#f5a623" }}>
+          <span style={{ color: "#8a7a5a" }}>
             -${row.incentive_amount.toLocaleString()}
           </span>
         ) : (
@@ -581,6 +588,19 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
             onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1f1f1f")}
           >
+            {/* Elevation image */}
+            {(() => {
+              const elevations = p.elevations ?? [];
+              const first = Array.isArray(elevations) ? elevations[0] : null;
+              const imgUrl = first ? s3ToHttps(first.image_path) : s3ToHttps(p.featured_image_url);
+              return imgUrl ? (
+                <div style={{ marginBottom: 10, borderRadius: 6, overflow: "hidden", height: 120 }}>
+                  <img src={imgUrl} alt={p.plan_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+              ) : (
+                <div style={{ marginBottom: 10, borderRadius: 6, height: 120, background: "#1a1a1a" }} />
+              );
+            })()}
             {/* Top row: plan name + badges */}
             <div
               style={{
@@ -634,9 +654,9 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
                     fontSize: 11,
                     padding: "2px 7px",
                     borderRadius: 4,
-                    backgroundColor: "#2a2a1a",
-                    color: "#f5a623",
-                    border: "1px solid #3f3a1f",
+                    backgroundColor: "#1e1e1e",
+                    color: "#8a7a5a",
+                    border: "1px solid #2a2a2a",
                     fontWeight: 500,
                   }}
                 >
@@ -793,7 +813,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
             {selectedPlan.net_price != null && (
               <div style={{ marginBottom: 8 }}>
                 <span
-                  style={{ fontSize: 22, fontWeight: 700, color: "#00c853" }}
+                  style={{ fontSize: 22, fontWeight: 700, color: "#c8c8c8" }}
                 >
                   {formatCurrency(selectedPlan.net_price)}
                 </span>
@@ -806,7 +826,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
               value={
                 selectedPlan.incentive_amount != null
                   ? (
-                      <span style={{ color: "#f5a623" }}>
+                      <span style={{ color: "#8a7a5a" }}>
                         -${selectedPlan.incentive_amount.toLocaleString()}
                       </span>
                     )
@@ -837,6 +857,29 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
             <Row label="Community" value={getCommunityName(selectedPlan)} />
             <Row label="Division" value={getDivisionName(selectedPlan)} />
           </Section>
+
+          {/* Elevations */}
+          {(() => {
+            const elevs = Array.isArray(selectedPlan.elevations) ? selectedPlan.elevations : [];
+            const visible = elevs.filter((e: { is_hidden?: boolean | null }) => !e.is_hidden);
+            if (!visible.length) return null;
+            return (
+              <Section title="Elevations">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {visible.map((e: { kova_name?: string; image_path?: string }, i: number) => {
+                    const url = s3ToHttps(e.image_path);
+                    return url ? (
+                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                        <img src={url} alt={e.kova_name ?? `Elevation ${i+1}`}
+                          style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 4, border: "1px solid #2a2a2a" }} />
+                        {e.kova_name && <span style={{ fontSize: 10, color: "#555" }}>{e.kova_name}</span>}
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </Section>
+            );
+          })()}
 
           {/* Assets */}
           {(selectedPlan.virtual_tour_url || selectedPlan.pdf_url || selectedPlan.page_url) && (
