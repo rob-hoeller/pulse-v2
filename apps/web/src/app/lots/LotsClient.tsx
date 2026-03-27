@@ -49,7 +49,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
 
 export default function LotsClient({ lots }: LotsClientProps) {
   const [search, setSearch] = useState("");
-  const [filteredLots, setFilteredLots] = useState<Lot[]>([]);
+  const [filteredLots, setFilteredLots] = useState<Lot[]>(lots);
 
   // Top-bar search pre-filters by address and lot_number only.
   // All column-level filtering (division, community, status, foundation, etc.)
@@ -187,11 +187,11 @@ export default function LotsClient({ lots }: LotsClientProps) {
 
   const statsSource = filteredLots.length > 0 ? filteredLots : rows;
   const lotStats: StatItem[] = [
-    { label: "Total lots",     value: statsSource.length,                                                     color: "#666"    },
-    { label: "Available",      value: statsSource.filter((l) => l.lot_status === "Available Homesite").length, color: "#00c853" },
-    { label: "Quick Delivery", value: statsSource.filter((l) => l.lot_status === "Quick Delivery").length,    color: "#0070f3" },
-    { label: "Future",         value: statsSource.filter((l) => l.lot_status === "Future Homesite").length,   color: "#f5a623" },
-    { label: "Sold",           value: statsSource.filter((l) => l.lot_status === "Sold").length,              color: "#444"    },
+    { label: "Total lots",     value: filteredLots.length,                                                     color: "#666"    },
+    { label: "Available",      value: filteredLots.filter((l) => l.lot_status === "Available Homesite").length, color: "#00c853" },
+    { label: "Quick Delivery", value: filteredLots.filter((l) => l.lot_status === "Quick Delivery").length,    color: "#0070f3" },
+    { label: "Future",         value: filteredLots.filter((l) => l.lot_status === "Future Homesite").length,   color: "#f5a623" },
+    { label: "Sold",           value: filteredLots.filter((l) => l.lot_status === "Sold").length,              color: "#444"    },
   ];
 
   // ─── Render ───────────────────────────────────────────────────────────────
