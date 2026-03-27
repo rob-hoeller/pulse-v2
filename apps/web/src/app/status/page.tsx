@@ -30,6 +30,7 @@ const SYNC_SCHEDULE: Record<string, { label: string; times: string[]; freq: stri
 function nextRun(times: string[]): string {
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
+  const fmt = (d: Date) => d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   for (const t of times) {
     const [time, period] = t.split(" ");
     const [h, m] = time.split(":").map(Number);
@@ -37,9 +38,22 @@ function nextRun(times: string[]): string {
     if (period === "PM" && h !== 12) hours += 12;
     if (period === "AM" && h === 12) hours = 0;
     const mins = hours * 60 + (m ?? 0);
-    if (mins > nowMins) return t + " EDT";
+    if (mins > nowMins) {
+      const next = new Date(now);
+      next.setHours(hours, m ?? 0, 0, 0);
+      return fmt(next);
+    }
   }
-  return times[0] + " EDT tomorrow";
+  // All times passed today — use first time tomorrow
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const [time, period] = times[0].split(" ");
+  const [h, m] = time.split(":").map(Number);
+  let hours = h;
+  if (period === "PM" && h !== 12) hours += 12;
+  if (period === "AM" && h === 12) hours = 0;
+  tomorrow.setHours(hours, m ?? 0, 0, 0);
+  return fmt(tomorrow);
 }
 
 export default async function StatusPage() {
