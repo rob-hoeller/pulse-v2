@@ -278,7 +278,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
 
   const dataTableStats: DataTableStatItem[] = [
     { label: "Total",          value: stats.total,     color: "#666" },
-    { label: "Avg Net Price",  value: "$" + Math.round(stats.avgPrice / 1000) + "k", color: "#777", isString: true },
+    { label: "Avg Net Price",  value: "$" + Math.round(stats.avgPrice / 1000) + "k", color: "#888", isString: true },
     { label: "Ranch",          value: stats.ranch,     color: "#666" },
     { label: "1st Floor Suite",value: stats.firstFloor, color: "#666" },
     { label: "w/ Tour",        value: stats.withTour,  color: "#666" },
@@ -455,9 +455,9 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
         color="#a1a1a1"
         isString
       />
-      <StatItem label="Ranch" value={stats.ranch} color="#00c853" />
-      <StatItem label="1st Floor Suite" value={stats.firstFloor} color="#0070f3" />
-      <StatItem label="w/ Virtual Tour" value={stats.withTour} color="#a855f7" />
+      <StatItem label="Ranch" value={stats.ranch} color="#777" />
+      <StatItem label="1st Floor Suite" value={stats.firstFloor} color="#777" />
+      <StatItem label="w/ Virtual Tour" value={stats.withTour} color="#777" />
     </div>
   );
 
@@ -611,7 +611,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
                 )}
               </div>
 
-              {p.incentive_amount != null && (
+              {p.incentive_amount != null && p.incentive_amount > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   <span style={{
                     fontSize: 11, padding: "2px 8px", borderRadius: 4,
