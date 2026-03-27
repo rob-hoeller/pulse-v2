@@ -27,53 +27,11 @@ const SYNC_SCHEDULE: Record<string, { label: string; times: string[]; freq: stri
   "floor_plans": { label: "HB Page Designer API", times: ["6:00 AM", "12:00 PM", "6:00 PM"], freq: "3× daily" },
 };
 
-function nextRun(times: string[]): string {
-  // Get current hour and minute in ET using Intl
-  const now = new Date();
-  const etFormatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric", minute: "2-digit", hour12: false,
-    month: "short", day: "numeric", year: "numeric",
-  });
-  const etParts = etFormatter.formatToParts(now);
-  const get = (t: string) => etParts.find(p => p.type === t)?.value ?? "";
-
-  const etHour = parseInt(get("hour"));
-  const etMin  = parseInt(get("minute"));
-  const nowMins = etHour * 60 + etMin;
-
-  // Parse a "6:00 AM" or "12:05 PM" string → total minutes
-  const toMins = (t: string) => {
-    const [time, period] = t.split(" ");
-    const [h, m] = time.split(":").map(Number);
-    let hours = h;
-    if (period === "PM" && h !== 12) hours += 12;
-    if (period === "AM" && h === 12) hours = 0;
-    return { hours, min: m ?? 0, totalMins: hours * 60 + (m ?? 0) };
-  };
-
-  // Format: "Mar 27, 12:05 PM EDT"
-  const fmtDate = (offsetDays: number, hours: number, min: number) => {
-    const base = new Date(now.getTime() + offsetDays * 86400000);
-    // Get the date string in ET
-    const dateParts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/New_York",
-      month: "short", day: "numeric",
-    }).format(base);
-    const h12 = hours % 12 === 0 ? 12 : hours % 12;
-    const ampm = hours < 12 ? "AM" : "PM";
-    const minStr = String(min).padStart(2, "0");
-    return `${dateParts}, ${h12}:${minStr} ${ampm} EDT`;
-  };
-
-  for (const t of times) {
-    const { hours, min, totalMins } = toMins(t);
-    if (totalMins > nowMins) return fmtDate(0, hours, min);
-  }
-  // All passed today — first time tomorrow
-  const { hours, min } = toMins(times[0]);
-  return fmtDate(1, hours, min);
-}
+// Next scheduled run times (hardcoded, matches cron schedule)
+const NEXT_RUN: Record<string, string> = {
+  "lots":        "6:05 AM EDT · 12:05 PM EDT · 6:05 PM EDT",
+  "floor_plans": "6:00 AM EDT · 12:00 PM EDT · 6:00 PM EDT",
+};
 
 
 export default async function StatusPage() {
@@ -186,7 +144,7 @@ export default async function StatusPage() {
                       </td>
                       <td style={{ padding: "9px 14px", color: "#a1a1a1", whiteSpace: "nowrap" }}>{rows}</td>
                       <td style={{ padding: "9px 14px", color: "#666", whiteSpace: "nowrap" }}>{dur}</td>
-                      <td style={{ padding: "9px 14px", color: "#a1a1a1", whiteSpace: "nowrap" }}>{nextRun(cfg.times)}</td>
+                      <td style={{ padding: "9px 14px", color: "#a1a1a1", whiteSpace: "nowrap" }}>{NEXT_RUN[key] ?? cfg.times.join(" · ")}</td>
                       <td style={{ padding: "9px 14px", color: "#555", whiteSpace: "nowrap", fontSize: 11 }}>{cfg.freq}</td>
                     </tr>
                   );
