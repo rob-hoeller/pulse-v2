@@ -96,9 +96,9 @@ function s3ToHttps(path: string | null | undefined): string | null {
 }
 
 function popularityColor(pop: number | null): string {
-  if (pop == null) return "#333";
-  if (pop > 10) return "#6b9e6b";
-  if (pop >= 5) return "#8a7a5a";
+  if (pop == null) return "#444";
+  if (pop > 10) return "#f5a623";
+  if (pop >= 5) return "#f5a623";
   return "#555";
 }
 
@@ -336,7 +336,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
       label: "Net Price",
       render: (_val, row) =>
         row.net_price != null ? (
-          <span style={{ color: "#c8c8c8", fontWeight: 600 }}>
+          <span style={{ color: "#00c853", fontWeight: 700 }}>
             {formatCurrency(row.net_price)}
           </span>
         ) : (
@@ -353,7 +353,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
       label: "Incentive",
       render: (_val, row) =>
         row.incentive_amount != null ? (
-          <span style={{ color: "#8a7a5a" }}>
+          <span style={{ color: "#f5a623" }}>
             -${row.incentive_amount.toLocaleString()}
           </span>
         ) : (
@@ -568,161 +568,101 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
   // ── Card view ─────────────────────────────────────────────────────────────────
 
   const cardView = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 16px" }}>
       {rows.map((p) => {
         const commName = getCommunityName(p);
-        const styles = p.style_filters ?? [];
+        const imgUrl = p.featured_image_url;
 
         return (
           <div
             key={p.id}
             onClick={() => setSelectedPlan(p)}
             style={{
-              borderRadius: 8,
-              border: "1px solid #1f1f1f",
-              backgroundColor: "#111111",
-              padding: 12,
+              borderRadius: 10,
+              border: "1px solid #1a1a1a",
+              backgroundColor: "#111",
+              padding: 16,
               cursor: "pointer",
+              display: "flex",
+              gap: 16,
+              alignItems: "flex-start",
               transition: "border-color 0.15s",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1f1f1f")}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1a1a1a")}
           >
-            {/* Elevation image */}
-            {(() => {
-              const elevations = p.elevations ?? [];
-              const first = Array.isArray(elevations) ? elevations[0] : null;
-              const imgUrl = first ? s3ToHttps(first.image_path) : s3ToHttps(p.featured_image_url);
-              return imgUrl ? (
-                <div style={{ marginBottom: 10, borderRadius: 6, overflow: "hidden", height: 120 }}>
-                  <img src={imgUrl} alt={p.plan_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                </div>
-              ) : (
-                <div style={{ marginBottom: 10, borderRadius: 6, height: 120, background: "#1a1a1a" }} />
-              );
-            })()}
-            {/* Top row: plan name + badges */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: 6,
-                marginBottom: 4,
-              }}
-            >
-              <span
-                style={{ fontSize: 13, fontWeight: 500, color: "#ededed", lineHeight: 1.3 }}
-              >
+            {/* Left: content */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#ededed", marginBottom: 2 }}>
                 {p.plan_name}
-              </span>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                {styles.map((s) => (
-                  <StyleBadge key={s} style={s} />
-                ))}
               </div>
-            </div>
+              <div style={{ fontSize: 12, color: "#555", marginBottom: 12 }}>{commName}</div>
 
-            {/* Community */}
-            <div style={{ fontSize: 11, color: "#555", marginBottom: 8 }}>{commName}</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                {p.net_price != null && (
+                  <span style={{ fontSize: 18, fontWeight: 700, color: "#00c853" }}>
+                    {formatCurrency(p.net_price)}
+                  </span>
+                )}
+                {p.base_price != null && p.net_price !== p.base_price && (
+                  <span style={{ fontSize: 12, color: "#444", textDecoration: "line-through" }}>
+                    {formatCurrency(p.base_price)}
+                  </span>
+                )}
+              </div>
 
-            {/* Pricing */}
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-              {p.net_price != null ? (
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#00c853" }}>
-                  {formatCurrency(p.net_price)}
-                </span>
-              ) : null}
-              {p.base_price != null && p.net_price !== p.base_price && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "#444",
-                    textDecoration: "line-through",
-                  }}
-                >
-                  {formatCurrency(p.base_price)}
-                </span>
+              {p.incentive_amount != null && (
+                <div style={{ marginBottom: 10 }}>
+                  <span style={{
+                    fontSize: 11, padding: "2px 8px", borderRadius: 4,
+                    backgroundColor: "#2a2a1a", color: "#f5a623",
+                    border: "1px solid #3f3a1f", fontWeight: 500,
+                  }}>
+                    -{formatCurrency(p.incentive_amount)}
+                  </span>
+                </div>
               )}
+
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 14 }}>
+                {formatBedsOrBaths(p.min_bedrooms, p.max_bedrooms)}bd
+                {" · "}
+                {formatBedsOrBaths(p.min_bathrooms, p.max_bathrooms)}ba
+                {(p.min_heated_sqft != null || p.max_heated_sqft != null)
+                  ? ` · ${formatSqft(p.min_heated_sqft, p.max_heated_sqft)} sf` : ""}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, color: popularityColor(p.popularity), fontWeight: 600 }}>
+                  {p.popularity != null ? `★ ${p.popularity}` : ""}
+                </span>
+                <div style={{ display: "flex", gap: 14 }}>
+                  {p.virtual_tour_url && (
+                    <a href={p.virtual_tour_url} target="_blank" rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ color: "#a855f7", fontSize: 13, textDecoration: "none" }}>
+                      ◉ Tour
+                    </a>
+                  )}
+                  {p.pdf_url && (
+                    <a href={p.pdf_url} target="_blank" rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ color: "#0070f3", fontSize: 13, textDecoration: "none" }}>
+                      ⬇ PDF
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Incentive badge */}
-            {p.incentive_amount != null && (
-              <div style={{ marginBottom: 6 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    padding: "2px 7px",
-                    borderRadius: 4,
-                    backgroundColor: "#1e1e1e",
-                    color: "#8a7a5a",
-                    border: "1px solid #2a2a2a",
-                    fontWeight: 500,
-                  }}
-                >
-                  -${p.incentive_amount.toLocaleString()}
-                </span>
+            {/* Right: featured image */}
+            {imgUrl ? (
+              <div style={{ flexShrink: 0, width: 200, height: 140, borderRadius: 8, overflow: "hidden" }}>
+                <img src={imgUrl} alt={p.plan_name}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               </div>
+            ) : (
+              <div style={{ flexShrink: 0, width: 200, height: 140, borderRadius: 8, background: "#1a1a1a" }} />
             )}
-
-            {/* Specs */}
-            <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
-              {formatBedsOrBaths(p.min_bedrooms, p.max_bedrooms)}bd
-              {" · "}
-              {formatBedsOrBaths(p.min_bathrooms, p.max_bathrooms)}ba
-              {p.min_heated_sqft != null || p.max_heated_sqft != null
-                ? ` · ${formatSqft(p.min_heated_sqft, p.max_heated_sqft)} sf`
-                : ""}
-            </div>
-
-            {/* Bottom row: popularity + links */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              {p.popularity != null ? (
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: popularityColor(p.popularity),
-                    fontWeight: 600,
-                  }}
-                >
-                  ★ {p.popularity}
-                </span>
-              ) : (
-                <span />
-              )}
-              <div style={{ display: "flex", gap: 10 }}>
-                {p.virtual_tour_url && (
-                  <a
-                    href={p.virtual_tour_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ color: "#a855f7", fontSize: 13, textDecoration: "none" }}
-                    title="Virtual Tour"
-                  >
-                    ◉ Tour
-                  </a>
-                )}
-                {p.pdf_url && (
-                  <a
-                    href={p.pdf_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ color: "#0070f3", fontSize: 13, textDecoration: "none" }}
-                    title="Download PDF"
-                  >
-                    ⬇ PDF
-                  </a>
-                )}
-              </div>
-            </div>
           </div>
         );
       })}
@@ -813,7 +753,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
             {selectedPlan.net_price != null && (
               <div style={{ marginBottom: 8 }}>
                 <span
-                  style={{ fontSize: 22, fontWeight: 700, color: "#c8c8c8" }}
+                  style={{ fontSize: 22, fontWeight: 700, color: "#00c853" }}
                 >
                   {formatCurrency(selectedPlan.net_price)}
                 </span>
@@ -826,7 +766,7 @@ export default function FloorPlansClient({ plans, communities, divisions }: Prop
               value={
                 selectedPlan.incentive_amount != null
                   ? (
-                      <span style={{ color: "#8a7a5a" }}>
+                      <span style={{ color: "#f5a623" }}>
                         -${selectedPlan.incentive_amount.toLocaleString()}
                       </span>
                     )
