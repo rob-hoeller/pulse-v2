@@ -28,33 +28,50 @@ const SYNC_SCHEDULE: Record<string, { label: string; times: string[]; freq: stri
 };
 
 function nextRun(times: string[]): string {
-  const now = new Date();
-  const nowMins = now.getHours() * 60 + now.getMinutes();
-  const fmt = (d: Date) => d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short" });
-  for (const t of times) {
+  const fmt = (d: Date) => d.toLocaleString("en-US", {
+    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    timeZone: "America/New_York", timeZoneName: "short",
+  });
+
+  // Parse current ET time
+  const etParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", hour: "numeric", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const etHour = parseInt(etParts.find(p => p.type === "hour")?.value ?? "0");
+  const etMin  = parseInt(etParts.find(p => p.type === "minute")?.value ?? "0");
+  const nowMins = etHour * 60 + etMin;
+
+  const parseTime = (t: string) => {
     const [time, period] = t.split(" ");
     const [h, m] = time.split(":").map(Number);
     let hours = h;
     if (period === "PM" && h !== 12) hours += 12;
     if (period === "AM" && h === 12) hours = 0;
-    const mins = hours * 60 + (m ?? 0);
-    if (mins > nowMins) {
-      const next = new Date(now);
-      next.setHours(hours, m ?? 0, 0, 0);
-      return fmt(next);
-    }
+    return { hours, mins: hours * 60 + (m ?? 0), m: m ?? 0 };
+  };
+
+  // Build a Date at a specific ET hour/minute today or tomorrow
+  const makeETDate = (hours: number, m: number, offsetDays = 0) => {
+    const etDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(
+      new Date(Date.now() + offsetDays * 86400000)
+    );
+    // Create ISO string in ET, then parse (JS will treat as local but we need UTC)
+    // Use a trick: create date at midnight ET then add hours
+    const base = new Date(`${etDateStr}T00:00:00`);
+    // Adjust for ET offset
+    const etOffsetMs = new Date(`${etDateStr}T12:00:00`).getTime() -
+      new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(`${etDateStr}T12:00:00`)) + "T12:00:00").getTime();
+    return new Date(base.getTime() + (hours * 60 + m) * 60000);
+  };
+
+  for (const t of times) {
+    const { hours, mins, m } = parseTime(t);
+    if (mins > nowMins) return fmt(makeETDate(hours, m));
   }
-  // All times passed today — use first time tomorrow
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const [time, period] = times[0].split(" ");
-  const [h, m] = time.split(":").map(Number);
-  let hours = h;
-  if (period === "PM" && h !== 12) hours += 12;
-  if (period === "AM" && h === 12) hours = 0;
-  tomorrow.setHours(hours, m ?? 0, 0, 0);
-  return fmt(tomorrow);
+  const { hours, m } = parseTime(times[0]);
+  return fmt(makeETDate(hours, m, 1));
 }
+
 
 export default async function StatusPage() {
   const supabase = createClient(
