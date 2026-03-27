@@ -28,48 +28,51 @@ const SYNC_SCHEDULE: Record<string, { label: string; times: string[]; freq: stri
 };
 
 function nextRun(times: string[]): string {
-  const fmt = (d: Date) => d.toLocaleString("en-US", {
-    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    timeZone: "America/New_York", timeZoneName: "short",
+  // Get current hour and minute in ET using Intl
+  const now = new Date();
+  const etFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric", minute: "2-digit", hour12: false,
+    month: "short", day: "numeric", year: "numeric",
   });
+  const etParts = etFormatter.formatToParts(now);
+  const get = (t: string) => etParts.find(p => p.type === t)?.value ?? "";
 
-  // Parse current ET time
-  const etParts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York", hour: "numeric", minute: "2-digit", hour12: false,
-  }).formatToParts(new Date());
-  const etHour = parseInt(etParts.find(p => p.type === "hour")?.value ?? "0");
-  const etMin  = parseInt(etParts.find(p => p.type === "minute")?.value ?? "0");
+  const etHour = parseInt(get("hour"));
+  const etMin  = parseInt(get("minute"));
   const nowMins = etHour * 60 + etMin;
 
-  const parseTime = (t: string) => {
+  // Parse a "6:00 AM" or "12:05 PM" string → total minutes
+  const toMins = (t: string) => {
     const [time, period] = t.split(" ");
     const [h, m] = time.split(":").map(Number);
     let hours = h;
     if (period === "PM" && h !== 12) hours += 12;
     if (period === "AM" && h === 12) hours = 0;
-    return { hours, mins: hours * 60 + (m ?? 0), m: m ?? 0 };
+    return { hours, min: m ?? 0, totalMins: hours * 60 + (m ?? 0) };
   };
 
-  // Build a Date at a specific ET hour/minute today or tomorrow
-  const makeETDate = (hours: number, m: number, offsetDays = 0) => {
-    const etDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(
-      new Date(Date.now() + offsetDays * 86400000)
-    );
-    // Create ISO string in ET, then parse (JS will treat as local but we need UTC)
-    // Use a trick: create date at midnight ET then add hours
-    const base = new Date(`${etDateStr}T00:00:00`);
-    // Adjust for ET offset
-    const etOffsetMs = new Date(`${etDateStr}T12:00:00`).getTime() -
-      new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(`${etDateStr}T12:00:00`)) + "T12:00:00").getTime();
-    return new Date(base.getTime() + (hours * 60 + m) * 60000);
+  // Format: "Mar 27, 12:05 PM EDT"
+  const fmtDate = (offsetDays: number, hours: number, min: number) => {
+    const base = new Date(now.getTime() + offsetDays * 86400000);
+    // Get the date string in ET
+    const dateParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      month: "short", day: "numeric",
+    }).format(base);
+    const h12 = hours % 12 === 0 ? 12 : hours % 12;
+    const ampm = hours < 12 ? "AM" : "PM";
+    const minStr = String(min).padStart(2, "0");
+    return `${dateParts}, ${h12}:${minStr} ${ampm} EDT`;
   };
 
   for (const t of times) {
-    const { hours, mins, m } = parseTime(t);
-    if (mins > nowMins) return fmt(makeETDate(hours, m));
+    const { hours, min, totalMins } = toMins(t);
+    if (totalMins > nowMins) return fmtDate(0, hours, min);
   }
-  const { hours, m } = parseTime(times[0]);
-  return fmt(makeETDate(hours, m, 1));
+  // All passed today — first time tomorrow
+  const { hours, min } = toMins(times[0]);
+  return fmtDate(1, hours, min);
 }
 
 
