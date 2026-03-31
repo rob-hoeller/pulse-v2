@@ -324,13 +324,82 @@ interface CorpViewProps {
   specHomes: SpecHome[];
 }
 
+// ─── HBv1 Funnel Placeholder (Corp / Division) ────────────────────────────────
+function HBv1FunnelPlaceholder() {
+  const stages = [
+    "Subscribed → Lead",
+    "Lead → Prospect",
+    "Prospect → Contract",
+    "Contract → Close",
+    "Overall",
+  ];
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "#ededed", margin: 0 }}>
+          Sales Funnel
+        </h2>
+        <span
+          style={{
+            display: "inline-block",
+            background: "#1a1a1a",
+            color: "#555",
+            border: "1px solid #2a2a2a",
+            borderRadius: 20,
+            fontSize: 9,
+            fontWeight: 600,
+            padding: "1px 7px",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          Coming Soon
+        </span>
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gap: 10,
+        }}
+      >
+        {stages.map((stage) => (
+          <div
+            key={stage}
+            style={{
+              background: "#3E3F44",
+              border: "1px solid #555",
+              borderRadius: 3,
+              padding: "12px 14px",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 24,
+                fontWeight: 700,
+                color: "#333",
+                marginBottom: 4,
+              }}
+            >
+              —
+            </div>
+            <div style={{ fontSize: 11, color: "#555", lineHeight: 1.3 }}>{stage}</div>
+            <div style={{ marginTop: 6, fontSize: 10, color: "#444" }}>—</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CorpView({ divisions, communities, lots, modelHomes, specHomes }: CorpViewProps) {
   const router = useRouter();
 
   const availableLots = lots.filter((l) => l.is_available);
   const totalLots = lots.length;
 
-  // Count plans per division using communities join
+  // Group communities by division
   const commByDiv: Record<string, Community[]> = {};
   for (const c of communities) {
     if (!commByDiv[c.division_id]) commByDiv[c.division_id] = [];
@@ -341,51 +410,141 @@ function CorpView({ divisions, communities, lots, modelHomes, specHomes }: CorpV
   const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#0d0d0d" }}>
-      {/* Top bar */}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#323236" }}>
+      {/* Top bar — HBv1 style */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 24px",
-          height: 44,
-          borderBottom: "1px solid #1f1f1f",
-          background: "#0d0d0d",
+          height: 52,
+          borderBottom: "1px solid #3a3b3e",
+          background: "#2a2b2e",
           flexShrink: 0,
         }}
       >
-        <h1 style={{ fontFamily: "var(--font-display)", color: "#ededed", fontSize: 15, fontWeight: 600, margin: 0 }}>
+        <h1
+          style={{
+            fontFamily: "var(--font-display)",
+            color: "#ededed",
+            fontSize: 16,
+            fontWeight: 700,
+            margin: 0,
+          }}
+        >
           HBx Intelligence Platform
         </h1>
-        <span style={{ color: "#555", fontSize: 12 }}>{dateStr}</span>
+        <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "var(--font-body)" }}>{dateStr}</span>
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
-        {/* Summary stats */}
+        {/* Summary stats — 7 cards */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
             gap: 10,
             marginBottom: 28,
           }}
         >
-          <StatCard label="Divisions" value={divisions.length} accent="#223347" />
-          <StatCard label="Communities" value={communities.length} accent="#223347" />
-          <StatCard label="Plans" value="102" accent="#223347" />
-          <StatCard label="Total Lots" value={totalLots || "—"} accent="#00c853" comingSoon={totalLots === 0} />
-          <StatCard label="Available Lots" value={availableLots.length || "—"} accent="#00c853" comingSoon={availableLots.length === 0} />
-          <StatCard label="Model Homes" value={modelHomes.length} accent="#5b80a0" />
-          <StatCard label="Quick Delivery" value={specHomes.length} accent="#8a7a5a" />
-          <StatCard label="Leads" value="—" accent="#a855f7" comingSoon />
-          <StatCard label="Prospects" value="—" accent="#f59e0b" comingSoon />
-          <StatCard label="Contracts" value="—" accent="#f59e0b" comingSoon />
+          {[
+            { label: "Divisions", value: divisions.length, accent: "#59a6bd" },
+            { label: "Communities", value: communities.length, accent: "#59a6bd" },
+            { label: "Plans", value: "—", accent: "#59a6bd" },
+            { label: "Available Lots", value: availableLots.length || "—", accent: "#59a6bd" },
+            { label: "Leads", value: "—", accent: "#59a6bd", cs: true },
+            { label: "Prospects", value: "—", accent: "#59a6bd", cs: true },
+            { label: "Contracts", value: "—", accent: "#59a6bd", cs: true },
+          ].map((s) => (
+            <div
+              key={s.label}
+              style={{
+                background: "#3E3F44",
+                border: "1px solid #555",
+                borderRadius: 3,
+                padding: "12px 14px",
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 28,
+                  fontWeight: 700,
+                  color: s.cs ? "#444" : "#ededed",
+                  lineHeight: 1.1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                {s.value}
+                {s.cs && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      background: "#1a1a1a",
+                      color: "#555",
+                      border: "1px solid #2a2a2a",
+                      borderRadius: 20,
+                      fontSize: 8,
+                      fontWeight: 600,
+                      padding: "1px 6px",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      verticalAlign: "middle",
+                    }}
+                  >
+                    Soon
+                  </span>
+                )}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.45)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.07em",
+                  marginTop: 4,
+                  fontWeight: 500,
+                }}
+              >
+                {s.label}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Division cards */}
-        <SectionHeader title="Divisions" count={divisions.length} />
+        {/* Division cards — 2×N grid */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <h2
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 16,
+              fontWeight: 600,
+              color: "#ededed",
+              margin: 0,
+            }}
+          >
+            Divisions
+          </h2>
+          <span
+            style={{
+              background: "#2a2b2e",
+              border: "1px solid #444",
+              borderRadius: 20,
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "1px 9px",
+            }}
+          >
+            {divisions.length}
+          </span>
+        </div>
+
         <div
           style={{
             display: "grid",
@@ -396,97 +555,107 @@ function CorpView({ divisions, communities, lots, modelHomes, specHomes }: CorpV
         >
           {divisions.map((div) => {
             const divComms = commByDiv[div.id] ?? [];
-            const divLots = lots.filter((l) => {
-              const comm = communities.find((c) => c.id === l.community_id);
-              return comm?.division_id === div.id;
-            });
+            const divCommIds = new Set(divComms.map((c) => c.id));
+            const divLots = lots.filter((l) => l.community_id != null && divCommIds.has(l.community_id));
             const divAvailLots = divLots.filter((l) => l.is_available);
-            const divModelHomes = modelHomes.filter((m) => {
-              const comm = communities.find((c) => c.name === m.community_name);
-              return comm?.division_id === div.id;
-            });
-            const divSpecHomes = specHomes.filter((s) => {
-              const comm = communities.find((c) => c.name === s.community_name);
-              return comm?.division_id === div.id;
-            });
+            const totalDivLots = divLots.length;
+            const barWidth =
+              totalDivLots > 0
+                ? `${Math.round((divAvailLots.length / totalDivLots) * 100)}%`
+                : "0%";
 
             return (
               <div
                 key={div.id}
                 onClick={() => router.push(`/?div=${div.id}`)}
                 style={{
-                  background: "#111",
-                  border: "1px solid #1f1f1f",
-                  borderLeft: "3px solid #223347",
-                  borderRadius: 10,
+                  background: "#3E3F44",
+                  border: "1px solid #555",
+                  borderLeft: "3px solid #59a6bd",
+                  borderRadius: 3,
                   padding: "14px 16px",
                   cursor: "pointer",
-                  transition: "border-color 0.15s",
+                  transition: "border-color 0.15s, box-shadow 0.15s",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = "#334";
+                  const el = e.currentTarget as HTMLDivElement;
+                  el.style.borderColor = "#59a6bd";
+                  el.style.boxShadow = "0 2px 8px rgba(89,166,189,0.2)";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = "#1f1f1f";
+                  const el = e.currentTarget as HTMLDivElement;
+                  el.style.borderColor = "#555";
+                  el.style.boxShadow = "none";
                 }}
               >
+                {/* Division name */}
                 <div
                   style={{
                     fontFamily: "var(--font-display)",
                     fontSize: 15,
-                    fontWeight: 600,
+                    fontWeight: 700,
                     color: "#ededed",
-                    marginBottom: 4,
+                    marginBottom: 2,
                   }}
                 >
                   {div.name}
                 </div>
-                <div style={{ color: "#555", fontSize: 11, marginBottom: 12 }}>
-                  {div.region} · {div.state_codes?.join(", ")}
+                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, marginBottom: 10, fontFamily: "var(--font-body)" }}>
+                  {divComms.length} Communities
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 8,
-                  }}
-                >
-                  {[
-                    { label: "Communities", value: divComms.length, accent: "#223347" },
-                    { label: "Model Homes", value: divModelHomes.length, accent: "#5b80a0" },
-                    { label: "Available Lots", value: divAvailLots.length || "—", accent: "#00c853" },
-                    { label: "Quick Delivery", value: divSpecHomes.length, accent: "#8a7a5a" },
-                  ].map((s) => (
+
+                {/* Lot count + mini progress bar */}
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: "var(--font-body)" }}>
+                      Available Lots
+                    </span>
+                    <span style={{ fontSize: 12, color: "#ededed", fontFamily: "var(--font-display)", fontWeight: 600 }}>
+                      {divAvailLots.length}
+                      {totalDivLots > 0 && (
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontWeight: 400 }}>
+                          {" "}/ {totalDivLots}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {/* Progress bar track */}
+                  <div
+                    style={{
+                      background: "#444",
+                      height: 4,
+                      borderRadius: 2,
+                      overflow: "hidden",
+                    }}
+                  >
                     <div
-                      key={s.label}
                       style={{
-                        background: "#161616",
-                        borderRadius: 6,
-                        padding: "8px 10px",
-                        border: "1px solid #1f1f1f",
-                        borderLeft: `2px solid ${s.accent}`,
+                        background: "#59a6bd",
+                        height: "100%",
+                        borderRadius: 2,
+                        width: barWidth,
+                        transition: "width 0.3s",
                       }}
-                    >
-                      <div style={{ color: "#555", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 3, fontWeight: 600 }}>
-                        {s.label}
-                      </div>
-                      <div style={{ color: "#ededed", fontSize: 15, fontWeight: 700 }}>{s.value}</div>
-                    </div>
-                  ))}
+                    />
+                  </div>
                 </div>
-                <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 10, color: "#555" }}>Leads: —</span>
-                  <ComingSoonBadge />
-                  <span style={{ fontSize: 10, color: "#555", marginLeft: 4 }}>Prospects: —</span>
-                  <ComingSoonBadge />
+
+                {/* Leads / Prospects placeholder */}
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-body)" }}>
+                    Leads: —
+                  </span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-body)" }}>
+                    Prospects: —
+                  </span>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Funnel placeholder */}
-        <FunnelPlaceholder />
+        {/* Funnel section */}
+        <HBv1FunnelPlaceholder />
       </div>
     </div>
   );
@@ -504,30 +673,41 @@ interface DivisionViewProps {
   selectedDivisionId: string;
 }
 
+type DivisionTabId = "overview" | "communities";
+
+const DIVISION_TABS: { id: DivisionTabId; label: string }[] = [
+  { id: "overview", label: "📊 Overview" },
+  { id: "communities", label: "🏘 Communities" },
+];
+
 function DivisionView({ communities, divisionPlans, lots, divisions, selectedDivisionId }: DivisionViewProps) {
   const router = useRouter();
+  const [divTab, setDivTab] = useState<DivisionTabId>("overview");
 
   const division = divisions.find((d) => d.id === selectedDivisionId);
-  const availableLots = lots.filter((l) => l.is_available && communities.some((c) => c.id === l.community_id));
+  const commIds = new Set(communities.map((c) => c.id));
+  const availableLots = lots.filter((l) => l.is_available && l.community_id != null && commIds.has(l.community_id));
   const underConstruction = lots.filter(
-    (l) => l.construction_status === "Under Construction" && communities.some((c) => c.id === l.community_id)
+    (l) => l.construction_status === "Under Construction" && l.community_id != null && commIds.has(l.community_id)
   );
-
-  // Count model homes / spec per community (from community.has_model)
   const modelHomeComms = communities.filter((c) => c.has_model);
+  const qdLots = lots.filter((l) => l.lot_status === "Quick Delivery" && l.community_id != null && commIds.has(l.community_id));
+
+  // Top communities scaffold — sorted by community name
+  const topCommunities = [...communities].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 10);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#0d0d0d" }}>
-      {/* Top bar */}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#323236" }}>
+      {/* Top bar — breadcrumb */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: 12,
           padding: "0 24px",
-          height: 44,
-          borderBottom: "1px solid #1f1f1f",
-          background: "#0d0d0d",
+          height: 52,
+          borderBottom: "1px solid #3a3b3e",
+          background: "#2a2b2e",
           flexShrink: 0,
         }}
       >
@@ -536,75 +716,261 @@ function DivisionView({ communities, divisionPlans, lots, divisions, selectedDiv
           style={{
             background: "none",
             border: "none",
-            color: "#555",
+            color: "rgba(255,255,255,0.5)",
             cursor: "pointer",
             fontSize: 13,
             padding: 0,
+            fontFamily: "var(--font-body)",
           }}
         >
           ← Corp
         </button>
-        <span style={{ color: "#333" }}>·</span>
-        <h1 style={{ fontFamily: "var(--font-display)", color: "#ededed", fontSize: 15, fontWeight: 600, margin: 0 }}>
+        <span style={{ color: "#444" }}>·</span>
+        <h1
+          style={{
+            fontFamily: "var(--font-display)",
+            color: "#ededed",
+            fontSize: 15,
+            fontWeight: 700,
+            margin: 0,
+          }}
+        >
           {division?.name ?? "Division"}
         </h1>
-        <span style={{ color: "#555", fontSize: 12 }}>
+        <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontFamily: "var(--font-body)", marginLeft: 4 }}>
           {communities.length} Communities · {divisionPlans.length} Plans
         </span>
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
-        {/* Summary stats */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-            gap: 10,
-            marginBottom: 28,
-          }}
-        >
-          <StatCard label="Communities" value={communities.length} accent="#223347" />
-          <StatCard label="Plans" value={divisionPlans.length} accent="#223347" />
-          <StatCard label="Available Lots" value={availableLots.length} accent="#00c853" />
-          <StatCard label="Under Construction" value={underConstruction.length} accent="#5b80a0" />
-          <StatCard label="Model Homes" value={modelHomeComms.length} accent="#5b80a0" />
-          <StatCard label="Leads" value="—" accent="#a855f7" comingSoon />
-          <StatCard label="Prospects" value="—" accent="#f59e0b" comingSoon />
-        </div>
+      {/* HBv1 sub-tab bar */}
+      <div
+        style={{
+          background: "#2a2b2e",
+          borderBottom: "2px solid #444",
+          display: "flex",
+          gap: 0,
+          padding: "0 24px",
+          flexShrink: 0,
+        }}
+      >
+        {DIVISION_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setDivTab(tab.id)}
+            style={{
+              background: "none",
+              border: "none",
+              borderBottom: divTab === tab.id ? "2px solid #59a6bd" : "2px solid transparent",
+              marginBottom: -2,
+              color: divTab === tab.id ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+              fontSize: 13,
+              fontFamily: "var(--font-body)",
+              fontWeight: divTab === tab.id ? 600 : 400,
+              padding: "10px 18px",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              transition: "color 0.15s",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Community cards */}
-        <SectionHeader title="Communities" count={communities.length} />
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: 14,
-            marginBottom: 32,
-          }}
-        >
-          {communities.map((comm) => {
-            const commPlans = divisionPlans.filter((p) => p.division_id === comm.division_id);
-            const hasModel = comm.has_model;
-            return (
-              <CommunityCard
-                key={comm.id}
-                name={comm.name}
-                city={comm.city}
-                state={comm.state}
-                priceFrom={comm.price_from}
-                imageUrl={comm.featured_image_url}
-                modelHomeName={hasModel ? "Model Home" : null}
-                status={comm.status}
-                amenities={comm.amenities ? comm.amenities.split(";").map((a: string) => a.trim()).filter(Boolean) : null}
-                onClick={() => router.push(`/?comm=${comm.id}`)}
-              />
-            );
-          })}
-        </div>
+      {/* Tab content */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
 
-        {/* Funnel */}
-        <FunnelPlaceholder />
+        {/* ─── Overview tab ─── */}
+        {divTab === "overview" && (
+          <div style={{ padding: 24 }}>
+            {/* 7 stat cards */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                gap: 10,
+                marginBottom: 28,
+              }}
+            >
+              {[
+                { label: "Communities", value: communities.length, cs: false },
+                { label: "Plans", value: divisionPlans.length, cs: false },
+                { label: "Available Lots", value: availableLots.length, cs: false },
+                { label: "Under Construction", value: underConstruction.length, cs: false },
+                { label: "Model Homes", value: modelHomeComms.length, cs: false },
+                { label: "QD Homes", value: qdLots.length, cs: false },
+                { label: "Leads", value: "—", cs: true },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  style={{
+                    background: "#3E3F44",
+                    border: "1px solid #555",
+                    borderRadius: 3,
+                    padding: "12px 14px",
+                    minWidth: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 28,
+                      fontWeight: 700,
+                      color: s.cs ? "#444" : "#ededed",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {s.value}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.45)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.07em",
+                      marginTop: 4,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {s.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Funnel placeholder */}
+            <HBv1FunnelPlaceholder />
+
+            {/* Top Communities table */}
+            <div style={{ marginBottom: 32 }}>
+              <h2
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: "#ededed",
+                  margin: "0 0 16px 0",
+                }}
+              >
+                Top Communities
+              </h2>
+              <div
+                style={{
+                  background: "#3E3F44",
+                  border: "1px solid #555",
+                  borderRadius: 3,
+                  overflow: "hidden",
+                }}
+              >
+                {/* Header row */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
+                    padding: "8px 16px",
+                    borderBottom: "1px solid #555",
+                    background: "#2a2b2e",
+                  }}
+                >
+                  {["Community", "Avail Lots", "Plans", "Leads", "Contracts"].map((h) => (
+                    <div
+                      key={h}
+                      style={{
+                        fontSize: 10,
+                        color: "rgba(255,255,255,0.4)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.07em",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {h}
+                    </div>
+                  ))}
+                </div>
+                {/* Data rows */}
+                {topCommunities.map((comm, i) => {
+                  const commAvail = lots.filter(
+                    (l) => l.community_id === comm.id && l.is_available
+                  ).length;
+                  return (
+                    <div
+                      key={comm.id}
+                      onClick={() => router.push(`/?comm=${comm.id}`)}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
+                        padding: "9px 16px",
+                        borderBottom: i < topCommunities.length - 1 ? "1px solid #4a4b50" : "none",
+                        cursor: "pointer",
+                        transition: "background 0.1s",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.background = "#484950";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: 13,
+                          color: "#ededed",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {comm.name}
+                      </div>
+                      <div style={{ fontSize: 13, color: "#ededed", fontFamily: "var(--font-body)" }}>
+                        {commAvail || "—"}
+                      </div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", fontFamily: "var(--font-body)" }}>—</div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", fontFamily: "var(--font-body)" }}>—</div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", fontFamily: "var(--font-body)" }}>—</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Communities tab ─── */}
+        {divTab === "communities" && (
+          <div style={{ padding: 24 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                gap: 14,
+                marginBottom: 32,
+              }}
+            >
+              {communities.map((comm) => {
+                const hasModel = comm.has_model;
+                return (
+                  <CommunityCard
+                    key={comm.id}
+                    name={comm.name}
+                    city={comm.city}
+                    state={comm.state}
+                    priceFrom={comm.price_from}
+                    imageUrl={comm.featured_image_url}
+                    modelHomeName={hasModel ? "Model Home" : null}
+                    status={comm.status}
+                    amenities={
+                      comm.amenities
+                        ? comm.amenities.split(";").map((a: string) => a.trim()).filter(Boolean)
+                        : null
+                    }
+                    onClick={() => router.push(`/?comm=${comm.id}`)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
