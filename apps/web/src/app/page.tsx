@@ -33,7 +33,7 @@ export default async function OverviewPage({
         .order("net_price"),
       supabase
         .from("lots")
-        .select("id,community_id,lot_number,lot_status,construction_status,is_available,lot_premium,address")
+        .select("id,community_id,lot_number,lot_status,construction_status,is_available,lot_premium,address,phase,is_buildable")
         .eq("community_id", filterComm)
         .order("lot_number"),
       supabase.from("model_homes").select("*").eq("community_id", filterComm).maybeSingle(),
