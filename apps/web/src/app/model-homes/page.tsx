@@ -9,20 +9,17 @@ export default async function ModelHomesPage() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 
-  const [{ data: communities }, { data: divisions }] = await Promise.all([
+  const [{ data: modelHomes }, { data: divisions }] = await Promise.all([
     supabase
-      .from("communities")
-      .select(
-        "id,name,city,state,status,price_from,featured_image_url,division_id,page_url,model_homes"
-      )
-      .not("model_homes", "is", null)
-      .order("name"),
+      .from("model_homes")
+      .select("*")
+      .order("community_name"),
     supabase.from("divisions").select("id,slug,name").order("name"),
   ]);
 
   return (
     <ModelHomesClient
-      communities={communities ?? []}
+      modelHomes={modelHomes ?? []}
       divisions={divisions ?? []}
     />
   );

@@ -12,48 +12,83 @@ interface Division {
   name: string;
 }
 
-interface Community {
+interface SpecHome {
   id: string;
-  name: string;
+  home_id: number;
+  name: string | null;
+  transaction_type: string | null;
+  division_id: number | null;
+  division_name: string | null;
+  division_parent_id: number | null;
+  division_parent_name: string | null;
+  community_id: string | null;
+  community_name: string | null;
+  community_slug: string | null;
+  community_parent_id: string | null;
+  address: string | null;
   city: string | null;
   state: string | null;
-  division_id: string;
+  zip: string | null;
+  lat: number | null;
+  lng: number | null;
+  lot_number: string | null;
+  block_number: string | null;
+  lot_block_number: string | null;
+  model_id: number | null;
+  model_name: string | null;
+  model_marketing_name: string | null;
+  is_market_home: boolean | null;
+  is_market_home_sold: boolean | null;
+  is_model: boolean | null;
+  is_model_sold: boolean | null;
+  is_leaseback: boolean | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  heated_sqft: number | null;
+  total_sqft: number | null;
+  base_price: number | null;
+  incentive_price: number | null;
+  net_price: number | null;
+  base_price_formatted: string | null;
+  incentive_price_formatted: string | null;
+  price_formatted: string | null;
+  listing_id: number | null;
+  is_marketing_active: boolean | null;
+  description: string | null;
+  page_title: string | null;
+  url: string | null;
   featured_image_url: string | null;
+  featured_image_thumbnail_url: string | null;
+  thumbnail_image_url: string | null;
+  flickr_set: string | null;
+  virtual_tour_url: string | null;
+  filters: unknown[] | null;
+  elevations: unknown[] | null;
+  floor_plan_images: unknown[] | null;
+  pdf_file_id: string | null;
+  card_label: string | null;
+  synced_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
-interface QDLot {
-  id: string;
-  community_id: string | null;
-  community_name_raw: string;
-  division_raw: string;
-  lot_number: string;
-  block: string | null;
-  lot_status: string;
-  construction_status: string | null;
-  lot_premium: number | null;
-  address: string | null;
-  is_available: boolean;
-}
-
-type QDRow = QDLot & Record<string, unknown> & {
-  _community_name: string;
-  _city: string;
-  _state: string;
-  _division_name: string;
-  _premium_display: string;
-};
+type SpecHomeRow = SpecHome & Record<string, unknown>;
 
 interface Props {
-  qdLots: QDLot[];
-  communities: Community[];
+  specHomes: SpecHome[];
   divisions: Division[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function formatPremium(n: number | null): string {
-  if (n == null || n === 0) return "—";
-  return `+$${n.toLocaleString()}`;
+function formatCurrency(n: number | null): string {
+  if (n == null) return "—";
+  return "$" + n.toLocaleString();
+}
+
+function formatSqft(n: number | null): string {
+  if (n == null) return "—";
+  return n.toLocaleString() + " sqft";
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -69,22 +104,19 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ color: "#666", fontSize: 13 }}>{label}</span>
-      <span style={{ color: "#a1a1a1", fontSize: 12, textAlign: "right", maxWidth: "60%" }}>{value ?? "—"}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      <span style={{ color: "#666", fontSize: 13, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: "#a1a1a1", fontSize: 12, textAlign: "right" }}>{value ?? "—"}</span>
     </div>
   );
 }
 
-function ConstructionBadge({ status }: { status: string | null }) {
+function StatusBadge({ status }: { status: string | null }) {
   if (!status) return <span style={{ color: "#444" }}>—</span>;
-  const isUC = status === "Under Construction";
   return (
     <span style={{
       fontSize: 10, padding: "2px 7px", borderRadius: 4, fontWeight: 500, whiteSpace: "nowrap",
-      backgroundColor: isUC ? "#161820" : "#161616",
-      color: isUC ? "#5b80a0" : "#555",
-      border: `1px solid ${isUC ? "#1a2a3f" : "#222"}`,
+      backgroundColor: "#161820", color: "#5b80a0", border: "1px solid #1a2a3f",
     }}>
       {status}
     </span>
@@ -93,13 +125,13 @@ function ConstructionBadge({ status }: { status: string | null }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export default function QuickDeliveryClient({ qdLots, communities, divisions }: Props) {
+export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
   const [view, setView] = useState<"table" | "card">("table");
   const [divFilter, setDivFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
   const [commFilter, setCommFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [selectedLot, setSelectedLot] = useState<QDRow | null>(null);
+  const [selectedHome, setSelectedHome] = useState<SpecHomeRow | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("quick-delivery-view");
@@ -111,112 +143,101 @@ export default function QuickDeliveryClient({ qdLots, communities, divisions }: 
     localStorage.setItem("quick-delivery-view", v);
   }
 
-  const commMap = new Map(communities.map(c => [c.id, c]));
-  const divMap = new Map(divisions.map(d => [d.id, d]));
+  const allRows: SpecHomeRow[] = specHomes as SpecHomeRow[];
 
-  // Build display rows — join community data where community_id exists
-  const allRows: QDRow[] = qdLots.map(lot => {
-    const comm = lot.community_id ? commMap.get(lot.community_id) : null;
-    const div = comm ? divMap.get(comm.division_id) : null;
-    return {
-      ...lot,
-      _community_name: comm?.name ?? lot.community_name_raw,
-      _city: comm?.city ?? "—",
-      _state: comm?.state ?? "—",
-      _division_name: div?.name ?? lot.division_raw,
-      _premium_display: formatPremium(lot.lot_premium),
-    };
-  });
+  // Unique states from data
+  const allStates = Array.from(new Set(allRows.map(r => r.state).filter(Boolean))).sort() as string[];
 
-  // Filter options
-  const allStates = Array.from(new Set(allRows.map(r => r._state).filter(s => s !== "—"))).sort();
-  const allDivisions = divisions;
-
-  const filteredComms = Array.from(
-    new Map(
-      allRows
-        .filter(r => divFilter === "all" || r._division_name === divisions.find(d => d.id === divFilter)?.name)
-        .filter(r => stateFilter === "all" || r._state === stateFilter)
-        .map(r => [r._community_name, r])
-    ).entries()
-  ).map(([name]) => name).sort();
+  // Unique community names for filter (cascaded)
+  const filteredComms = Array.from(new Set(
+    allRows
+      .filter(r => divFilter === "all" || String(r.division_parent_id) === divFilter)
+      .filter(r => stateFilter === "all" || r.state === stateFilter)
+      .map(r => r.community_name)
+      .filter(Boolean)
+  )).sort() as string[];
 
   const rows = allRows
-    .filter(r => divFilter === "all" || r._division_name === divisions.find(d => d.id === divFilter)?.name)
-    .filter(r => stateFilter === "all" || r._state === stateFilter)
-    .filter(r => commFilter === "all" || r._community_name === commFilter)
-    .filter(r => !search || r._community_name.toLowerCase().includes(search.toLowerCase()) || r.lot_number.includes(search));
+    .filter(r => divFilter === "all" || String(r.division_parent_id) === divFilter)
+    .filter(r => stateFilter === "all" || r.state === stateFilter)
+    .filter(r => commFilter === "all" || r.community_name === commFilter)
+    .filter(r => !search ||
+      (r.community_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.model_marketing_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.address ?? "").toLowerCase().includes(search.toLowerCase())
+    );
 
   // Stats
-  const withPremium = rows.filter(r => r.lot_premium && r.lot_premium > 0);
-  const avgPremium = withPremium.length
-    ? Math.round(withPremium.reduce((s, r) => s + (r.lot_premium ?? 0), 0) / withPremium.length)
+  const withPrice = rows.filter(r => r.net_price && r.net_price > 0);
+  const avgPrice = withPrice.length
+    ? Math.round(withPrice.reduce((s, r) => s + (r.net_price ?? 0), 0) / withPrice.length)
     : null;
 
-  const cardStats = {
-    total: rows.length,
-    communities: new Set(rows.map(r => r._community_name)).size,
-    states: new Set(rows.map(r => r._state)).size,
-    avgPremium,
-  };
-
-  const statConfig: StatConfigItem<QDRow>[] = [
-    { label: "Total", color: "#666", getValue: (r: QDRow[]) => r.length },
-    { label: "Communities", color: "#666", getValue: (r: QDRow[]) => new Set(r.map((x: QDRow) => x._community_name)).size },
-    { label: "States", color: "#666", getValue: (r: QDRow[]) => new Set(r.map((x: QDRow) => x._state)).size },
+  const statConfig: StatConfigItem<SpecHomeRow>[] = [
+    { label: "Total", color: "#666", getValue: (r) => r.length },
+    { label: "Communities", color: "#666", getValue: (r) => new Set(r.map(x => x.community_name)).size },
+    { label: "States", color: "#666", getValue: (r) => new Set(r.map(x => x.state)).size },
     {
-      label: "Avg Premium", color: "#8a7a5a", isString: true,
-      getValue: (r: QDRow[]) => {
-        const wp = r.filter((x: QDRow) => x.lot_premium && x.lot_premium > 0);
+      label: "Avg Price", color: "#8a7a5a", isString: true,
+      getValue: (r) => {
+        const wp = r.filter(x => x.net_price && x.net_price > 0);
         if (!wp.length) return "—";
-        const avg = wp.reduce((s: number, x: QDRow) => s + (x.lot_premium ?? 0), 0) / wp.length;
+        const avg = wp.reduce((s, x) => s + (x.net_price ?? 0), 0) / wp.length;
         return `$${Math.round(avg / 1000)}k`;
       }
     },
   ];
 
   // Table columns
-  const columns: Column<QDRow>[] = [
+  const columns: Column<SpecHomeRow>[] = [
     {
-      key: "_community_name", label: "Community", sticky: true,
-      render: (_v, row) => <span style={{ color: "#ededed", fontWeight: 500, fontSize: 13 }}>{row._community_name}</span>,
-    },
-    { key: "_city", label: "City", filterable: true },
-    { key: "_state", label: "State", filterable: true },
-    { key: "_division_name", label: "Division", filterable: true },
-    {
-      key: "lot_number", label: "Lot #",
-      render: (_v, row) => <span style={{ color: "#a1a1a1" }}>{row.lot_number}{row.block ? ` / ${row.block}` : ""}</span>,
+      key: "community_name", label: "Community", sticky: true,
+      render: (_v, row) => <span style={{ color: "#ededed", fontWeight: 500, fontSize: 13 }}>{row.community_name ?? "—"}</span>,
     },
     {
-      key: "construction_status", label: "Construction",
-      render: (_v, row) => <ConstructionBadge status={row.construction_status} />,
+      key: "model_marketing_name", label: "Plan Name",
+      render: (_v, row) => <span style={{ color: "#c0c0c0", fontSize: 13 }}>{row.model_marketing_name ?? row.model_name ?? "—"}</span>,
+    },
+    { key: "city", label: "City", filterable: true },
+    { key: "state", label: "State", filterable: true },
+    { key: "division_parent_name", label: "Division", filterable: true },
+    {
+      key: "bedrooms", label: "Beds/Baths",
+      render: (_v, row) => <span style={{ color: "#a1a1a1", fontSize: 12 }}>
+        {row.bedrooms ?? "—"} / {row.bathrooms ?? "—"}
+      </span>,
     },
     {
-      key: "lot_premium", label: "Premium",
-      render: (_v, row) => row.lot_premium && row.lot_premium > 0
-        ? <span style={{ color: "#8a7a5a", fontWeight: 600 }}>{formatPremium(row.lot_premium)}</span>
+      key: "heated_sqft", label: "Sqft",
+      render: (_v, row) => <span style={{ color: "#a1a1a1", fontSize: 12 }}>
+        {row.heated_sqft ? row.heated_sqft.toLocaleString() : "—"}
+      </span>,
+    },
+    {
+      key: "net_price", label: "Price",
+      render: (_v, row) => row.net_price
+        ? <span style={{ color: "#8a7a5a", fontWeight: 600, fontSize: 13 }}>{row.price_formatted ?? formatCurrency(row.net_price)}</span>
         : <span style={{ color: "#444" }}>—</span>,
+    },
+    {
+      key: "transaction_type", label: "Status",
+      render: (_v, row) => <StatusBadge status={row.transaction_type} />,
     },
     {
       key: "address", label: "Address",
       render: (_v, row) => <span style={{ color: "#666", fontSize: 12 }}>{row.address ?? "—"}</span>,
     },
     {
-      key: "id", label: "View", sortable: false,
-      render: (_v, row) => {
-        const comm = row.community_id ? commMap.get(row.community_id) : null;
-        const pageUrl = comm ? `https://www.schellbrothers.com${comm.featured_image_url ? "" : ""}` : null;
-        return (
-          <a href={`https://www.schellbrothers.com`} target="_blank" rel="noopener noreferrer"
+      key: "url", label: "View", sortable: false,
+      render: (_v, row) => row.url
+        ? <a href={`https://www.schellbrothers.com${row.url}`} target="_blank" rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
             style={{ color: "#777", fontSize: 13, textDecoration: "none" }}>↗</a>
-        );
-      },
+        : <span style={{ color: "#444" }}>—</span>,
     },
   ];
 
-  // ── Top bar ─────────────────────────────────────────────────────────────────
+  // ── Top bar ──────────────────────────────────────────────────────────────────
   const topBar = (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", height: 44, borderBottom: "1px solid #1f1f1f", background: "#0d0d0d", flexShrink: 0 }}>
       <h1 style={{ color: "#ededed", fontSize: 14, fontWeight: 600, margin: 0 }}>Quick Delivery</h1>
@@ -235,11 +256,16 @@ export default function QuickDeliveryClient({ qdLots, communities, divisions }: 
   // ── Filter bar ───────────────────────────────────────────────────────────────
   const selectStyle: React.CSSProperties = { background: "#111", border: "1px solid #2a2a2a", color: "#a1a1a1", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", outline: "none" };
 
+  // Build unique parent division options from data
+  const divisionOptions = Array.from(
+    new Map(allRows.filter(r => r.division_parent_id && r.division_parent_name).map(r => [String(r.division_parent_id), r.division_parent_name!])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
   const filtersBar = (
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 24px", borderBottom: "1px solid #1a1a1a", background: "#0a0a0a", flexShrink: 0, flexWrap: "wrap" }}>
       <select value={divFilter} onChange={e => { setDivFilter(e.target.value); setCommFilter("all"); }} style={selectStyle}>
         <option value="all">All Divisions</option>
-        {allDivisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+        {divisionOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
       </select>
       <select value={stateFilter} onChange={e => { setStateFilter(e.target.value); setCommFilter("all"); }} style={selectStyle}>
         <option value="all">All States</option>
@@ -258,10 +284,10 @@ export default function QuickDeliveryClient({ qdLots, communities, divisions }: 
   const statsBar = (
     <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "6px 24px", backgroundColor: "#0d0d0d", borderBottom: "1px solid #1a1a1a", flexShrink: 0 }}>
       {[
-        { label: "Total", value: cardStats.total, color: "#666" },
-        { label: "Communities", value: cardStats.communities, color: "#666" },
-        { label: "States", value: cardStats.states, color: "#666" },
-        { label: "Avg Premium", value: cardStats.avgPremium != null ? `$${Math.round(cardStats.avgPremium / 1000)}k` : "—", color: "#8a7a5a", isStr: true },
+        { label: "Total", value: rows.length, color: "#666" },
+        { label: "Communities", value: new Set(rows.map(r => r.community_name)).size, color: "#666" },
+        { label: "States", value: new Set(rows.map(r => r.state)).size, color: "#666" },
+        { label: "Avg Price", value: avgPrice != null ? `$${Math.round(avgPrice / 1000)}k` : "—", color: "#8a7a5a", isStr: true },
       ].map(s => (
         <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 11, color: "#555" }}>{s.label}:</span>
@@ -274,76 +300,104 @@ export default function QuickDeliveryClient({ qdLots, communities, divisions }: 
   // ── Card view ────────────────────────────────────────────────────────────────
   const cardView = (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, padding: "16px" }}>
-      {rows.map(lot => {
-        const comm = lot.community_id ? commMap.get(lot.community_id) : null;
-        const imgUrl = comm?.featured_image_url ?? null;
-        return (
-          <div key={lot.id} onClick={() => setSelectedLot(lot)}
-            style={{ borderRadius: 10, border: "1px solid #1a1a1a", backgroundColor: "#111", padding: 16, cursor: "pointer", display: "flex", gap: 16, alignItems: "flex-start", transition: "border-color 0.15s" }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = "#2a2a2a")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "#1a1a1a")}
-          >
-            {/* Left: content */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#ededed", marginBottom: 2 }}>{lot._community_name}</div>
-              <div style={{ fontSize: 12, color: "#555", marginBottom: 10 }}>{lot._city}, {lot._state}</div>
-              <div style={{ marginBottom: 8 }}><ConstructionBadge status={lot.construction_status} /></div>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>Lot {lot.lot_number}{lot.block ? ` / Block ${lot.block}` : ""}</div>
-              {lot.address && <div style={{ fontSize: 11, color: "#555", marginBottom: 10 }}>{lot.address}</div>}
-              {lot.lot_premium != null && lot.lot_premium > 0 && (
-                <div style={{ marginBottom: 10 }}>
-                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, backgroundColor: "#1e1e1a", color: "#8a7a5a", border: "1px solid #2a2a1a", fontWeight: 500 }}>
-                    {formatPremium(lot.lot_premium)}
-                  </span>
-                </div>
-              )}
+      {rows.map(home => (
+        <div key={home.id} onClick={() => setSelectedHome(home)}
+          style={{ borderRadius: 10, border: "1px solid #1a1a1a", backgroundColor: "#111", overflow: "hidden", cursor: "pointer", transition: "border-color 0.15s" }}
+          onMouseEnter={e => (e.currentTarget.style.borderColor = "#2a2a2a")}
+          onMouseLeave={e => (e.currentTarget.style.borderColor = "#1a1a1a")}
+        >
+          {home.featured_image_url ? (
+            <img src={home.featured_image_url} alt={home.community_name ?? ""} style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }} />
+          ) : (
+            <div style={{ width: "100%", height: 140, backgroundColor: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 28, opacity: 0.2 }}>⌂</span>
             </div>
-            {/* Right: image */}
-            {imgUrl ? (
-              <div style={{ flexShrink: 0, width: 140, height: 100, borderRadius: 8, overflow: "hidden" }}>
-                <img src={imgUrl} alt={lot._community_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          )}
+          <div style={{ padding: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#ededed", marginBottom: 2 }}>{home.model_marketing_name ?? home.model_name ?? home.name ?? "—"}</div>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>{home.community_name}</div>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 6 }}>{home.city}, {home.state}</div>
+            {home.net_price && (
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#8a7a5a", marginBottom: 6 }}>
+                {home.price_formatted ?? formatCurrency(home.net_price)}
               </div>
-            ) : (
-              <div style={{ flexShrink: 0, width: 140, height: 100, borderRadius: 8, background: "#1a1a1a" }} />
             )}
+            <div style={{ fontSize: 11, color: "#666" }}>
+              {home.bedrooms ?? "—"} bd · {home.bathrooms ?? "—"} ba · {home.heated_sqft ? home.heated_sqft.toLocaleString() : "—"} sqft
+            </div>
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 
   // ── Slide-over ───────────────────────────────────────────────────────────────
-  const slideOver = selectedLot && (
+  const slideOver = selectedHome && (
     <>
-      <div onClick={() => setSelectedLot(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40 }} />
-      <div style={{ position: "fixed", top: 0, right: 0, width: 480, height: "100vh", background: "#111", borderLeft: "1px solid #1f1f1f", zIndex: 50, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div onClick={() => setSelectedHome(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40 }} />
+      <div style={{ position: "fixed", top: 0, right: 0, width: 500, height: "100vh", background: "#111", borderLeft: "1px solid #1f1f1f", zIndex: 50, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #1f1f1f", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <div>
-            <div style={{ marginBottom: 8 }}><ConstructionBadge status={selectedLot.construction_status} /></div>
-            <h2 style={{ color: "#ededed", fontSize: 16, fontWeight: 600, margin: 0 }}>{selectedLot._community_name}</h2>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ marginBottom: 6 }}><StatusBadge status={selectedHome.transaction_type} /></div>
+            <h2 style={{ color: "#ededed", fontSize: 16, fontWeight: 600, margin: 0 }}>{selectedHome.model_marketing_name ?? selectedHome.model_name ?? selectedHome.name ?? "—"}</h2>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>{selectedHome.community_name}</div>
           </div>
-          <button onClick={() => setSelectedLot(null)} style={{ background: "transparent", border: "none", color: "#555", fontSize: 22, cursor: "pointer", padding: 0, lineHeight: 1, marginTop: 2 }}>×</button>
+          <button onClick={() => setSelectedHome(null)} style={{ background: "transparent", border: "none", color: "#555", fontSize: 22, cursor: "pointer", padding: 0, lineHeight: 1, marginTop: 2 }}>×</button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+          {selectedHome.featured_image_url ? (
+            <img src={selectedHome.featured_image_url} alt={selectedHome.name ?? ""} style={{ width: "100%", borderRadius: 8, marginBottom: 20, objectFit: "cover", maxHeight: 220 }} />
+          ) : (
+            <div style={{ width: "100%", height: 160, backgroundColor: "#1a1a1a", borderRadius: 8, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 32, opacity: 0.2 }}>⌂</span>
+            </div>
+          )}
+
+          <Section title="Pricing">
+            <Row label="Net Price" value={<span style={{ color: "#8a7a5a", fontWeight: 600 }}>{selectedHome.price_formatted ?? formatCurrency(selectedHome.net_price)}</span>} />
+            <Row label="Base Price" value={selectedHome.base_price_formatted ?? formatCurrency(selectedHome.base_price)} />
+            {selectedHome.incentive_price && selectedHome.incentive_price > 0 && (
+              <Row label="Incentive" value={<span style={{ color: "#5a8a5a" }}>{selectedHome.incentive_price_formatted ?? formatCurrency(selectedHome.incentive_price)}</span>} />
+            )}
+          </Section>
+
+          <Section title="Home Details">
+            <Row label="Plan" value={selectedHome.model_marketing_name ?? selectedHome.model_name} />
+            <Row label="Bedrooms" value={selectedHome.bedrooms ?? "—"} />
+            <Row label="Bathrooms" value={selectedHome.bathrooms ?? "—"} />
+            <Row label="Heated Sqft" value={selectedHome.heated_sqft ? selectedHome.heated_sqft.toLocaleString() : "—"} />
+            <Row label="Total Sqft" value={selectedHome.total_sqft ? selectedHome.total_sqft.toLocaleString() : "—"} />
+            <Row label="Lot" value={selectedHome.lot_block_number ?? selectedHome.lot_number ?? "—"} />
+          </Section>
+
           <Section title="Location">
-            <Row label="City" value={selectedLot._city} />
-            <Row label="State" value={selectedLot._state} />
-            <Row label="Division" value={selectedLot._division_name} />
-            <Row label="Address" value={selectedLot.address} />
+            <Row label="Address" value={selectedHome.address} />
+            <Row label="City" value={selectedHome.city} />
+            <Row label="State" value={selectedHome.state} />
+            <Row label="Zip" value={selectedHome.zip} />
+            <Row label="Division" value={selectedHome.division_parent_name} />
+            <Row label="Community" value={selectedHome.community_name} />
           </Section>
-          <Section title="Lot Details">
-            <Row label="Lot #" value={selectedLot.lot_number} />
-            <Row label="Block" value={selectedLot.block || "—"} />
-            <Row label="Construction" value={<ConstructionBadge status={selectedLot.construction_status} />} />
-            <Row label="Premium" value={selectedLot.lot_premium && selectedLot.lot_premium > 0
-              ? <span style={{ color: "#8a7a5a", fontWeight: 600 }}>{formatPremium(selectedLot.lot_premium)}</span>
-              : "—"} />
-          </Section>
+
+          {selectedHome.description && (
+            <Section title="Description">
+              <p style={{ color: "#888", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{selectedHome.description}</p>
+            </Section>
+          )}
+
           <Section title="Actions">
-            <a href="https://www.schellbrothers.com" target="_blank" rel="noopener noreferrer"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6, border: "1px solid #1a2a3f", backgroundColor: "#1a1f2e", color: "#5b80a0", fontSize: 13, textDecoration: "none", fontWeight: 500 }}>
-              ↗ View Quick Delivery Home
-            </a>
+            {selectedHome.url && (
+              <a href={`https://www.schellbrothers.com${selectedHome.url}`} target="_blank" rel="noopener noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6, border: "1px solid #1a2a3f", backgroundColor: "#1a1f2e", color: "#5b80a0", fontSize: 13, textDecoration: "none", fontWeight: 500 }}>
+                ↗ View on schellbrothers.com
+              </a>
+            )}
+            {selectedHome.virtual_tour_url && (
+              <a href={selectedHome.virtual_tour_url} target="_blank" rel="noopener noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6, border: "1px solid #1a3f1a", backgroundColor: "#1a2e1a", color: "#5a8a5a", fontSize: 13, textDecoration: "none", fontWeight: 500, marginTop: 8 }}>
+                ▶ Virtual Tour
+              </a>
+            )}
           </Section>
         </div>
       </div>
@@ -359,7 +413,7 @@ export default function QuickDeliveryClient({ qdLots, communities, divisions }: 
         {view === "card" && statsBar}
         <div style={{ flex: 1, overflow: "auto" }}>
           {view === "table"
-            ? <DataTable<QDRow> columns={columns} rows={rows} statConfig={statConfig} defaultPageSize={100} onRowClick={setSelectedLot} emptyMessage="No quick delivery homes" minWidth={1000} />
+            ? <DataTable<SpecHomeRow> columns={columns} rows={rows} statConfig={statConfig} defaultPageSize={100} onRowClick={setSelectedHome} emptyMessage="No quick delivery homes" minWidth={1100} />
             : cardView}
         </div>
       </main>
