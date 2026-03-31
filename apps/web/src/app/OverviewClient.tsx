@@ -28,6 +28,7 @@ export interface Community {
   featured_image_url: string | null;
   model_homes: string | null;
   amenities: string | null;
+  amenities_structured?: unknown[] | null;
   status: string | null;
   page_url: string | null;
   hoa_fee: number | null;
@@ -594,7 +595,7 @@ function DivisionView({ communities, divisionPlans, lots, divisions, selectedDiv
                 imageUrl={comm.featured_image_url}
                 modelHomeName={hasModel ? "Model Home" : null}
                 status={comm.status}
-                amenities={comm.amenities ? JSON.parse(comm.amenities) : null}
+                amenities={comm.amenities ? comm.amenities.split(";").map((a: string) => a.trim()).filter(Boolean) : null}
                 onClick={() => router.push(`/?comm=${comm.id}`)}
               />
             );
