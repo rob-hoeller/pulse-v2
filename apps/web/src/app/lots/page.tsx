@@ -40,8 +40,10 @@ export interface DivisionRow {
 export default async function LotsPage({
   searchParams,
 }: {
-  searchParams: { div?: string; comm?: string; plan?: string };
+  searchParams: Promise<{ div?: string; comm?: string; plan?: string }>;
 }) {
+  const { div: filterDiv, comm: filterComm } = await searchParams;
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
@@ -57,8 +59,8 @@ export default async function LotsPage({
       .select("*")
       .order("community_name_raw")
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-    if (searchParams.comm) {
-      q = q.eq("community_id", searchParams.comm);
+    if (filterComm) {
+      q = q.eq("community_id", filterComm);
     }
     const { data, error } = await q;
     if (error || !data || data.length === 0) break;
@@ -68,13 +70,15 @@ export default async function LotsPage({
   }
 
   let commQuery = supabase.from("communities").select("id,name,city,state,division_id").order("name");
-  if (searchParams.div) {
-    commQuery = commQuery.eq("division_id", searchParams.div);
+  if (filterDiv) {
+    commQuery = commQuery.eq("division_id", filterDiv);
   }
 
   const [{ data: communities }, { data: divisions }] = await Promise.all([
     commQuery,
-    supabase.from("divisions").select("id,slug,name").order("name"),
+    const { div: filterDiv, comm: filterComm } = await searchParams;
+
+  supabase.from("divisions").select("id,slug,name").order("name"),
   ]);
 
   return (

@@ -6,18 +6,20 @@ export const revalidate = 30;
 export default async function QuickDeliveryPage({
   searchParams,
 }: {
-  searchParams: { div?: string; comm?: string; plan?: string };
+  searchParams: Promise<{ div?: string; comm?: string; plan?: string }>;
 }) {
+  const { div: filterDiv, comm: filterComm } = await searchParams;
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 
   let specHomesQuery = supabase.from("spec_homes").select("*").order("community_name");
-  if (searchParams.comm) {
-    specHomesQuery = specHomesQuery.eq("community_id", searchParams.comm);
-  } else if (searchParams.div) {
-    specHomesQuery = specHomesQuery.eq("division_parent_id", searchParams.div);
+  if (filterComm) {
+    specHomesQuery = specHomesQuery.eq("community_id", filterComm);
+  } else if (filterDiv) {
+    specHomesQuery = specHomesQuery.eq("division_parent_id", filterDiv);
   }
 
   const [{ data: specHomes }, { data: divisions }] = await Promise.all([

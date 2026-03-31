@@ -63,8 +63,10 @@ export interface Division {
 export default async function PlansPage({
   searchParams,
 }: {
-  searchParams: { div?: string; comm?: string; plan?: string };
+  searchParams: Promise<{ div?: string; comm?: string; plan?: string }>;
 }) {
+  const { div: filterDiv, comm: filterComm, plan: filterPlan } = await searchParams;
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
@@ -75,8 +77,8 @@ export default async function PlansPage({
     .select("*")
     .order("marketing_name")
     .returns<DivisionPlan[]>();
-  if (searchParams.div) {
-    divisionPlansQuery = divisionPlansQuery.eq("division_id", searchParams.div) as typeof divisionPlansQuery;
+  if (filterDiv) {
+    divisionPlansQuery = divisionPlansQuery.eq("division_id", filterDiv) as typeof divisionPlansQuery;
   }
 
   let communityPlansQuery = supabase
@@ -84,10 +86,10 @@ export default async function PlansPage({
     .select("*")
     .order("plan_name")
     .returns<CommunityPlan[]>();
-  if (searchParams.comm) {
-    communityPlansQuery = communityPlansQuery.eq("community_id", searchParams.comm) as typeof communityPlansQuery;
-  } else if (searchParams.div) {
-    communityPlansQuery = communityPlansQuery.eq("division_id", searchParams.div) as typeof communityPlansQuery;
+  if (filterComm) {
+    communityPlansQuery = communityPlansQuery.eq("community_id", filterComm) as typeof communityPlansQuery;
+  } else if (filterDiv) {
+    communityPlansQuery = communityPlansQuery.eq("division_id", filterDiv) as typeof communityPlansQuery;
   }
 
   let commQuery = supabase
@@ -95,8 +97,8 @@ export default async function PlansPage({
     .select("id,name,city,state,division_id,featured_image_url")
     .order("name")
     .returns<Community[]>();
-  if (searchParams.div) {
-    commQuery = commQuery.eq("division_id", searchParams.div) as typeof commQuery;
+  if (filterDiv) {
+    commQuery = commQuery.eq("division_id", filterDiv) as typeof commQuery;
   }
 
   const [
