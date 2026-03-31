@@ -1,257 +1,145 @@
 import { createClient } from "@supabase/supabase-js";
-import Link from "next/link";
-
+import OverviewClient from "./OverviewClient";
 
 export const revalidate = 60;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export default async function OverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ div?: string; comm?: string; plan?: string }>;
+}) {
+  const { div: filterDiv, comm: filterComm } = await searchParams;
 
-interface CommunityRef {
-  id: string;
-  status: string | null;
-  price_from: number | null;
-}
-
-interface RawDivision {
-  id: string;
-  slug: string;
-  name: string;
-  region: string;
-  timezone: string;
-  state_codes: string[];
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  communities: CommunityRef[];
-}
-
-interface DivisionStats {
-  id: string;
-  slug: string;
-  name: string;
-  region: string;
-  timezone: string;
-  state_codes: string[];
-  is_active: boolean;
-  community_count: number;
-  active_count: number;
-  coming_soon_count: number;
-  sold_out_count: number;
-  price_min: number | null;
-  price_max: number | null;
-}
-
-// ─── Nav ──────────────────────────────────────────────────────────────────────
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatPriceRange(min: number | null, max: number | null): string {
-  if (min == null && max == null) return "TBD";
-  if (min != null && max != null)
-    return `$${(min / 1000).toFixed(0)}K – $${(max / 1000).toFixed(0)}K`;
-  if (min != null)
-    return `From $${(min / 1000).toFixed(0)}K`;
-  return `Up to $${(max! / 1000).toFixed(0)}K`;
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-export default async function DivisionsPage() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 
-  const { data: rawDivisions } = await supabase
-    .from("divisions")
-    .select("*, communities(id, status, price_from)")
-    .order("name")
-    .returns<RawDivision[]>();
+  // ── Community View ──────────────────────────────────────────────────────────
+  if (filterComm) {
+    const [
+      { data: communityData },
+      { data: plans },
+      { data: lots },
+      { data: modelHomeData },
+      { data: specHomesData },
+      { data: divisions },
+    ] = await Promise.all([
+      supabase.from("communities").select("*").eq("id", filterComm).single(),
+      supabase
+        .from("community_plans")
+        .select("*")
+        .eq("community_id", filterComm)
+        .order("net_price"),
+      supabase
+        .from("lots")
+        .select("id,community_id,lot_number,lot_status,construction_status,is_available,lot_premium,address")
+        .eq("community_id", filterComm)
+        .order("lot_number"),
+      supabase.from("model_homes").select("*").eq("community_id", filterComm).maybeSingle(),
+      supabase.from("spec_homes").select("*").eq("community_id", filterComm),
+      supabase.from("divisions").select("id,name,slug"),
+    ]);
 
-  const divStats: DivisionStats[] = (rawDivisions ?? []).map((d: RawDivision) => {
-    const comms = d.communities ?? [];
-    const prices = comms.map((c: CommunityRef) => c.price_from).filter((p): p is number => p != null);
-    return {
-      id:               d.id,
-      slug:             d.slug,
-      name:             d.name,
-      region:           d.region,
-      timezone:         d.timezone,
-      state_codes:      d.state_codes ?? [],
-      is_active:        d.is_active,
-      community_count: comms.filter((c: CommunityRef) => c.status !== "sold-out").length,
-      // Exclude sold-out from main counts — they are tracked separately
-      sold_out_count: comms.filter((c: CommunityRef) => c.status === "sold-out").length,
-      // Active = active | now-selling | last-chance (not sold-out)
-      active_count: comms.filter((c: CommunityRef) =>
-        ["active", "now-selling", "last-chance"].includes(c.status ?? "")
-      ).length,
-      // Coming Soon = coming-soon only
-      coming_soon_count: comms.filter((c: CommunityRef) => c.status === "coming-soon").length,
-      price_min:        prices.length ? Math.min(...prices) : null,
-      price_max:        prices.length ? Math.max(...prices) : null,
-    };
-  });
+    const community = communityData;
 
-  // ── Card grid ──────────────────────────────────────────────────────────────
+    // If model_homes.community_id is not a UUID match, also try by community_name
+    let resolvedModelHome = modelHomeData;
+    if (!resolvedModelHome && community?.name) {
+      const { data: mhByName } = await supabase
+        .from("model_homes")
+        .select("*")
+        .eq("community_name", community.name)
+        .maybeSingle();
+      resolvedModelHome = mhByName;
+    }
 
-  const cardGrid = (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-      gap: 16,
-      padding: "0 0 32px",
-    }}>
-      {divStats.map(d => (
-        <div
-          key={d.id}
-          style={{
-            background: "#111", border: "1px solid #1f1f1f", borderRadius: 12, padding: 12,
-          }}
-        >
-          {/* Name + Active badge */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <h2 style={{ color: "#ededed", fontSize: 14, fontWeight: 600, margin: 0 }}>{d.name}</h2>
-            {d.is_active && (
-              <span style={{
-                background: "#1a2a1a", color: "#00c853", border: "1px solid #1f3f1f",
-                borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "2px 10px",
-                textTransform: "uppercase", letterSpacing: "0.07em",
-              }}>
-                Active
-              </span>
-            )}
-          </div>
+    // Same for spec_homes: if none returned by UUID, try by community_name
+    let resolvedSpecHomes = specHomesData ?? [];
+    if (resolvedSpecHomes.length === 0 && community?.name) {
+      const { data: shByName } = await supabase
+        .from("spec_homes")
+        .select("*")
+        .eq("community_name", community.name);
+      resolvedSpecHomes = shByName ?? [];
+    }
 
-          {/* Region · State · Timezone */}
-          <div style={{ color: "#666", fontSize: 12, marginBottom: 16 }}>
-            {[
-              d.region,
-              d.state_codes?.join(", "),
-              d.timezone,
-            ].filter(Boolean).join(" · ")}
-          </div>
+    return (
+      <OverviewClient
+        view="community"
+        community={community ?? {}}
+        plans={plans ?? []}
+        lots={lots ?? []}
+        modelHome={resolvedModelHome}
+        specHomes={resolvedSpecHomes}
+        divisions={divisions ?? []}
+      />
+    );
+  }
 
-          {/* 4-stat grid */}
-          <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16,
-          }}>
-            {[
-              { label: "Total",       value: d.community_count },
-              { label: "Active",      value: d.active_count },
-              { label: "Coming Soon", value: d.coming_soon_count },
-              { label: "Price Range", value: formatPriceRange(d.price_min, d.price_max) },
-            ].map(stat => (
-              <div key={stat.label} style={{
-                background: "#161616", borderRadius: 8, padding: "10px 14px",
-                border: "1px solid #1f1f1f",
-              }}>
-                <div style={{ color: "#555", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>
-                  {stat.label}
-                </div>
-                <div style={{ color: "#ededed", fontSize: 16, fontWeight: 700 }}>
-                  {stat.value}
-                </div>
-              </div>
-            ))}
-          </div>
+  // ── Division View ───────────────────────────────────────────────────────────
+  if (filterDiv) {
+    const [
+      { data: communities },
+      { data: divisionPlans },
+      { data: lots },
+      { data: divisions },
+    ] = await Promise.all([
+      supabase
+        .from("communities")
+        .select("*")
+        .eq("division_id", filterDiv)
+        .order("name"),
+      supabase
+        .from("division_plans")
+        .select("id,division_id,marketing_name")
+        .eq("division_id", filterDiv),
+      supabase
+        .from("lots")
+        .select("id,community_id,lot_number,lot_status,construction_status,is_available,lot_premium,address"),
+      supabase.from("divisions").select("*"),
+    ]);
 
-          {/* View Communities link */}
-          <Link
-            href={`/communities?division=${d.slug}`}
-            style={{
-              display: "block", textAlign: "center",
-              background: "#1a1a1a", border: "1px solid #2a2a2a",
-              color: "#818cf8", borderRadius: 8, padding: "8px 16px",
-              fontSize: 13, fontWeight: 600, textDecoration: "none",
-            }}
-          >
-            View Communities →
-          </Link>
-        </div>
-      ))}
-    </div>
-  );
+    return (
+      <OverviewClient
+        view="division"
+        communities={communities ?? []}
+        divisionPlans={divisionPlans ?? []}
+        lots={lots ?? []}
+        divisions={divisions ?? []}
+        selectedDivisionId={filterDiv}
+      />
+    );
+  }
 
-  // ── Comparison table ───────────────────────────────────────────────────────
-
-  const thStyle: React.CSSProperties = {
-    background: "#111", color: "#666", fontSize: 11, fontWeight: 500,
-    textTransform: "uppercase", letterSpacing: "0.06em",
-    padding: "6px 12px", whiteSpace: "nowrap",
-    borderBottom: "1px solid #1f1f1f", textAlign: "left",
-  };
-
-  const tdStyle: React.CSSProperties = {
-    padding: "6px 12px", color: "#a1a1a1", fontSize: 13,
-    borderBottom: "1px solid #161616", whiteSpace: "nowrap",
-  };
-
-  const comparisonTable = (
-    <div style={{ overflowX: "auto", marginBottom: 40 }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
-        <thead>
-          <tr>
-            {["Division", "Region", "States", "Timezone", "Total", "Active", "Coming Soon", "Price Range"].map(h => (
-              <th key={h} style={thStyle}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {divStats.map(d => (
-            <tr key={d.id}>
-              <td style={{ ...tdStyle, color: "#ededed", fontWeight: 500, fontSize: 13 }}>{d.name}</td>
-              <td style={tdStyle}>{d.region || "—"}</td>
-              <td style={tdStyle}>{d.state_codes?.join(", ") || "—"}</td>
-              <td style={tdStyle}>{d.timezone || "—"}</td>
-              <td style={{ ...tdStyle, textAlign: "center" }}>{d.community_count}</td>
-              <td style={{ ...tdStyle, textAlign: "center", color: "#00c853" }}>{d.active_count}</td>
-              <td style={{ ...tdStyle, textAlign: "center", color: "#f5a623" }}>{d.coming_soon_count}</td>
-              <td style={tdStyle}>{formatPriceRange(d.price_min, d.price_max)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  // ── Full layout ────────────────────────────────────────────────────────────
+  // ── Corp View ───────────────────────────────────────────────────────────────
+  const [
+    { data: divisions },
+    { data: communities },
+    { data: lots },
+    { data: modelHomes },
+    { data: specHomes },
+  ] = await Promise.all([
+    supabase.from("divisions").select("*").order("name"),
+    supabase
+      .from("communities")
+      .select("id,name,city,state,division_id,price_from,featured_image_url,model_homes,amenities,status,page_url,hoa_fee,hoa_period,school_district,short_description,total_homesites,has_model")
+      .order("name"),
+    supabase
+      .from("lots")
+      .select("id,community_id,lot_number,lot_status,construction_status,is_available,lot_premium,address"),
+    supabase.from("model_homes").select("id,community_id,community_name,name,address,city,state,model_name,model_marketing_name,image_url,virtual_tour_url,page_url,open_hours,leaseback"),
+    supabase.from("spec_homes").select("id,community_id,community_name,plan_name,address,city,state,beds,baths,sqft,list_price,image_url,page_url"),
+  ]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#0d0d0d" }}>
-        {/* Top bar */}
-        <div style={{
-          display: "flex", alignItems: "center",
-          padding: "0 24px", height: 44,
-          borderBottom: "1px solid #1f1f1f",
-          background: "#0d0d0d", flexShrink: 0,
-        }}>
-          <h1 style={{ color: "#ededed", fontSize: 14, fontWeight: 600, margin: 0 }}>Divisions</h1>
-          <span style={{ marginLeft: 12, color: "#555", fontSize: 13 }}>
-            {divStats.length} division{divStats.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
-          {/* Section heading */}
-          <div style={{ marginBottom: 20 }}>
-            <h2 style={{ color: "#888", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-              All Divisions
-            </h2>
-          </div>
-
-          {cardGrid}
-
-          {/* Table section */}
-          <div style={{ marginBottom: 16 }}>
-            <h2 style={{ color: "#888", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-              Comparison
-            </h2>
-          </div>
-
-          {comparisonTable}
-        </div>
-    </div>
+    <OverviewClient
+      view="corp"
+      divisions={divisions ?? []}
+      communities={communities ?? []}
+      lots={lots ?? []}
+      modelHomes={modelHomes ?? []}
+      specHomes={specHomes ?? []}
+    />
   );
 }
