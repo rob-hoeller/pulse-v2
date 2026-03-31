@@ -5,21 +5,21 @@ import Link from "next/link";
 // ── Canonical nav items — single source of truth ─────────────────────────────
 // To add a new page: add one entry here. All client pages inherit it automatically.
 export const NAV_ITEMS = [
-  { icon: "▤", label: "Overview",      href: "/"               },
-  { icon: "⊡", label: "Agents",        href: "#"               },
-  { icon: "✓", label: "Tasks",         href: "/tasks"          },
-  { icon: "⊕", label: "Leads",         href: "/leads"          },
-  { icon: "⊞", label: "Divisions",     href: "/divisions"      },
-  { icon: "⌂", label: "Communities",   href: "/communities"    },
-  { icon: "◱", label: "Plans",         href: "/plans"          },
-  { icon: "⌂", label: "Model Homes",   href: "/model-homes"    },
-  { icon: "◈", label: "Quick Delivery", href: "/quick-delivery" },
-  { icon: "◫", label: "Lots",          href: "/lots"           },
-  { icon: "◷", label: "Calendar",      href: "#"               },
-  { icon: "◉", label: "Notifications", href: "#"               },
-  { icon: "⚙", label: "Settings",      href: "#"               },
-  { icon: "◈", label: "Status",        href: "/status"         },
-  { icon: "◧", label: "Docs",          href: "/docs"           },
+  { icon: "▤", label: "Overview",       href: "/",               group: "core" },
+  { icon: "⊡", label: "Agents",         href: "#",               group: "core" },
+  { icon: "✓", label: "Tasks",          href: "/tasks",          group: "core" },
+  { icon: "⊕", label: "Leads",          href: "/leads",          group: "core" },
+  { icon: "⊞", label: "Divisions",      href: "/divisions",      group: "data" },
+  { icon: "⌂", label: "Communities",    href: "/communities",    group: "data" },
+  { icon: "◱", label: "Plans",          href: "/plans",          group: "data" },
+  { icon: "⌂", label: "Model Homes",    href: "/model-homes",    group: "data" },
+  { icon: "◈", label: "Quick Delivery", href: "/quick-delivery", group: "data" },
+  { icon: "◫", label: "Lots",           href: "/lots",           group: "data" },
+  { icon: "◷", label: "Calendar",       href: "#",               group: "tools" },
+  { icon: "◉", label: "Notifications",  href: "#",               group: "tools" },
+  { icon: "⚙", label: "Settings",       href: "#",               group: "tools" },
+  { icon: "◈", label: "Status",         href: "/status",         group: "tools" },
+  { icon: "◧", label: "Docs",           href: "/docs",           group: "tools" },
 ] as const;
 
 interface SidebarProps {
@@ -41,21 +41,29 @@ export default function Sidebar({ activeHref }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5">
-        {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] transition-colors ${
-              item.href === activeHref
-                ? "bg-[#1a1a1a] text-[#ededed]"
-                : "text-[#888] hover:text-[#ededed] hover:bg-[#111111]"
-            }`}
-          >
-            <span className="text-[14px] w-4 text-center opacity-70">{item.icon}</span>
-            {item.label}
-          </Link>
-        ))}
+      <nav className="flex-1 px-2 py-3">
+        {NAV_ITEMS.map((item, i) => {
+          const prevItem = i > 0 ? NAV_ITEMS[i - 1] : null;
+          const showDivider = prevItem && prevItem.group !== item.group;
+          return (
+            <div key={item.label}>
+              {showDivider && (
+                <div className="my-1.5 mx-2 border-t border-[#1a1a1a]" />
+              )}
+              <Link
+                href={item.href}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] transition-colors ${
+                  item.href === activeHref
+                    ? "bg-[#1a1a1a] text-[#ededed]"
+                    : "text-[#888] hover:text-[#ededed] hover:bg-[#111111]"
+                }`}
+              >
+                <span className="text-[14px] w-4 text-center opacity-70">{item.icon}</span>
+                {item.label}
+              </Link>
+            </div>
+          );
+        })}
       </nav>
 
       {/* Footer */}

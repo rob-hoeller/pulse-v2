@@ -2,7 +2,14 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
+import PageShell from "@/components/PageShell";
+import TopBar from "@/components/TopBar";
+import FiltersBar from "@/components/FiltersBar";
+import StatsBar from "@/components/StatsBar";
+import ViewToggle from "@/components/ViewToggle";
+import CommunityCard from "@/components/CommunityCard";
+import SlideOver from "@/components/SlideOver";
+import Badge from "@/components/Badge";
 import DataTable, { type Column, type StatItem as DataTableStatItem } from "@/components/DataTable";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,7 +50,7 @@ interface Community {
   division_name: string;
   region: string;
   timezone: string;
-  // New Heartbeat fields
+  // Heartbeat fields
   heartbeat_community_id: number | null;
   abbr: string | null;
   sales_phone: string | null;
@@ -56,23 +63,22 @@ interface Community {
   school_middle: string | null;
   school_high: string | null;
   logo_image_url: string | null;
+  featured_image_url: string | null;
   brochure_url: string | null;
   lot_map_url: string | null;
   page_url: string | null;
   flickr_set_id: string | null;
   marketing_video_url: string | null;
   is_lotworks: boolean | null;
-  model_homes: string | null;   // JSON string
-  spec_homes: string | null;    // JSON string
+  model_homes: string | null;
+  spec_homes: string | null;
 }
 
-// Augmented row type for DataTable (adds computed/display fields)
 type CommunityTableRow = Community & Record<string, unknown> & {
   _status_display: string;
-  _tag: string;
   _city_state: string;
   _hoa_display: string;
-  _available: string;
+  _price_display: string;
 };
 
 interface Props {
@@ -82,87 +88,53 @@ interface Props {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getStatusAndTag(status: string | null): { isActive: boolean; tag: string | null } {
+function getStatusLabel(status: string | null): string {
   switch (status) {
-    case "active":       return { isActive: true,  tag: null };
-    case "now-selling":  return { isActive: true,  tag: "Now Selling" };
-    case "last-chance":  return { isActive: true,  tag: "Last Chance" };
-    case "coming-soon":  return { isActive: false, tag: "Coming Soon" };
-    case "sold-out":     return { isActive: false, tag: "Sold Out" };
-    default:             return { isActive: false, tag: null };
+    case "active":       return "Active";
+    case "now-selling":  return "Now Selling";
+    case "last-chance":  return "Last Chance";
+    case "coming-soon":  return "Coming Soon";
+    case "sold-out":     return "Sold Out";
+    default:             return status ?? "Unknown";
   }
 }
 
-function StatItem({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <span style={{ fontSize: 11, color: "#555" }}>{label}:</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color }}>{value.toLocaleString()}</span>
-    </div>
-  );
+function isActiveStatus(status: string | null): boolean {
+  return ["active", "now-selling", "last-chance"].includes(status ?? "");
 }
 
-function StatusBadge({ status }: { status: string | null }) {
-  const { isActive } = getStatusAndTag(status);
-  return (
-    <span style={{
-      fontSize: 11,
-      padding: "2px 8px",
-      borderRadius: 4,
-      backgroundColor: isActive ? "#1a2a1a" : "#1a1a1a",
-      color: isActive ? "#00c853" : "#555",
-      border: `1px solid ${isActive ? "#1f3f1f" : "#2a2a2a"}`,
-      fontWeight: 500,
-    }}>
-      {isActive ? "Active" : "Not Active"}
-    </span>
-  );
-}
-
-function TagBadge({ status }: { status: string | null }) {
-  const { tag } = getStatusAndTag(status);
-  if (!tag) return null;
-  const styles: Record<string, { bg: string; text: string; border: string }> = {
-    "Now Selling":  { bg: "#1a1f2e", text: "#0070f3", border: "#1a2a3f" },
-    "Last Chance":  { bg: "#2a1a1a", text: "#ff6b6b", border: "#3f1f1f" },
-    "Coming Soon":  { bg: "#2a2a1a", text: "#f5a623", border: "#3f3a1f" },
-    "Sold Out":     { bg: "#1a1a1a", text: "#555",    border: "#2a2a2a" },
-  };
-  const s = styles[tag] ?? { bg: "#1a1a1a", text: "#555", border: "#2a2a2a" };
-  return (
-    <span style={{
-      fontSize: 11,
-      padding: "2px 8px",
-      borderRadius: 4,
-      backgroundColor: s.bg,
-      color: s.text,
-      border: `1px solid ${s.border}`,
-      fontWeight: 500,
-    }}>
-      {tag}
-    </span>
-  );
-}
-
-function formatPrice(n: number | null) {
+function formatPrice(n: number | null): string {
   if (n == null) return "—";
   return `$${(n / 1000).toFixed(0)}K`;
 }
 
-function formatHoa(fee: number | null, period: string | null) {
+function formatHoa(fee: number | null, period: string | null): string {
   if (fee == null) return "—";
   return `$${fee.toLocaleString()}/${period ?? "mo"}`;
 }
 
-// ─── Slide-over helpers ───────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: string | null }) {
+  const active = isActiveStatus(status);
+  return (
+    <span style={{
+      fontSize: 11, padding: "2px 7px", borderRadius: 4,
+      background: active ? "#1a2a1a" : "#1a1a1a",
+      color: active ? "#4ade80" : "#555",
+      border: `1px solid ${active ? "#1f3f1f" : "#2a2a2a"}`,
+      fontWeight: 500, whiteSpace: "nowrap",
+    }}>
+      {getStatusLabel(status)}
+    </span>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-6">
-      <h3 style={{ color: "#555", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+    <div style={{ marginBottom: 24 }}>
+      <h3 style={{ color: "#555", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, margin: "0 0 10px" }}>
         {title}
       </h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         {children}
       </div>
     </div>
@@ -171,330 +143,199 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ color: "#666", fontSize: 13 }}>{label}</span>
-      <span style={{ color: "#a1a1a1", fontSize: 12, textAlign: "right", maxWidth: "60%" }}>
-        {value ?? "—"}
-      </span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      <span style={{ color: "#666", fontSize: 12, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: "#a1a1a1", fontSize: 12, textAlign: "right" }}>{value ?? "—"}</span>
     </div>
   );
 }
 
-// ─── Inner component (uses useSearchParams) ───────────────────────────────────
+// ─── Inner component ──────────────────────────────────────────────────────────
 
-function CommunitiesInner(props: Props) {
-  const { communities, divisions } = props;
+function CommunitiesInner({ communities, divisions }: Props) {
   const searchParams = useSearchParams();
 
   const [view, setView] = useState<"card" | "table">("card");
   const [divisionFilter, setDivisionFilter] = useState<string>(
     searchParams.get("division") ?? "all"
   );
+  const [stateFilter, setStateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [tagFilter, setTagFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Community | null>(null);
 
-  // Hydrate view from localStorage after mount
   useEffect(() => {
     const saved = localStorage.getItem("communities-view");
     if (saved === "card" || saved === "table") setView(saved);
   }, []);
 
-  function handleViewChange(v: "card" | "table") {
+  const handleViewChange = (v: "card" | "table") => {
     setView(v);
     localStorage.setItem("communities-view", v);
-  }
-
-  const rows = communities
-    .filter(c => divisionFilter === "all" || c.division_slug === divisionFilter)
-    .filter(c => {
-      if (tagFilter === "all") return true;
-      const { tag } = getStatusAndTag(c.status);
-      if (tagFilter === "active") return getStatusAndTag(c.status).isActive;
-      if (tagFilter === "not-active") return !getStatusAndTag(c.status).isActive;
-      return tag === tagFilter;
-    })
-    .filter(c => {
-      if (statusFilter === "all") return true;
-      if (statusFilter === "active") return getStatusAndTag(c.status).isActive;
-      if (statusFilter === "not-active") return !getStatusAndTag(c.status).isActive;
-      return true;
-    });
-
-  // Augmented rows for DataTable — adds computed display fields
-  const tableRows: CommunityTableRow[] = rows.map(c => {
-    const { isActive, tag } = getStatusAndTag(c.status);
-    return {
-      ...c,
-      _status_display: isActive ? "Active" : "Not Active",
-      _tag: tag ?? "",
-      _city_state: [c.city, c.state].filter(Boolean).join(", "),
-      _hoa_display: formatHoa(c.hoa_fee, c.hoa_period),
-      _available: c.has_lotworks ? "Yes" : "—",
-    };
-  });
-
-  // Stats (based on filtered rows, excluding sold-out from total)
-  const stats = {
-    total: rows.filter(c => c.status !== "sold-out").length,
-    active: rows.filter(c => ["active","now-selling","last-chance"].includes(c.status ?? "")).length,
-    comingSoon: rows.filter(c => c.status === "coming-soon").length,
-    soldOut: rows.filter(c => c.status === "sold-out").length,
   };
 
-  const dataTableStats: DataTableStatItem[] = [
-    { label: "Total",       value: stats.total,     color: "#666" },
-    { label: "Active",      value: stats.active,    color: "#00c853" },
-    { label: "Coming Soon", value: stats.comingSoon, color: "#f5a623" },
-    { label: "Sold Out",    value: stats.soldOut,   color: "#555" },
+  // Unique states
+  const allStates = Array.from(
+    new Set(communities.map((c) => c.state).filter(Boolean))
+  ).sort() as string[];
+
+  // Filter
+  const filtered = communities.filter((c) => {
+    if (divisionFilter !== "all" && c.division_slug !== divisionFilter) return false;
+    if (stateFilter !== "all" && c.state !== stateFilter) return false;
+    if (statusFilter !== "all") {
+      if (statusFilter === "active" && !isActiveStatus(c.status)) return false;
+      if (statusFilter === "coming-soon" && c.status !== "coming-soon") return false;
+      if (statusFilter === "sold-out" && c.status !== "sold-out") return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      if (!c.name.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Aggregate stats
+  const allPrices = communities.map((c) => c.price_from).filter((p): p is number => p != null);
+  const priceMin = allPrices.length ? Math.min(...allPrices) : null;
+  const priceMax = allPrices.length ? Math.max(...allPrices) : null;
+  const priceRange = priceMin != null && priceMax != null
+    ? `$${(priceMin / 1000).toFixed(0)}K – $${(priceMax / 1000).toFixed(0)}K`
+    : "—";
+
+  const statsBarItems = [
+    { label: "Total",      value: filtered.length },
+    { label: "Active",     value: filtered.filter((c) => isActiveStatus(c.status)).length, color: "#4ade80" },
+    { label: "Coming Soon",value: filtered.filter((c) => c.status === "coming-soon").length, color: "#f5a623" },
+    { label: "States",     value: new Set(filtered.map((c) => c.state).filter(Boolean)).size },
+    { label: "Divisions",  value: new Set(filtered.map((c) => c.division_slug).filter(Boolean)).size },
+    { label: "Price Range",value: priceRange, color: "#8a7a5a" },
   ];
 
-  // DataTable column definitions
+  // ── Table setup ────────────────────────────────────────────────────────────
+
+  const tableRows: CommunityTableRow[] = filtered.map((c) => ({
+    ...c,
+    _status_display: getStatusLabel(c.status),
+    _city_state: [c.city, c.state].filter(Boolean).join(", "),
+    _hoa_display: formatHoa(c.hoa_fee, c.hoa_period),
+    _price_display: formatPrice(c.price_from),
+  }));
+
   const tableColumns: Column<CommunityTableRow>[] = [
     {
       key: "name",
-      label: "Name",
-      sticky: true,
-      render: (_val, row) => (
-        <span style={{ color: "#ededed", fontWeight: 500, fontSize: 13 }}>
-          {row.name}
-          {row.is_55_plus && (
-            <span style={{
-              color: "#f5a623", fontSize: 10, fontWeight: 600, marginLeft: 6,
-              background: "#2a2a1a", border: "1px solid #3f3a1f", borderRadius: 4, padding: "1px 5px",
-            }}>
-              55+
-            </span>
-          )}
-        </span>
+      label: "Community",
+      sortable: true,
+      render: (_v, row) => (
+        <span style={{ color: "#ededed", fontWeight: 500 }}>{row.name}</span>
       ),
+    },
+    {
+      key: "_city_state",
+      label: "Location",
+      sortable: true,
     },
     {
       key: "division_name",
       label: "Division",
-      filterable: true,
+      sortable: true,
     },
     {
-      key: "_status_display",
-      label: "Status",
-      filterable: true,
-      render: (_val, row) => <StatusBadge status={row.status} />,
-    },
-    {
-      key: "_tag",
-      label: "Tag",
-      filterable: true,
-      render: (_val, row) => <TagBadge status={row.status} />,
-    },
-    {
-      key: "_city_state",
-      label: "City/State",
-    },
-    {
-      key: "price_from",
+      key: "_price_display",
       label: "Price From",
-      render: (val) => formatPrice(val as number | null),
+      sortable: true,
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (_v, row) => <StatusBadge status={row.status} />,
     },
     {
       key: "_hoa_display",
       label: "HOA",
-      sortable: false,
+      sortable: true,
     },
     {
-      key: "_available",
-      label: "Available",
+      key: "has_model",
+      label: "Model",
+      render: (_v, row) => (
+        <span style={{ color: row.has_model ? "#4ade80" : "#333", fontSize: 12 }}>
+          {row.has_model ? "Yes" : "—"}
+        </span>
+      ),
     },
     {
-      key: "foundation",
-      label: "Foundation",
-    },
-    {
-      key: "amenities",
-      label: "Amenities",
-      sortable: false,
-      render: (val) => {
-        const s = val as string | null;
-        if (!s) return "—";
-        return s.length > 50 ? s.slice(0, 50) + "…" : s;
-      },
+      key: "page_url",
+      label: "View",
+      render: (_v, row) =>
+        row.page_url ? (
+          <a
+            href={`https://schellbrothers.com${row.page_url}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: "#818cf8", fontSize: 11, textDecoration: "none" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            ↗
+          </a>
+        ) : null,
     },
   ];
 
-  // ── Sidebar ────────────────────────────────────────────────────────────────
-
-  const sidebar = (
-    <Sidebar activeHref="/communities" />
-  );
-
-  // ── Top bar ────────────────────────────────────────────────────────────────
-
-  const topBar = (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "0 24px", height: 44, borderBottom: "1px solid #1f1f1f",
-      background: "#0d0d0d", flexShrink: 0,
-    }}>
-      <h1 style={{ color: "#ededed", fontSize: 14, fontWeight: 600, margin: 0 }}>Communities</h1>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {/* Division filter */}
-        <select
-          value={divisionFilter}
-          onChange={e => setDivisionFilter(e.target.value)}
-          style={{
-            background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#ededed",
-            borderRadius: 8, padding: "4px 10px", fontSize: 13, cursor: "pointer",
-            outline: "none",
-          }}
-        >
-          <option value="all">All Divisions</option>
-          {divisions.map(d => (
-            <option key={d.slug} value={d.slug}>{d.name}</option>
-          ))}
-        </select>
-
-        {/* Status filter */}
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="bg-[#111] border border-[#2a2a2a] text-[#a1a1a1] text-[12px] rounded px-3 py-1.5 outline-none"
-        >
-          <option value="all">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="not-active">Not Active</option>
-        </select>
-
-        {/* Tag filter */}
-        <select
-          value={tagFilter}
-          onChange={e => setTagFilter(e.target.value)}
-          className="bg-[#111] border border-[#2a2a2a] text-[#a1a1a1] text-[12px] rounded px-3 py-1.5 outline-none"
-        >
-          <option value="all">All Tags</option>
-          <option value="Now Selling">Now Selling</option>
-          <option value="Last Chance">Last Chance</option>
-          <option value="Coming Soon">Coming Soon</option>
-          <option value="Sold Out">Sold Out</option>
-        </select>
-
-        {/* View toggle */}
-        <div style={{ display: "flex", gap: 2, background: "#1a1a1a", borderRadius: 8, padding: 3, border: "1px solid #2a2a2a" }}>
-          {(["card", "table"] as const).map((v, i) => (
-            <button
-              key={v}
-              onClick={() => handleViewChange(v)}
-              style={{
-                background: view === v ? "#2a2a2a" : "transparent",
-                border: "none", color: view === v ? "#ededed" : "#555",
-                borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 14,
-                transition: "background 0.15s, color 0.15s",
-              }}
-            >
-              {i === 0 ? "⊞" : "≡"}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  const dataTableStats: DataTableStatItem[] = [
+    { label: "Communities", value: filtered.length, color: "#ededed" },
+    { label: "Active", value: filtered.filter((c) => isActiveStatus(c.status)).length, color: "#4ade80" },
+  ];
 
   // ── Card view ──────────────────────────────────────────────────────────────
 
   const cardView = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" style={{ padding: 24 }}>
-      {rows.map(c => {
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+        gap: 14,
+        padding: 24,
+      }}
+    >
+      {filtered.map((c) => {
         const amenityList = c.amenities
-          ? c.amenities.split(",").map(s => s.trim()).filter(Boolean)
+          ? c.amenities.split(",").map((a) => a.trim()).filter(Boolean)
           : [];
-        const visibleAmenities = amenityList.slice(0, 3);
-        const overflow = amenityList.length - 3;
-
         return (
-          <div
+          <CommunityCard
             key={c.id}
-            onClick={() => c.slug ? window.location.href = `/communities/${c.slug}` : setSelected(c)}
-            style={{
-              background: "#111", border: "1px solid #1f1f1f", borderRadius: 12,
-              padding: 12, cursor: "pointer", transition: "border-color 0.15s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = "#333")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "#1f1f1f")}
-          >
-            {/* Badges row */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-              <span style={{
-                background: "#1a1a2e", color: "#818cf8", border: "1px solid #2a2a4a",
-                borderRadius: 6, fontSize: 10, fontWeight: 600, padding: "2px 8px",
-                textTransform: "uppercase", letterSpacing: "0.06em",
-              }}>
-                {c.division_name || c.division_slug}
-              </span>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <StatusBadge status={c.status} />
-                <TagBadge status={c.status} />
-              </div>
-            </div>
-
-            {/* Name */}
-            <div style={{ color: "#ededed", fontWeight: 500, fontSize: 13, marginBottom: 4 }}>
-              {c.name}
-              {c.is_55_plus && (
-                <span style={{ color: "#f5a623", fontSize: 10, fontWeight: 600, marginLeft: 6,
-                  background: "#2a2a1a", border: "1px solid #3f3a1f", borderRadius: 4, padding: "1px 5px" }}>
-                  55+
-                </span>
-              )}
-            </div>
-
-            {/* Location */}
-            {(c.city || c.state) && (
-              <div style={{ color: "#666", fontSize: 13, marginBottom: 10 }}>
-                {[c.city, c.state].filter(Boolean).join(", ")}
-              </div>
-            )}
-
-            {/* Price / HOA */}
-            <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
-              <div>
-                <div style={{ color: "#555", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>From</div>
-                <div style={{ color: "#ededed", fontSize: 14, fontWeight: 600 }}>{formatPrice(c.price_from)}</div>
-              </div>
-              {c.hoa_fee != null && (
-                <div>
-                  <div style={{ color: "#555", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>HOA</div>
-                  <div style={{ color: "#ededed", fontSize: 14, fontWeight: 600 }}>{formatHoa(c.hoa_fee, c.hoa_period)}</div>
-                </div>
-              )}
-            </div>
-
-            {/* Amenity tags */}
-            {visibleAmenities.length > 0 && (
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {visibleAmenities.map(a => (
-                  <span key={a} style={{
-                    background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#888",
-                    borderRadius: 4, fontSize: 10, padding: "2px 7px",
-                  }}>
-                    {a}
-                  </span>
-                ))}
-                {overflow > 0 && (
-                  <span style={{
-                    background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#555",
-                    borderRadius: 4, fontSize: 10, padding: "2px 7px",
-                  }}>
-                    +{overflow}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+            name={c.name}
+            city={c.city}
+            state={c.state}
+            priceFrom={c.price_from}
+            tagline={c.short_description}
+            imageUrl={c.featured_image_url}
+            modelHomeName={c.has_model ? "Model Home" : null}
+            status={getStatusLabel(c.status)}
+            amenities={amenityList}
+            onClick={() => setSelected(c)}
+          />
         );
       })}
+      {filtered.length === 0 && (
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            padding: 48,
+            textAlign: "center",
+            color: "#555",
+            fontSize: 13,
+          }}
+        >
+          No communities match filters.
+        </div>
+      )}
     </div>
   );
 
-  // ── Table view (DataTable) ─────────────────────────────────────────────────
+  // ── Table view ─────────────────────────────────────────────────────────────
 
   const tableView = (
     <DataTable<CommunityTableRow>
@@ -504,236 +345,266 @@ function CommunitiesInner(props: Props) {
       defaultPageSize={100}
       onRowClick={(row) => setSelected(row)}
       emptyMessage="No communities"
-      minWidth={1200}
+      minWidth={1100}
     />
   );
 
-  // ── Slide-over panel ───────────────────────────────────────────────────────
+  // ── Slide-over content ─────────────────────────────────────────────────────
+
+  const amenities = selected?.amenities
+    ? selected.amenities.split(",").map((a) => a.trim()).filter(Boolean)
+    : [];
 
   const allUtilsNull = selected
-    ? [selected.natural_gas, selected.electric, selected.water, selected.sewer, selected.cable_internet, selected.trash].every(v => v == null)
+    ? [selected.natural_gas, selected.electric, selected.water, selected.sewer, selected.cable_internet, selected.trash].every((v) => v == null)
     : true;
 
-  const slideOver = selected && (
-    <>
-      {/* Overlay */}
-      <div
-        onClick={() => setSelected(null)}
-        style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 40,
-        }}
-      />
-      {/* Panel */}
-      <div style={{
-        position: "fixed", top: 0, right: 0, width: 480, height: "100vh",
-        background: "#111", borderLeft: "1px solid #1f1f1f", zIndex: 50,
-        display: "flex", flexDirection: "column", overflow: "hidden",
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: "20px 24px", borderBottom: "1px solid #1f1f1f",
-          display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-        }}>
-          <div>
-            <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{
-                background: "#1a1a2e", color: "#818cf8", border: "1px solid #2a2a4a",
-                borderRadius: 6, fontSize: 10, fontWeight: 600, padding: "2px 8px",
-                textTransform: "uppercase", letterSpacing: "0.06em",
-              }}>
-                {selected.division_name || selected.division_slug}
-              </span>
-              <StatusBadge status={selected.status} />
-              <TagBadge status={selected.status} />
-            </div>
-            <h2 style={{ color: "#ededed", fontSize: 16, fontWeight: 600, margin: 0 }}>
-              {selected.name}
-              {selected.is_55_plus && (
-                <span style={{ color: "#f5a623", fontSize: 11, fontWeight: 600, marginLeft: 8,
-                  background: "#2a2a1a", border: "1px solid #3f3a1f", borderRadius: 4, padding: "2px 6px" }}>
-                  55+
-                </span>
-              )}
-            </h2>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {selected?.slug && (
-              <a
-                href={`/communities/${selected.slug}`}
-                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
-                  backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
-                  color: "#a1a1a1", textDecoration: "none", whiteSpace: "nowrap" }}
-              >
-                View Dashboard →
-              </a>
-            )}
-          <button
-            onClick={() => setSelected(null)}
-            style={{
-              background: "transparent", border: "none", color: "#555",
-              fontSize: 22, cursor: "pointer", padding: 0, lineHeight: 1,
-              marginTop: 2,
-            }}
-          >
-            ×
-          </button>
-          </div>
-        </div>
+  // ── Filters ────────────────────────────────────────────────────────────────
 
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
-          <Section title="Overview">
-            <Row label="Division" value={selected.division_name || selected.division_slug} />
-            <Row label="Location" value={[selected.city, selected.state].filter(Boolean).join(", ") || null} />
-            <Row label="Region"   value={selected.region} />
-            <Row label="Timezone" value={selected.timezone} />
-            <Row
-              label="Status"
-              value={getStatusAndTag(selected.status).isActive ? "Active" : "Not Active"}
-            />
-            {getStatusAndTag(selected.status).tag && (
-              <Row
-                label="Tag"
-                value={getStatusAndTag(selected.status).tag}
-              />
-            )}
-            {selected.short_description && (
-              <div style={{ fontSize: 12, color: "#666", fontStyle: "italic", marginTop: 6, lineHeight: 1.5 }}>
-                {selected.short_description}
-              </div>
-            )}
-          </Section>
+  const divisionOptions = [
+    { value: "all", label: "All Divisions" },
+    ...divisions.map((d) => ({ value: d.slug, label: d.name })),
+  ];
 
-          <Section title="Pricing">
-            <Row label="Price From" value={formatPrice(selected.price_from)} />
-            <Row label="Price To"   value={formatPrice(selected.price_to)} />
-            <Row label="HOA"        value={selected.hoa_fee != null ? formatHoa(selected.hoa_fee, selected.hoa_period) : null} />
-            <Row label="Priced From" value={selected.priced_from ? `$${selected.priced_from.toLocaleString()}` : null} />
-          </Section>
+  const stateOptions = [
+    { value: "all", label: "All States" },
+    ...allStates.map((s) => ({ value: s, label: s })),
+  ];
 
-          {selected.school_district && (
-            <Section title="Schools">
-              <Row label="District"   value={selected.school_district} />
-              <Row label="Elementary" value={selected.school_elementary} />
-              <Row label="Middle"     value={selected.school_middle} />
-              <Row label="High"       value={selected.school_high} />
-            </Section>
-          )}
-
-          {(selected.sales_phone || selected.sales_center_address) && (
-            <Section title="Sales">
-              <Row label="Phone"   value={selected.sales_phone} />
-              <Row label="Address" value={selected.sales_center_address} />
-            </Section>
-          )}
-
-          {(selected.brochure_url || selected.lot_map_url || selected.page_url || selected.marketing_video_url) && (
-            <Section title="Resources">
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                {selected.brochure_url && (
-                  <a href={selected.brochure_url} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
-                      backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
-                      color: "#a1a1a1", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
-                    ⬇ Brochure
-                  </a>
-                )}
-                {selected.lot_map_url && (
-                  <a href={selected.lot_map_url} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
-                      backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
-                      color: "#a1a1a1", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
-                    ◫ Lot Map
-                  </a>
-                )}
-                {selected.page_url && (
-                  <a href={`https://schellbrothers.com${selected.page_url}`} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
-                      backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
-                      color: "#a1a1a1", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
-                    ↗ Website
-                  </a>
-                )}
-                {selected.marketing_video_url && (
-                  <a href={selected.marketing_video_url} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4,
-                      backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a",
-                      color: "#0070f3", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
-                    ▶ Video
-                  </a>
-                )}
-              </div>
-            </Section>
-          )}
-
-          <Section title="Features">
-            <Row label="Model Home"  value={selected.has_model  ? "Yes" : "No"} />
-            <Row label="Lot Works"   value={selected.has_lotworks ? "Yes" : "No"} />
-            <Row label="55+ Comm."   value={selected.is_55_plus  ? "Yes" : "No"} />
-          </Section>
-
-          {!allUtilsNull && (
-            <Section title="Utilities">
-              {selected.natural_gas    != null && <Row label="Natural Gas"    value={selected.natural_gas} />}
-              {selected.electric       != null && <Row label="Electric"       value={selected.electric} />}
-              {selected.water          != null && <Row label="Water"          value={selected.water} />}
-              {selected.sewer          != null && <Row label="Sewer"          value={selected.sewer} />}
-              {selected.cable_internet != null && <Row label="Cable/Internet" value={selected.cable_internet} />}
-              {selected.trash          != null && <Row label="Trash"          value={selected.trash} />}
-            </Section>
-          )}
-
-          {selected.amenities && (
-            <Section title="Amenities">
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {selected.amenities.split(",").map(a => a.trim()).filter(Boolean).map(a => (
-                  <span key={a} style={{
-                    background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#a1a1a1",
-                    borderRadius: 6, fontSize: 12, padding: "3px 10px",
-                  }}>
-                    {a}
-                  </span>
-                ))}
-              </div>
-            </Section>
-          )}
-        </div>
-      </div>
-    </>
-  );
-
-  // ── Layout ─────────────────────────────────────────────────────────────────
+  const statusOptions = [
+    { value: "all",         label: "All Statuses" },
+    { value: "active",      label: "Active" },
+    { value: "coming-soon", label: "Coming Soon" },
+    { value: "sold-out",    label: "Sold Out" },
+  ];
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "#0d0d0d", overflow: "hidden" }}>
-      {sidebar}
+    <PageShell
+      activeHref="/communities"
+      topBar={
+        <TopBar
+          title="Communities"
+          right={<ViewToggle view={view} onChange={handleViewChange} />}
+        />
+      }
+      filtersBar={
+        <>
+          <FiltersBar
+            filters={[
+              {
+                value: divisionFilter,
+                onChange: setDivisionFilter,
+                options: divisionOptions,
+                placeholder: "All Divisions",
+              },
+              {
+                value: stateFilter,
+                onChange: setStateFilter,
+                options: stateOptions,
+                placeholder: "All States",
+              },
+              {
+                value: statusFilter,
+                onChange: setStatusFilter,
+                options: statusOptions,
+                placeholder: "All Statuses",
+              },
+            ]}
+            search={search}
+            onSearch={setSearch}
+            searchPlaceholder="Search communities…"
+          />
+          <StatsBar stats={statsBarItems} />
+        </>
+      }
+    >
+      {view === "card" ? cardView : tableView}
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {topBar}
-        {/* Stats bar — shown in card view; DataTable renders its own stats ribbon in table view */}
-        {view === "card" && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 20,
-            padding: "6px 24px", backgroundColor: "#0d0d0d",
-            borderBottom: "1px solid #1a1a1a", flexShrink: 0,
-          }}>
-            <StatItem label="Total" value={stats.total} color="#666" />
-            <StatItem label="Active" value={stats.active} color="#00c853" />
-            <StatItem label="Coming Soon" value={stats.comingSoon} color="#f5a623" />
-            <StatItem label="Sold Out" value={stats.soldOut} color="#555" />
+      {/* Slide-over */}
+      <SlideOver
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected?.name ?? ""}
+        subtitle={
+          selected
+            ? [selected.city, selected.state].filter(Boolean).join(", ")
+            : undefined
+        }
+        badge={selected ? <StatusBadge status={selected.status} /> : undefined}
+        width={500}
+      >
+        {selected && (
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 0 }}>
+            {/* Hero image */}
+            {selected.featured_image_url && (
+              <div
+                style={{
+                  width: "100%",
+                  height: 180,
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  marginBottom: 20,
+                  background: "#1a1a1a",
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={selected.featured_image_url}
+                  alt={selected.name}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </div>
+            )}
+
+            {/* Badges */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+              {selected.division_name && (
+                <Badge variant="custom" label={selected.division_name} customColor="#818cf8" customBg="#1a1a2e" customBorder="#2a2a4a" />
+              )}
+              {selected.is_55_plus && (
+                <Badge variant="custom" label="55+" customColor="#f5a623" customBg="#2a2a1a" customBorder="#3f3a1f" />
+              )}
+              {selected.has_model && <Badge variant="model" />}
+            </div>
+
+            {/* Description */}
+            {selected.short_description && (
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "#888",
+                  lineHeight: 1.5,
+                  marginBottom: 20,
+                  margin: "0 0 20px",
+                }}
+              >
+                {selected.short_description}
+              </p>
+            )}
+
+            <Section title="Overview">
+              <Row label="Division" value={selected.division_name || selected.division_slug} />
+              <Row label="Location" value={[selected.city, selected.state].filter(Boolean).join(", ") || null} />
+              <Row label="Price From" value={formatPrice(selected.price_from)} />
+              <Row label="Price To"   value={formatPrice(selected.price_to)} />
+              {selected.hoa_fee != null && (
+                <Row label="HOA" value={formatHoa(selected.hoa_fee, selected.hoa_period)} />
+              )}
+            </Section>
+
+            {selected.school_district && (
+              <Section title="Schools">
+                <Row label="District"   value={selected.school_district} />
+                <Row label="Elementary" value={selected.school_elementary} />
+                <Row label="Middle"     value={selected.school_middle} />
+                <Row label="High"       value={selected.school_high} />
+              </Section>
+            )}
+
+            {(selected.sales_phone || selected.sales_center_address) && (
+              <Section title="Sales">
+                <Row label="Phone"   value={selected.sales_phone} />
+                <Row label="Address" value={selected.sales_center_address} />
+              </Section>
+            )}
+
+            {!allUtilsNull && (
+              <Section title="Utilities">
+                {selected.natural_gas    != null && <Row label="Natural Gas"    value={selected.natural_gas} />}
+                {selected.electric       != null && <Row label="Electric"       value={selected.electric} />}
+                {selected.water          != null && <Row label="Water"          value={selected.water} />}
+                {selected.sewer          != null && <Row label="Sewer"          value={selected.sewer} />}
+                {selected.cable_internet != null && <Row label="Cable/Internet" value={selected.cable_internet} />}
+                {selected.trash          != null && <Row label="Trash"          value={selected.trash} />}
+              </Section>
+            )}
+
+            {amenities.length > 0 && (
+              <Section title="Amenities">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {amenities.map((a) => (
+                    <span
+                      key={a}
+                      style={{
+                        background: "#1a1a1a",
+                        border: "1px solid #2a2a2a",
+                        color: "#a1a1a1",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        padding: "3px 9px",
+                      }}
+                    >
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+              {selected.page_url && (
+                <a
+                  href={`https://schellbrothers.com${selected.page_url}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    fontSize: 12,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    background: "#1a2a3a",
+                    border: "1px solid #223347",
+                    color: "#7aafdf",
+                    textDecoration: "none",
+                    fontWeight: 500,
+                  }}
+                >
+                  ↗ SchellBrothers.com
+                </a>
+              )}
+              <a
+                href={`/plans?community=${selected.id}`}
+                style={{
+                  fontSize: 12,
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  background: "#1a1a2e",
+                  border: "1px solid #2a2a4a",
+                  color: "#818cf8",
+                  textDecoration: "none",
+                  fontWeight: 500,
+                }}
+              >
+                View Plans →
+              </a>
+              {selected.brochure_url && (
+                <a
+                  href={selected.brochure_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    fontSize: 12,
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    background: "#1a1a1a",
+                    border: "1px solid #2a2a2a",
+                    color: "#a1a1a1",
+                    textDecoration: "none",
+                    fontWeight: 500,
+                  }}
+                >
+                  ⬇ Brochure
+                </a>
+              )}
+            </div>
           </div>
         )}
-        <div style={{ flex: 1, overflow: "auto" }}>
-          {view === "card" ? cardView : tableView}
-        </div>
-      </div>
-
-      {slideOver}
-    </div>
+      </SlideOver>
+    </PageShell>
   );
 }
 
-// ─── Default export (wraps inner with Suspense) ───────────────────────────────
+// ─── Export (wrapped in Suspense for useSearchParams) ─────────────────────────
 
 export default function CommunitiesClient(props: Props) {
   return (
