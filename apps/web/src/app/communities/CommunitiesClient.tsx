@@ -197,8 +197,10 @@ function CommunitiesInner({ communities, divisions }: Props) {
 
   // Filter
   const filtered = communities.filter((c) => {
+    // Global filter takes priority
+    if (filter.communityId && c.id !== filter.communityId) return false;
     if (divisionFilter !== "all" && c.division_slug !== divisionFilter) return false;
-    if (stateFilter !== "all" && c.state !== stateFilter) return false;
+    if (!filter.communityId && stateFilter !== "all" && c.state !== stateFilter) return false;
     if (statusFilter !== "all") {
       if (statusFilter === "active" && !isActiveStatus(c.status)) return false;
       if (statusFilter === "coming-soon" && c.status !== "coming-soon") return false;
@@ -420,12 +422,12 @@ function CommunitiesInner({ communities, divisions }: Props) {
                 options: divisionOptions,
                 placeholder: "All Divisions",
               }] : []),
-              {
+              ...(!filter.communityId ? [{
                 value: stateFilter,
                 onChange: setStateFilter,
                 options: stateOptions,
                 placeholder: "All States",
-              },
+              }] : []),
               {
                 value: statusFilter,
                 onChange: setStatusFilter,

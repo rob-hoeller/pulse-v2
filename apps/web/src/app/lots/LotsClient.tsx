@@ -171,12 +171,20 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
   // Filtered rows
   const rows = useMemo<LotTableRow[]>(() => {
     return (lots as LotTableRow[]).filter((l) => {
+      // Global filter: community by UUID takes priority
+      if (filter.communityId && l.community_id !== filter.communityId) return false;
+      // Global filter: division by UUID
+      if (filter.divisionId && !divFilter) {
+        const comm = l.community_id ? communityMap.get(l.community_id as string) : null;
+        const div = comm?.division_id ? divisionMap.get(comm.division_id) : null;
+        if (div?.id !== filter.divisionId) return false;
+      }
       if (divFilter) {
         const comm = l.community_id ? communityMap.get(l.community_id as string) : null;
         const div = comm?.division_id ? divisionMap.get(comm.division_id) : null;
         if (div?.id !== divFilter) return false;
       }
-      if (commFilter && l.community_name_raw !== commFilter) return false;
+      if (!filter.communityId && commFilter && l.community_name_raw !== commFilter) return false;
       if (statusFilter && l.lot_status !== statusFilter) return false;
       if (constructionFilter && l.construction_status !== constructionFilter) return false;
       if (search) {

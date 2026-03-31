@@ -480,12 +480,12 @@ export default function ModelHomesClient({ modelHomes, divisions }: Props) {
                 options: divisionOptions,
                 placeholder: "All Divisions",
               }] : []),
-              {
+              ...(!filter.communityId ? [{
                 value: stateFilter,
                 onChange: (v: string) => { setStateFilter(v); setCommFilter(""); },
                 options: stateOptions,
                 placeholder: "All States",
-              },
+              }] : []),
               ...(!filter.communityId ? [{
                 value: commFilter,
                 onChange: setCommFilter,

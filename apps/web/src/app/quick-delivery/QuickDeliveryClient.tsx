@@ -499,7 +499,7 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
                 options: divisionOptions,
                 placeholder: "All Divisions",
               }] : []),
-              {
+              ...(!globalFilter.communityId ? [{
                 value: stateFilter,
                 onChange: (v: string) => {
                   setStateFilter(v);
@@ -507,7 +507,7 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
                 },
                 options: stateOptions,
                 placeholder: "All States",
-              },
+              }] : []),
               ...(!globalFilter.communityId ? [{
                 value: commFilter,
                 onChange: setCommFilter,
