@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useCallback, useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { GlobalFilterContext, type GlobalFilter, type GlobalFilterContextValue } from "./GlobalFilterContext";
 
 interface Props {
@@ -10,21 +10,30 @@ interface Props {
 
 export function GlobalFilterProvider({ children }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const pathname = usePathname();
 
   const [labels, setLabels] = useState<{ division?: string; community?: string; plan?: string }>({});
 
-  // Read current filter from URL
-  const filter: GlobalFilter = {
-    divisionId: searchParams.get("div"),
-    communityId: searchParams.get("comm"),
-    planModelId: searchParams.get("plan"),
-  };
+  // Read filter from URL on client only (avoids SSR suspense freeze)
+  const [filter, setFilter] = useState<GlobalFilter>({
+    divisionId: null,
+    communityId: null,
+    planModelId: null,
+  });
+
+  // Sync filter state from URL on mount and navigation
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setFilter({
+      divisionId: params.get("div"),
+      communityId: params.get("comm"),
+      planModelId: params.get("plan"),
+    });
+  }, [pathname]);
 
   const updateUrl = useCallback(
     (updates: Partial<Record<"div" | "comm" | "plan", string | null>>) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(window.location.search);
       for (const [key, val] of Object.entries(updates)) {
         if (val === null || val === "") {
           params.delete(key);
@@ -33,9 +42,16 @@ export function GlobalFilterProvider({ children }: Props) {
         }
       }
       const query = params.toString();
-      router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+      const newUrl = `${pathname}${query ? `?${query}` : ""}`;
+      router.replace(newUrl, { scroll: false });
+      // Update local state immediately
+      setFilter({
+        divisionId: params.get("div"),
+        communityId: params.get("comm"),
+        planModelId: params.get("plan"),
+      });
     },
-    [router, searchParams, pathname]
+    [router, pathname]
   );
 
   const setDivision = useCallback(
