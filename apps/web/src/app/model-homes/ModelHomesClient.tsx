@@ -139,13 +139,7 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
     ? communities.find((c) => c.id === filter.communityId)?.name ?? null
     : null;
 
-  const [divFilter, setDivFilter] = useState<string>(() =>
-    globalDivName
-      ? (modelHomes.find((r) => r.division_parent_name === globalDivName)
-          ? String(modelHomes.find((r) => r.division_parent_name === globalDivName)!.division_parent_id ?? "")
-          : "")
-      : ""
-  );
+  const [divFilter, setDivFilter] = useState<string>("");
   const [stateFilter, setStateFilter] = useState("");
   const [commFilter, setCommFilter] = useState<string>(() => filter.communityId ? filter.communityId : "");
   const [search, setSearch] = useState("");
@@ -167,8 +161,7 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
   const stateOptions = Array.from(new Set(allRows.map((r) => r.state).filter(Boolean))).sort().map((s) => ({ value: s as string, label: s as string }));
 
   const filteredForComm = allRows
-    .filter((r) => !divFilter || String(r.division_parent_id) === divFilter)
-    .filter((r) => !stateFilter || r.state === stateFilter);
+        .filter((r) => !stateFilter || r.state === stateFilter);
 
   const commOptions = Array.from(new Set(filteredForComm.map((r) => r.community_name).filter(Boolean))).sort().map((n) => ({ value: n as string, label: n as string }));
 
