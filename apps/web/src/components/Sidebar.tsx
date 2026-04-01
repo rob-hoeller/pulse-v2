@@ -102,7 +102,18 @@ export default function Sidebar() {
                 </div>
               )}
               <Link
-                href={item.href === "#" ? "#" : queryString ? `${item.href}?${queryString}` : item.href}
+                href={item.href === "#" ? "#" : (() => {
+                const [basePath, itemQuery] = item.href.split("?");
+                const params = new URLSearchParams();
+                // Preserve global filter params
+                if (searchParams.get("div")) params.set("div", searchParams.get("div")!);
+                if (searchParams.get("comm")) params.set("comm", searchParams.get("comm")!);
+                if (searchParams.get("plan")) params.set("plan", searchParams.get("plan")!);
+                // Apply item's own params (e.g. mode)
+                if (itemQuery) new URLSearchParams(itemQuery).forEach((v, k) => params.set(k, v));
+                const qs = params.toString();
+                return qs ? `${basePath}?${qs}` : basePath;
+              })()}
                 style={{
                   display: "flex",
                   alignItems: "center",
