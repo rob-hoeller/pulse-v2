@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { usePathname } from "next/navigation";
 
 // ── Canonical nav items — single source of truth ─────────────────────────────
@@ -31,6 +32,8 @@ const GROUP_LABELS: Record<string, string> = {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const queryString = searchParams.toString();
 
   return (
     <aside
@@ -98,7 +101,7 @@ export default function Sidebar() {
                 </div>
               )}
               <Link
-                href={item.href}
+                href={item.href === "#" ? "#" : queryString ? `${item.href}?${queryString}` : item.href}
                 style={{
                   display: "flex",
                   alignItems: "center",

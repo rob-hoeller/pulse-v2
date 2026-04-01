@@ -70,7 +70,7 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
 
   // Apply filters
   const rows = specHomes.filter((r) => {
-    if (globalDivName && r.division_parent_name !== globalDivName) return false;
+    if (globalDivName && !(r.division_parent_name ?? "").startsWith(globalDivName)) return false;
     if (filter.communityId) {
       const commName = labels.community;
       if (commName && r.community_name !== commName) return false;

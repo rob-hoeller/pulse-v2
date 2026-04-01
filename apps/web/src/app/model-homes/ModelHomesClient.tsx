@@ -165,7 +165,7 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
   const commOptions = Array.from(new Set(filteredForComm.map((r) => r.community_name).filter(Boolean))).sort().map((n) => ({ value: n as string, label: n as string }));
 
   const rows = allRows
-    .filter((r) => !globalDivName || r.division_parent_name === globalDivName)
+    .filter((r) => !globalDivName || (r.division_parent_name ?? "").startsWith(globalDivName))
     .filter((r) => !stateFilter || r.state === stateFilter)
     .filter((r) => {
       if (!globalCommName && !commFilter) return true;
