@@ -6,10 +6,10 @@
 
 :root {
   /* HBv1 design tokens */
-  --bg:              #222326;
+  --bg:              #121314;
   --sidebar-bg:      #222326;
   --sidebar-border:  #333333;
-  --surface:         #1d1d1d;
+  --surface:         #1e2024;
   --surface-2:       #2a2b2e;
   --surface-3:       #363739;
   --border:          #444444;
