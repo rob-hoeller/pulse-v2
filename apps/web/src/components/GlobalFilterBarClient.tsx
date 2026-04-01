@@ -39,7 +39,7 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
         style={{
           width: 170,
           height: 44,
-          background: "#1a1a1e",
+          background: "#2a2b2e",
           border: `1px solid ${isActive ? "#80B602" : "#333"}`,
           borderRadius: 3,
           padding: "6px 10px",
@@ -74,7 +74,7 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
             top: 48,
             left: 0,
             zIndex: 50,
-            background: "#1a1a1e",
+            background: "#2a2b2e",
             border: "1px solid #333",
             borderRadius: 3,
             minWidth: 200,
@@ -157,7 +157,7 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
       gap: 8,
       padding: "0 16px",
       height: 56,
-      background: "#121314",
+      background: "#0d0d0d",
       borderBottom: "1px solid #222",
       flexShrink: 0,
     }}>
@@ -191,7 +191,6 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
       <div style={{ flex: 1 }} />
 
       {/* Right: bell + account */}
-      <button style={{ background: "none", border: "none", cursor: "pointer", color: "#555", fontSize: 15, padding: 0 }}>🔔</button>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#80B602", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" }}>L</div>
         <span style={{ fontSize: 12, color: "#888" }}>Hello, Lance!</span>

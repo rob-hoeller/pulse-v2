@@ -101,7 +101,7 @@ export default function TableSubHeader<T>({
         padding: "0 16px",
         height: 40,
         flexShrink: 0,
-        background: "#0d0e10",
+        background: "#222323",
         borderBottom: "1px solid #1a1a1e",
         gap: 16,
         overflowX: "auto",
@@ -113,7 +113,7 @@ export default function TableSubHeader<T>({
           style={{
             fontSize: 14,
             fontWeight: 700,
-            color: "#ededed",
+            color: "#ffffff",
             fontFamily: "var(--font-body)",
             whiteSpace: "nowrap",
           }}
@@ -152,8 +152,8 @@ export default function TableSubHeader<T>({
               {i > 0 && (
                 <span style={{ color: "#2a2a2a", margin: "0 8px" }}>·</span>
               )}
-              <span style={{ fontSize: 12, color: "#555" }}>{stat.label}: </span>
-              <span style={{ fontSize: 12, color: "#aaa", fontWeight: 500 }}>
+              <span style={{ fontSize: 12, color: "#888" }}>{stat.label}: </span>
+              <span style={{ fontSize: 12, color: "#cccccc", fontWeight: 500 }}>
                 {stat.getValue(rows)}
               </span>
             </span>
@@ -203,7 +203,7 @@ export default function TableSubHeader<T>({
         </button>
 
         {/* Range */}
-        <span style={{ fontSize: 12, color: "#555", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 12, color: "#888", whiteSpace: "nowrap" }}>
           {totalRows === 0 ? "0 results" : `${start}–${end} of ${totalRows}`}
         </span>
 
