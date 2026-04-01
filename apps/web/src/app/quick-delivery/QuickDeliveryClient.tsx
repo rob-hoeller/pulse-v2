@@ -8,7 +8,7 @@ import SlideOver, { Section, Row } from "@/components/SlideOver";
 import Badge from "@/components/Badge";
 import DataTable, { type Column } from "@/components/DataTable";
 
-interface Division { id: string; slug: string; name: string; }
+interface Division { id: string; slug: string; name: string; heartbeat_division_id?: number | null; }
 
 interface SpecHome {
   id: string; home_id: number; name: string | null; transaction_type: string | null;
@@ -49,13 +49,6 @@ function formatCurrency(n: number | null): string {
   if (n == null) return "—";
   return "$" + n.toLocaleString();
 }
-
-const SLUG_TO_HB_DIV_ID: Record<string, number> = {
-  "delaware-beaches": 1,
-  "richmond": 2,
-  "nashville": 4,
-  "boise": 6,
-};
 
 export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
   const { filter, labels } = useGlobalFilter();

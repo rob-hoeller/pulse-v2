@@ -10,18 +10,12 @@ import { useGlobalFilter } from "@/context/GlobalFilterContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-const SLUG_TO_HB_DIV_ID: Record<string, number> = {
-  "delaware-beaches": 1,
-  "richmond": 2,
-  "nashville": 4,
-  "boise": 6,
-};
-
 
 interface Division {
   id: string;
   slug: string;
   name: string;
+  heartbeat_division_id?: number | null;
 }
 
 interface ModelHome {
@@ -133,7 +127,7 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
   const { filter, labels } = useGlobalFilter();
 
   const globalHBDivId = filter.divisionId
-    ? (SLUG_TO_HB_DIV_ID[divisions.find((d) => d.id === filter.divisionId)?.slug ?? ""] ?? null)
+    ? (divisions.find((d) => d.id === filter.divisionId)?.heartbeat_division_id ?? null)
     : null;
   const globalCommName = filter.communityId
     ? communities.find((c) => c.id === filter.communityId)?.name ?? null
