@@ -49,8 +49,8 @@ function LotStatusBadge({ status }: { status: string | null }) {
     <span
       style={{
         fontSize: 10,
-        padding: "2px 8px",
-        borderRadius: 4,
+        padding: "2px 7px",
+        borderRadius: 3,
         backgroundColor: s.bg,
         color: s.color,
         border: `1px solid ${s.border}`,
@@ -58,9 +58,13 @@ function LotStatusBadge({ status }: { status: string | null }) {
         whiteSpace: "nowrap",
         textTransform: "uppercase",
         letterSpacing: "0.04em",
+        display: "inline-block",
+        maxWidth: 120,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
       }}
     >
-      {status}
+      {status?.replace(" Homesite","").replace(" Home","") ?? ""}
     </span>
   );
 }
@@ -82,7 +86,7 @@ function ConstructionBadge({ status }: { status: string | null }) {
         letterSpacing: "0.04em",
       }}
     >
-      {status}
+      {status?.replace(" Started","").replace("Under ","UC ") ?? ""}
     </span>
   );
 }
