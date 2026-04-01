@@ -50,6 +50,13 @@ function formatCurrency(n: number | null): string {
   return "$" + n.toLocaleString();
 }
 
+const SLUG_TO_HB_DIV_ID: Record<string, number> = {
+  "delaware-beaches": 1,
+  "richmond": 2,
+  "nashville": 4,
+  "boise": 6,
+};
+
 export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
   const { filter, labels } = useGlobalFilter();
   const [search, setSearch] = useState("");
@@ -70,7 +77,7 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
 
   // Apply filters
   const rows = specHomes.filter((r) => {
-    if (globalDivName && !(r.division_parent_name ?? "").startsWith(globalDivName)) return false;
+    if (globalHBDivId !== null && r.division_parent_id !== globalHBDivId) return false;
     if (filter.communityId) {
       const commName = labels.community;
       if (commName && r.community_name !== commName) return false;

@@ -124,8 +124,8 @@ function filterSelectStyle(active: boolean): React.CSSProperties {
 export default function ModelHomesClient({ modelHomes, divisions, communities }: Props) {
   const { filter, labels } = useGlobalFilter();
 
-  const globalDivName = filter.divisionId
-    ? divisions.find((d) => d.id === filter.divisionId)?.name ?? null
+  const globalHBDivId = filter.divisionId
+    ? (SLUG_TO_HB_DIV_ID[divisions.find((d) => d.id === filter.divisionId)?.slug ?? ""] ?? null)
     : null;
   const globalCommName = filter.communityId
     ? communities.find((c) => c.id === filter.communityId)?.name ?? null
@@ -165,7 +165,7 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
   const commOptions = Array.from(new Set(filteredForComm.map((r) => r.community_name).filter(Boolean))).sort().map((n) => ({ value: n as string, label: n as string }));
 
   const rows = allRows
-    .filter((r) => !globalDivName || (r.division_parent_name ?? "").startsWith(globalDivName))
+    .filter((r) => !globalHBDivId || r.division_parent_id === globalHBDivId)
     .filter((r) => !stateFilter || r.state === stateFilter)
     .filter((r) => {
       if (!globalCommName && !commFilter) return true;
