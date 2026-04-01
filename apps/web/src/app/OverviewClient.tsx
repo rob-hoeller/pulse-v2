@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import CommunityCard from "@/components/CommunityCard";
 import PlanCard from "@/components/PlanCard";
+import SlideOver, { Section, Row } from "@/components/SlideOver";
+import DataTable, { type Column } from "@/components/DataTable";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -35,10 +37,29 @@ export interface Community {
   hoa_fee: number | null;
   hoa_period: string | null;
   school_district: string | null;
+  school_elementary?: string | null;
+  school_middle?: string | null;
+  school_high?: string | null;
+  electric?: string | null;
+  gas?: string | null;
+  water?: string | null;
+  sewer?: string | null;
+  trash?: string | null;
+  cable_internet?: string | null;
   short_description: string | null;
   total_homesites: number | null;
   has_model: boolean;
+  is_55_plus?: boolean | null;
+  hours?: unknown | null;
   lot_map_url?: string | null;
+  brochure_url?: string | null;
+  included_features_url?: string | null;
+  website_url?: string | null;
+  design_center_url?: string | null;
+  sales_center_address?: string | null;
+  zip?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface CommunityPlan {
@@ -1182,21 +1203,39 @@ const DUMMY_MESSAGES: Record<string, DummyMessage[]> = {
 };
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type CommunityTabId = "performance" | "sitemap" | "prospects" | "communications" | "calendar";
+type CommTab = 'overview'|'plans'|'lots'|'siteplan'|'leads'|'calendar'|'comms'|'amenities'|'designcenter'|'info';
 
-const COMMUNITY_TABS: { id: CommunityTabId; label: string }[] = [
-  { id: "performance", label: "📊 Performance" },
-  { id: "sitemap", label: "🗺 Sitemap & Plans" },
-  { id: "prospects", label: "👥 Prospects" },
-  { id: "communications", label: "💬 Communications" },
-  { id: "calendar", label: "📅 Calendar" },
+const COMMUNITY_TABS: { id: CommTab; icon: string; label: string }[] = [
+  { id: 'overview',     icon: '◉', label: 'Overview'      },
+  { id: 'plans',        icon: '◱', label: 'Plans'          },
+  { id: 'lots',         icon: '◫', label: 'Lots'           },
+  { id: 'siteplan',     icon: '⊞', label: 'Site Plan'     },
+  { id: 'leads',        icon: '⊕', label: 'Leads'          },
+  { id: 'calendar',     icon: '◷', label: 'Calendar'       },
+  { id: 'comms',        icon: '◈', label: 'Comm Hub'       },
+  { id: 'amenities',    icon: '⌂', label: 'Amenities'     },
+  { id: 'designcenter', icon: '✦', label: 'Design Center' },
+  { id: 'info',         icon: '◧', label: 'Info'           },
 ];
 
-function CommunityView({ community, plans, lots, modelHome, specHomes, divisions }: CommunityViewProps) {
+// ─── Info Row helper ──────────────────────────────────────────────────────────
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 8, marginBottom: 6, alignItems: "flex-start" }}>
+      <span style={{ fontSize: 12, color: "#555", minWidth: 110, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 13, color: "#888" }}>{value}</span>
+    </div>
+  );
+}
+
+function CommunityView({ community, plans, lots, specHomes, divisions }: CommunityViewProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<CommunityTabId>("performance");
+  const [activeTab, setActiveTab] = useState<CommTab>('overview');
   const [activeCommTab, setActiveCommTab] = useState<"Email" | "SMS" | "Calls">("Email");
   const [selectedMessage, setSelectedMessage] = useState<DummyMessage | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<CommunityPlan | null>(null);
+  const [selectedLot, setSelectedLot] = useState<LotRow | null>(null);
+  const [lotStatusFilter, setLotStatusFilter] = useState<string>('all');
 
   const division = divisions.find((d) => d.id === community.division_id);
 
@@ -1270,145 +1309,95 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
   }
   const todayDate = today.getDate();
 
+  // ─── Lot status filter ─────────────────────────────────────────────────────
+  const filteredLots = lotStatusFilter === 'all' ? lots : lots.filter(l => l.lot_status === lotStatusFilter);
+  const uniqueLotStatuses = Array.from(new Set(lots.map(l => l.lot_status).filter(Boolean))) as string[];
+
+  // ─── Plans DataTable columns ────────────────────────────────────────────────
+  const planColumns: Column<CommunityPlan & Record<string, unknown>>[] = [
+    { key: 'plan_name', label: 'Plan Name', sortable: true },
+    { key: 'beds', label: 'Beds', align: 'center', sortable: true },
+    { key: 'baths', label: 'Baths', align: 'center', sortable: true },
+    { key: 'sqft_min', label: 'Sqft', align: 'right', sortable: true, render: (v) => v ? Number(v).toLocaleString() : '—' },
+    { key: 'base_price', label: 'Base Price', align: 'right', sortable: true, render: (v) => v ? '$' + Number(v).toLocaleString() : '—' },
+    { key: 'incentive_amount', label: 'Incentive', align: 'right', sortable: true, render: (v) => v && Number(v) > 0 ? '-$' + Number(v).toLocaleString() : '—' },
+    { key: 'net_price', label: 'Net Price', align: 'right', sortable: true, render: (v) => v ? '$' + Number(v).toLocaleString() : '—' },
+    { key: 'page_url', label: 'View', align: 'center', render: (v) => v ? <a href={String(v)} target="_blank" rel="noopener noreferrer" style={{ color: '#59a6bd', fontSize: 12 }}>↗</a> : '—' },
+  ];
+
+  // ─── Lots DataTable columns ─────────────────────────────────────────────────
+  const lotColumns: Column<LotRow & Record<string, unknown>>[] = [
+    { key: 'lot_number', label: 'Lot #', sortable: true },
+    { key: 'phase', label: 'Phase', sortable: true, render: (v) => (v as string | null) ?? '—' },
+    { key: 'address', label: 'Address', render: (v) => (v as string | null) ?? '—' },
+    { key: 'lot_status', label: 'Status', sortable: true, render: (v) => {
+      const s = v as string | null;
+      const color = s === 'Available' || s === 'Available Homesite' ? '#00c853' : s === 'Sold' || s === 'Closed' ? '#ef4444' : s === 'Reserved' ? '#f59e0b' : s === 'Future' ? '#5b80a0' : s === 'Quick Delivery' ? '#8a7a5a' : '#555';
+      return <span style={{ color, fontWeight: 600 }}><span style={{ marginRight: 4 }}>●</span>{s ?? '—'}</span>;
+    }},
+    { key: 'construction_status', label: 'Construction', render: (v) => (v as string | null) ?? '—' },
+    { key: 'lot_premium', label: 'Premium', align: 'right', render: (v) => v ? '$' + Number(v).toLocaleString() : '—' },
+    { key: 'is_buildable', label: 'Foundation', align: 'center', render: (v) => v ? '✓' : '—' },
+  ];
+
+  // ─── Amenities ──────────────────────────────────────────────────────────────
+  let amenityList: string[] = [];
+  if (community.amenities_structured && Array.isArray(community.amenities_structured)) {
+    amenityList = (community.amenities_structured as Array<{ name?: string } | string>).map(a => typeof a === 'string' ? a : (a?.name ?? '')).filter(Boolean);
+  } else if (community.amenities) {
+    amenityList = community.amenities.split(';').map(s => s.trim()).filter(Boolean);
+  }
+
+  // ─── Info: Hours ────────────────────────────────────────────────────────────
+  let hoursObj: Record<string, string> = {};
+  if (community.hours) {
+    try { hoursObj = typeof community.hours === 'string' ? JSON.parse(community.hours) : (community.hours as Record<string, string>); } catch { hoursObj = {}; }
+  }
+
+  const priceFrom = community.price_from ? community.price_from.toLocaleString() : null;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#0d0d0d" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#121314" }}>
 
-      {/* ── Breadcrumb top bar ── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "0 24px",
-          height: 44,
-          borderBottom: "1px solid #1f1f1f",
-          background: "#0d0d0d",
-          flexShrink: 0,
-        }}
-      >
-        <button
-          onClick={() => router.push("/")}
-          style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 13, padding: 0 }}
-        >
-          ← Corp
-        </button>
-        {division && (
-          <>
-            <span style={{ color: "#333" }}>·</span>
-            <button
-              onClick={() => router.push(`/?div=${division.id}`)}
-              style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 13, padding: 0 }}
-            >
-              {division.name}
-            </button>
-          </>
-        )}
-        <span style={{ color: "#333" }}>·</span>
-        <h1 style={{ fontFamily: "var(--font-display)", color: "#ededed", fontSize: 15, fontWeight: 600, margin: 0 }}>
-          {community.name}
-        </h1>
-      </div>
-
-      {/* ── Community hero header (always visible) ── */}
-      <div style={{ flexShrink: 0, background: "#161718", borderBottom: "1px solid #3a3b3e" }}>
-        <div style={{ width: "100%", height: 160, overflow: "hidden", position: "relative" }}>
-          {community.featured_image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={community.featured_image_url as string}
-              alt={community.name}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", background: "#1e1f22" }} />
+      {/* ── Header (no image) ── */}
+      <div style={{ background: "#0d0e10", borderBottom: "1px solid #222", padding: "16px 24px", flexShrink: 0 }}>
+        {/* Breadcrumb */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <button onClick={() => router.push("/")} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 12, padding: 0 }}>← Corp</button>
+          {division && (
+            <>
+              <span style={{ color: "#333" }}>·</span>
+              <button onClick={() => router.push(`/?div=${division.id}`)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 12, padding: 0 }}>{division.name}</button>
+            </>
           )}
-          {/* Gradient overlay */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: "60%",
-              background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)",
-            }}
-          />
-          {/* Text overlay */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 16,
-              left: 24,
-              zIndex: 2,
-            }}
-          >
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "#ffffff" }}>
-              {community.name}
-            </div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>
-              {[community.city, community.state].filter(Boolean).join(" · ")}
-              {division ? ` · ${division.name}` : ""}
-            </div>
-          </div>
         </div>
-
-        {/* Community meta pills */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "10px 24px 12px", alignItems: "center" }}>
-          {community.price_from && (
-            <span style={{ background: "#1d1d1d", border: "1px solid #555", borderRadius: 3, padding: "3px 8px", fontSize: 11, color: "#59a6bd", fontWeight: 600 }}>
-              From {formatPrice(community.price_from as number)}
-            </span>
-          )}
-          {community.hoa_fee && (
-            <span style={{ background: "#1d1d1d", border: "1px solid #555", borderRadius: 3, padding: "3px 8px", fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
-              ${community.hoa_fee}/mo HOA
-            </span>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#ededed" }}>{community.name}</div>
+        <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+          {[community.city, community.state].filter(Boolean).join(" · ")}
+          {division ? ` · ${division.name}` : ""}
+          {priceFrom ? ` · Priced from $${priceFrom}` : ""}
+        </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+          {community.status && (
+            <span style={{ background: "#1a1a1e", border: "1px solid #2a2a2a", borderRadius: 3, padding: "2px 10px", fontSize: 11, color: "#888" }}>{community.status}</span>
           )}
           {community.total_homesites && (
-            <span style={{ background: "#1d1d1d", border: "1px solid #555", borderRadius: 3, padding: "3px 8px", fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
-              {community.total_homesites} homesites
+            <span style={{ background: "#1a1a1e", border: "1px solid #2a2a2a", borderRadius: 3, padding: "2px 10px", fontSize: 11, color: "#888" }}>{community.total_homesites} homesites</span>
+          )}
+          {(community.hoa_fee || community.hoa_period) && (
+            <span style={{ background: "#1a1a1e", border: "1px solid #2a2a2a", borderRadius: 3, padding: "2px 10px", fontSize: 11, color: "#888" }}>
+              {community.hoa_fee ? `$${Number(community.hoa_fee).toLocaleString()}` : ""}
+              {community.hoa_period ? `/${community.hoa_period} HOA` : " HOA"}
             </span>
           )}
           {community.school_district && (
-            <span style={{ background: "#1d1d1d", border: "1px solid #555", borderRadius: 3, padding: "3px 8px", fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
-              {community.school_district}
-            </span>
-          )}
-          {community.page_url && (
-            <a
-              href={community.page_url as string}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                marginLeft: "auto",
-                border: "1px solid #59a6bd",
-                background: "rgba(89,166,189,0.15)",
-                color: "#59a6bd",
-                borderRadius: 3,
-                padding: "3px 10px",
-                fontSize: 11,
-                fontWeight: 600,
-                textDecoration: "none",
-                flexShrink: 0,
-              }}
-            >
-              View on schellbrothers.com ↗
-            </a>
+            <span style={{ background: "#1a1a1e", border: "1px solid #2a2a2a", borderRadius: 3, padding: "2px 10px", fontSize: 11, color: "#888" }}>{community.school_district}</span>
           )}
         </div>
       </div>
 
-      {/* ── HBv1-style tab bar ── */}
-      <div
-        style={{
-          background: "#161718",
-          borderBottom: "2px solid #444",
-          display: "flex",
-          gap: 0,
-          padding: "0 24px",
-          flexShrink: 0,
-        }}
-      >
+      {/* ── Tab bar ── */}
+      <div style={{ display: "flex", background: "#0d0e10", borderBottom: "2px solid #1a1a1e", flexShrink: 0, overflowX: "auto" }}>
         {COMMUNITY_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -1416,84 +1405,69 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
             style={{
               background: "none",
               border: "none",
-              borderBottom: activeTab === tab.id ? "3px solid #59a6bd" : "3px solid transparent",
+              borderBottom: activeTab === tab.id ? "2px solid #80B602" : "2px solid transparent",
               marginBottom: -2,
-              color: activeTab === tab.id ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
-              fontSize: 13,
-              fontFamily: "Open Sans, Arial, sans-serif",
+              color: activeTab === tab.id ? "#ededed" : "#555",
+              fontSize: 12,
               fontWeight: activeTab === tab.id ? 600 : 400,
-              padding: "12px 20px",
+              padding: "10px 16px",
               cursor: "pointer",
               whiteSpace: "nowrap",
-              transition: "color 0.15s",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
             }}
           >
-            {tab.label}
+            <span>{tab.icon}</span>
+            <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
-      {/* ── Tab content area ── */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      {/* ── Tab content ── */}
+      <div style={{ flex: 1, overflow: "auto" }}>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 1: PERFORMANCE */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === "performance" && (
+        {/* ═══ OVERVIEW ═══════════════════════════════════════════════════════ */}
+        {activeTab === 'overview' && (
           <div style={{ padding: 24 }}>
-            {/* Stats Row (8 cards) */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(8, 1fr)",
-                gap: 10,
-                marginBottom: 32,
-              }}
-            >
+            {/* Real stat cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
               <StatCard label="Plans" value={plans.length} accent="#223347" />
               <StatCard label="Avail Lots" value={availableLots.length} accent="#00c853" />
               <StatCard label="Under Const" value={underConstruction.length} accent="#5b80a0" />
               <StatCard label="QD Homes" value={specHomes.length + qdLots.length} accent="#8a7a5a" />
+            </div>
+            {/* Placeholder stat cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 32 }}>
               <StatCard label="Leads" value="—" accent="#a855f7" comingSoon />
               <StatCard label="Prospects" value="—" accent="#f59e0b" comingSoon />
-              <StatCard label="Appts" value="—" accent="#f59e0b" comingSoon />
+              <StatCard label="Appointments" value="—" accent="#f59e0b" comingSoon />
               <StatCard label="Contracts" value="—" accent="#00c853" comingSoon />
             </div>
 
             {/* Sales Performance */}
             <div style={{ marginBottom: 32 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "#ededed", margin: 0 }}>
-                  Sales Performance
-                </h2>
-                <span style={{ fontSize: 12, color: "#555" }}>{currentYear}</span>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: "#ededed", margin: 0 }}>Sales Performance</h2>
                 <ComingSoonBanner source="HBv1 Sales API" />
               </div>
-              <div style={{ overflowX: "auto", marginBottom: 16 }}>
+              <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
                   <thead>
                     <tr>
-                      <td style={{ width: 70, fontSize: 12, fontWeight: 700, color: "#ffffff", background: "#E32027", paddingBottom: 8, paddingLeft: 6, paddingTop: 6, textAlign: "center" }}>{currentYear}</td>
+                      <td style={{ width: 60, fontSize: 12, fontWeight: 700, color: "#fff", background: "#E32027", padding: "6px 8px", textAlign: "center" }}>{currentYear}</td>
                       {MONTHS.map((m) => (
-                        <th key={m} style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, textAlign: "center", paddingBottom: 8, minWidth: 52, background: "#1d1d1d", border: "1px solid #333", padding: "6px 4px" }}>
-                          {m}
-                        </th>
+                        <th key={m} style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, textAlign: "center", background: "#1d1d1d", border: "1px solid #333", padding: "6px 4px", minWidth: 48 }}>{m}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { label: "Net", color: "#ffffff", size: 18 },
-                      { label: "Goal", color: "rgba(255,255,255,0.5)", size: 13 },
-                      { label: "Var", color: "rgba(255,255,255,0.5)", size: 13 },
-                    ].map((row) => (
+                    {[{ label: "Net" }, { label: "Goal" }, { label: "Var" }].map((row) => (
                       <tr key={row.label} style={{ borderTop: "1px solid #1a1a1a" }}>
-                        <td style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontWeight: 600, padding: "8px 0", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                          {row.label}
-                        </td>
+                        <td style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", fontWeight: 600, padding: "8px 6px", textTransform: "uppercase", letterSpacing: "0.1em" }}>{row.label}</td>
                         {MONTHS.map((m) => (
                           <td key={m} style={{ textAlign: "center", padding: "8px 4px" }}>
-                            <span style={{ fontFamily: "var(--font-body)", fontSize: row.size, color: row.color }}>—</span>
+                            <span style={{ fontSize: 13, color: "#333" }}>—</span>
                           </td>
                         ))}
                       </tr>
@@ -1501,465 +1475,234 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
                   </tbody>
                 </table>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                {["Weekly Net Sales", "Avg Sale Price", "Avg Upgrades"].map((c) => (
-                  <div key={c} style={{ background: "#111", border: "1px solid #1f1f1f", borderRadius: 8, padding: "12px 14px" }}>
-                    <PlaceholderValue />
-                    <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.07em", marginTop: 4, fontWeight: 500 }}>{c}</div>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* Appointments */}
             <div style={{ marginBottom: 32 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "#ededed", margin: 0 }}>
-                  Appointments
-                </h2>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: "#ededed", margin: 0 }}>Appointments</h2>
                 <ComingSoonBanner source="Pulse v1" />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
                 {["Held", "Set", "Upcoming", "Cancelled", "Conversion %"].map((label) => (
                   <PlaceholderStatCard key={label} label={label} accent="#f59e0b" />
                 ))}
               </div>
             </div>
 
-            {/* Prospecting & Engagement */}
+            {/* Prospecting */}
             <div style={{ marginBottom: 32 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "#ededed", margin: 0 }}>
-                  Prospecting &amp; Engagement
-                </h2>
-                <ComingSoonBanner source="Pulse v1 + Mailchimp" />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: "#ededed", margin: 0 }}>Prospecting</h2>
+                <ComingSoonBanner source="Pulse v1" />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
                 {["New Prospects", "Total Prospects", "A Prospects", "Unique Contacts", "Campaigns Sent"].map((label) => (
                   <PlaceholderStatCard key={label} label={label} accent="#a855f7" />
                 ))}
               </div>
             </div>
-
-            {/* Inventory & Sales Pace */}
-            <div style={{ marginBottom: 32 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "#ededed", margin: 0 }}>
-                  Inventory &amp; Sales Pace
-                </h2>
-                <span style={{ background: "#0d1f0d", color: "#00c853", border: "1px solid #1a3f1a", borderRadius: 4, fontSize: 9, fontWeight: 600, padding: "2px 7px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  Live
-                </span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
-                <StatCard label="Available Lots" value={availableLots.length} accent="#00c853" />
-                <StatCard label="Buildable" value={buildableLots.length} accent="#00c853" />
-                <StatCard label="Future" value={futureLots.length} accent="#5b80a0" />
-                <StatCard label="Sold / Closed" value={soldLots.length} accent="#ef4444" />
-                <StatCard label="3-Mo Pace" value="—" accent="#f59e0b" comingSoon />
-                <StatCard label="Proj. Sell-Out" value="—" accent="#f59e0b" comingSoon />
-              </div>
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Phase Breakdown</div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", background: "#1d1d1d", borderRadius: 3, overflow: "hidden" }}>
-                    <thead>
-                      <tr style={{ background: "#161616" }}>
-                        {["Phase", "Total", "Available", "Sold", "Under Const", "Future"].map((h) => (
-                          <th key={h} style={{ padding: "8px 12px", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, textAlign: h === "Phase" ? "left" : "center", borderBottom: "1px solid #1f1f1f" }}>
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {phaseRows.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} style={{ padding: "12px", fontSize: 12, color: "#555", textAlign: "center" }}>No lots found</td>
-                        </tr>
-                      ) : (
-                        phaseRows.map(([phase, data], idx) => (
-                          <tr key={phase} style={{ background: idx % 2 === 0 ? "#111" : "#0d0d0d", borderBottom: "1px solid #1a1a1a" }}>
-                            <td style={{ padding: "8px 12px", fontSize: 12, color: "#ededed", fontWeight: 600 }}>{phase}</td>
-                            <td style={{ padding: "8px 12px", fontSize: 12, color: "#888", textAlign: "center" }}>{data.total}</td>
-                            <td style={{ padding: "8px 12px", fontSize: 12, color: "#00c853", textAlign: "center" }}>{data.available || "—"}</td>
-                            <td style={{ padding: "8px 12px", fontSize: 12, color: "#ef4444", textAlign: "center" }}>{data.sold || "—"}</td>
-                            <td style={{ padding: "8px 12px", fontSize: 12, color: "#5b80a0", textAlign: "center" }}>{data.underConst || "—"}</td>
-                            <td style={{ padding: "8px 12px", fontSize: 12, color: "#666", textAlign: "center" }}>{data.future || "—"}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 12, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Construction Pipeline</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-                  <StatCard label="Settled / Closed" value={settled} accent="#555" />
-                  <StatCard label="Under Construction" value={activeConstruction} accent="#5b80a0" />
-                  <StatCard label="Sold – Not Started" value={soldNotStarted} accent="#f59e0b" />
-                  <StatCard label="Not Sold" value={notSold} accent="#00c853" />
-                </div>
-              </div>
-            </div>
-
-            {/* Plans Available */}
-            <div style={{ marginBottom: 32 }}>
-              <SectionHeader title="Plans Available" count={sortedPlans.length} />
-              {sortedPlans.length === 0 ? (
-                <div style={{ background: "#111", border: "1px solid #1f1f1f", borderRadius: 8, padding: "24px", color: "#555", fontSize: 13, textAlign: "center" }}>
-                  No plans configured in Heartbeat for this community
-                </div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-                  {sortedPlans.map((plan) => (
-                    <PlanCard
-                      key={plan.id}
-                      planName={plan.plan_name}
-                      beds={plan.beds}
-                      baths={plan.baths}
-                      sqft={plan.sqft_min}
-                      netPrice={plan.net_price}
-                      basePrice={plan.base_price}
-                      incentiveAmount={plan.incentive_amount}
-                      imageUrl={plan.featured_image_url}
-                      pageUrl={plan.page_url ?? undefined}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Model Home + Quick Delivery */}
-            <div style={{ marginBottom: 32 }}>
-              <SectionHeader title="Model Home" />
-              {modelHome ? (
-                <div style={{ background: "#111", border: "1px solid #1a2a3f", borderRadius: 10, overflow: "hidden", maxWidth: 480, marginBottom: 20 }}>
-                  {modelHome.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={modelHome.image_url} alt={modelHome.model_name ?? "Model Home"} style={{ width: "100%", height: 200, objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: 100, background: "#161820", display: "flex", alignItems: "center", justifyContent: "center", color: "#333", fontSize: 11 }}>No Image</div>
-                  )}
-                  <div style={{ padding: "14px 16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                      <span style={{ background: "#161820", color: "#5b80a0", border: "1px solid #1a2a3f", borderRadius: 4, fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", padding: "2px 7px" }}>Model Home</span>
-                      {modelHome.leaseback && (
-                        <span style={{ background: "#1f1a0f", color: "#8a7a5a", border: "1px solid #3f3a1f", borderRadius: 4, fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", padding: "2px 7px" }}>Leaseback</span>
-                      )}
-                    </div>
-                    <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "#ededed", marginBottom: 4 }}>
-                      {modelHome.model_marketing_name ?? modelHome.model_name ?? modelHome.name ?? "Model"}
-                    </div>
-                    {modelHome.address && <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>{modelHome.address}</div>}
-                    {modelHome.open_hours && <div style={{ fontSize: 12, color: "#666", marginBottom: 8, whiteSpace: "pre-line" }}>{modelHome.open_hours}</div>}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {modelHome.virtual_tour_url && (
-                        <a href={modelHome.virtual_tour_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#818cf8", textDecoration: "none", background: "#12121f", border: "1px solid #2a2a4a", borderRadius: 5, padding: "4px 8px" }}>Virtual Tour →</a>
-                      )}
-                      {modelHome.page_url && (
-                        <a href={modelHome.page_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#5b80a0", textDecoration: "none", background: "#111820", border: "1px solid #1a2a3f", borderRadius: 5, padding: "4px 8px" }}>schellbrothers.com ↗</a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ background: "#111", border: "1px solid #1f1f1f", borderRadius: 8, padding: "20px 24px", color: "#555", fontSize: 13, marginBottom: 20 }}>
-                  No model home for this community
-                </div>
-              )}
-
-              <SectionHeader title="Quick Delivery" count={specHomes.length} />
-              {specHomes.length === 0 ? (
-                <div style={{ background: "#111", border: "1px solid #1f1f1f", borderRadius: 8, padding: "20px 24px", color: "#555", fontSize: 13 }}>
-                  No quick delivery homes available
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {specHomes.map((s) => (
-                    <div key={s.id} style={{ background: "#111", border: "1px solid #1f1f1f", borderLeft: "2px solid #8a7a5a", borderRadius: 8, padding: "10px 12px" }}>
-                      <div style={{ fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 600, color: "#ededed", marginBottom: 3 }}>{s.plan_name ?? "Quick Delivery"}</div>
-                      {s.address && <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>{s.address}</div>}
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: "#666" }}>
-                        {s.beds && <span>{s.beds} bd</span>}
-                        {s.baths && <span>{s.baths} ba</span>}
-                        {s.sqft && <span>{s.sqft.toLocaleString()} sf</span>}
-                        {s.list_price && <span style={{ color: "#8a7a5a", fontWeight: 600 }}>{formatPrice(s.list_price)}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 2: SITEMAP & PLANS */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === "sitemap" && (
-          <div style={{ display: "flex", gap: 0, height: "100%", minHeight: 0 }}>
-            {/* Left 60% — Lot Map */}
-            <div style={{ flex: "0 0 60%", padding: 24, borderRight: "1px solid #1f1f1f", overflowY: "auto" }}>
-              <SectionHeader title="Interactive Lot Map" />
-              {community.lot_map_url ? (
-                <iframe
-                  src={community.lot_map_url}
-                  style={{ width: "100%", height: 500, border: "none", borderRadius: 3 }}
-                  title="Lot Map"
-                />
-              ) : (
-                <div style={{ background: "#1d1d1d", border: "1px solid #555", borderRadius: 3, padding: "32px 24px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
-                  Lot map not configured for this community
-                </div>
-              )}
-              {/* Legend */}
-              <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
-                <span>🟢 Available</span>
-                <span>🔵 Sold</span>
-                <span>🟡 Under Construction</span>
-                <span>⬜ Future</span>
-              </div>
-            </div>
-
-            {/* Right 40% — Plan Cards + Lots Table */}
-            <div style={{ flex: "0 0 40%", padding: 24, overflowY: "auto" }}>
-              <SectionHeader title={`Plans Available (${sortedPlans.length})`} />
-              {sortedPlans.length === 0 ? (
-                <div style={{ background: "#1d1d1d", border: "1px solid #555", borderRadius: 3, padding: "20px", color: "rgba(255,255,255,0.4)", fontSize: 13, textAlign: "center", marginBottom: 20 }}>
-                  No plans configured for this community
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-                  {sortedPlans.map((plan) => (
-                    <div key={plan.id} style={{ background: "#1d1d1d", border: "1px solid #555", borderRadius: 3, padding: "12px 14px" }}>
-                      <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 600, color: "#ededed", marginBottom: 4 }}>{plan.plan_name}</div>
-                      <div style={{ display: "flex", gap: 10, fontSize: 12, color: "rgba(255,255,255,0.5)", flexWrap: "wrap" }}>
-                        {plan.beds && <span>{plan.beds} bd</span>}
-                        {plan.baths && <span>{plan.baths} ba</span>}
-                        {plan.sqft_min && <span>{plan.sqft_min.toLocaleString()} sf</span>}
-                        {(plan.net_price ?? plan.base_price) && (
-                          <span style={{ color: "#59a6bd", fontWeight: 600 }}>{formatPrice((plan.net_price ?? plan.base_price) as number)}</span>
-                        )}
-                        {plan.incentive_amount && plan.incentive_amount > 0 && (
-                          <span style={{ background: "#80B602", color: "#fff", borderRadius: 3, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}>
-                            -{formatPrice(plan.incentive_amount)} incentive
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Available Lots table */}
-              <div style={{ fontSize: 12, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Available Lots</div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: "#161718" }}>
-                      {["Lot #", "Phase", "Address", "Status", "Premium"].map((h) => (
-                        <th key={h} style={{ padding: "6px 10px", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, textAlign: "left", borderBottom: "1px solid #444" }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {availableLots.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} style={{ padding: "10px", color: "#555", textAlign: "center" }}>No available lots</td>
-                      </tr>
-                    ) : (
-                      availableLots.map((lot) => (
-                        <tr key={lot.id} style={{ borderBottom: "1px solid #1f1f1f" }}>
-                          <td style={{ padding: "6px 10px", color: "#ededed" }}>{lot.lot_number ?? "—"}</td>
-                          <td style={{ padding: "6px 10px", color: "#888" }}>{lot.phase ?? "—"}</td>
-                          <td style={{ padding: "6px 10px", color: "#888", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lot.address ?? "—"}</td>
-                          <td style={{ padding: "6px 10px" }}>
-                            <span style={{ color: lotStatusColor(lot.lot_status), fontWeight: 600 }}>{lot.lot_status ?? "—"}</span>
-                          </td>
-                          <td style={{ padding: "6px 10px", color: "#8a7a5a" }}>
-                            {lot.lot_premium ? formatPrice(lot.lot_premium) : "—"}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 3: PROSPECTS */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === "prospects" && (
+        {/* ═══ PLANS ══════════════════════════════════════════════════════════ */}
+        {activeTab === 'plans' && (
           <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "#ededed", margin: 0 }}>
-                Prospects — {community.name}
-              </h2>
+            <DataTable<CommunityPlan & Record<string, unknown>>
+              columns={planColumns}
+              rows={sortedPlans as (CommunityPlan & Record<string, unknown>)[]}
+              onRowClick={(row) => setSelectedPlan(row as CommunityPlan)}
+              emptyMessage="No plans configured for this community"
+            />
+            <SlideOver open={!!selectedPlan} onClose={() => setSelectedPlan(null)} title={selectedPlan?.plan_name ?? "Plan"} subtitle={selectedPlan ? [selectedPlan.beds && `${selectedPlan.beds} bd`, selectedPlan.baths && `${selectedPlan.baths} ba`, selectedPlan.sqft_min && `${selectedPlan.sqft_min.toLocaleString()} sf`].filter(Boolean).join(" · ") : undefined}>
+              {selectedPlan && (
+                <>
+                  <Section title="Pricing">
+                    <Row label="Base Price" value={selectedPlan.base_price ? '$' + selectedPlan.base_price.toLocaleString() : '—'} />
+                    <Row label="Incentive" value={selectedPlan.incentive_amount && selectedPlan.incentive_amount > 0 ? '-$' + selectedPlan.incentive_amount.toLocaleString() : '—'} />
+                    <Row label="Net Price" value={selectedPlan.net_price ? '$' + selectedPlan.net_price.toLocaleString() : '—'} />
+                  </Section>
+                  <Section title="Specs">
+                    <Row label="Beds" value={selectedPlan.beds ?? '—'} />
+                    <Row label="Baths" value={selectedPlan.baths ?? '—'} />
+                    <Row label="Sqft" value={selectedPlan.sqft_min ? selectedPlan.sqft_min.toLocaleString() : '—'} />
+                  </Section>
+                  {selectedPlan.page_url && (
+                    <div style={{ padding: "12px 24px" }}>
+                      <a href={selectedPlan.page_url} target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd", fontSize: 13 }}>View on schellbrothers.com ↗</a>
+                    </div>
+                  )}
+                </>
+              )}
+            </SlideOver>
+          </div>
+        )}
+
+        {/* ═══ LOTS ═══════════════════════════════════════════════════════════ */}
+        {activeTab === 'lots' && (
+          <div style={{ padding: 24 }}>
+            {/* Status filter */}
+            <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
+              <label style={{ fontSize: 12, color: "#555" }}>Status:</label>
+              <select
+                value={lotStatusFilter}
+                onChange={(e) => setLotStatusFilter(e.target.value)}
+                style={{ background: "#1a1a1e", border: "1px solid #2a2a2a", color: "#888", borderRadius: 3, padding: "4px 10px", fontSize: 12 }}
+              >
+                <option value="all">All</option>
+                {uniqueLotStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <span style={{ fontSize: 11, color: "#555" }}>{filteredLots.length} lots</span>
+            </div>
+            <DataTable<LotRow & Record<string, unknown>>
+              columns={lotColumns}
+              rows={filteredLots as (LotRow & Record<string, unknown>)[]}
+              onRowClick={(row) => setSelectedLot(row as LotRow)}
+              emptyMessage="No lots found"
+            />
+            <SlideOver open={!!selectedLot} onClose={() => setSelectedLot(null)} title={`Lot ${selectedLot?.lot_number ?? ''}`} subtitle={selectedLot?.address ?? undefined}>
+              {selectedLot && (
+                <Section title="Lot Details">
+                  <Row label="Lot #" value={selectedLot.lot_number ?? '—'} />
+                  <Row label="Phase" value={selectedLot.phase ?? '—'} />
+                  <Row label="Address" value={selectedLot.address ?? '—'} />
+                  <Row label="Status" value={selectedLot.lot_status ?? '—'} />
+                  <Row label="Construction" value={selectedLot.construction_status ?? '—'} />
+                  <Row label="Premium" value={selectedLot.lot_premium ? '$' + selectedLot.lot_premium.toLocaleString() : '—'} />
+                  <Row label="Buildable" value={selectedLot.is_buildable ? 'Yes' : selectedLot.is_buildable === false ? 'No' : '—'} />
+                  <Row label="Available" value={selectedLot.is_available ? 'Yes' : 'No'} />
+                </Section>
+              )}
+            </SlideOver>
+          </div>
+        )}
+
+        {/* ═══ SITE PLAN ══════════════════════════════════════════════════════ */}
+        {activeTab === 'siteplan' && (
+          <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            {/* Legend */}
+            <div style={{ display: "flex", gap: 16, padding: "8px 24px", background: "#0d0e10", borderBottom: "1px solid #1a1a1e", fontSize: 12, color: "#888", flexShrink: 0 }}>
+              <span><span style={{ color: "#00c853" }}>●</span> Available</span>
+              <span><span style={{ color: "#ef4444" }}>●</span> Sold</span>
+              <span><span style={{ color: "#5b80a0" }}>●</span> Under Construction</span>
+              <span><span style={{ color: "#f59e0b" }}>●</span> Future</span>
+            </div>
+            {community.lot_map_url ? (
+              <iframe src={community.lot_map_url} style={{ width: "100%", flex: 1, border: "none" }} title="Site Plan" />
+            ) : (
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", color: "#555", gap: 8 }}>
+                <span style={{ fontSize: 32 }}>⊞</span>
+                <div style={{ fontSize: 14 }}>No lot map configured for this community</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ LEADS ══════════════════════════════════════════════════════════ */}
+        {activeTab === 'leads' && (
+          <div style={{ padding: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 24 }}>
+              {["Leads", "Prospects", "Appointments"].map(label => (
+                <PlaceholderStatCard key={label} label={label} accent="#a855f7" />
+              ))}
+            </div>
+            <div style={{ background: "#1a1a1e", border: "1px solid #2a2a2a", borderRadius: 3, overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#0d0e10" }}>
+                    {["Name", "Stage", "Score", "Last Contact", "Next Action", "OSC"].map(h => (
+                      <th key={h} style={{ padding: "10px 14px", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, textAlign: "left", borderBottom: "1px solid #2a2a2a" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colSpan={6} style={{ padding: "40px 24px", textAlign: "center", color: "#555", fontSize: 13 }}>
+                      Connect Pulse v1 to see lead data
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ CALENDAR ═══════════════════════════════════════════════════════ */}
+        {activeTab === 'calendar' && (
+          <div style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "#ededed", margin: 0 }}>{calMonthName}</h2>
               <ComingSoonBanner source="Pulse v1" />
             </div>
-
-            <div style={{ background: "#1d1d1d", border: "1px solid #555", borderRadius: 3, overflow: "hidden", maxWidth: 700 }}>
-              {/* AI scoring header */}
-              <div style={{ background: "#161718", padding: "12px 16px", borderBottom: "1px solid #444", display: "flex", gap: 24, alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontWeight: 600 }}>AI Lead Scoring</span>
-                <span style={{ fontSize: 12 }}>🔥 <span style={{ color: "#ef4444" }}>High</span> <span style={{ color: "#555" }}>(0)</span></span>
-                <span style={{ fontSize: 12 }}>⚡ <span style={{ color: "#f59e0b" }}>Medium</span> <span style={{ color: "#555" }}>(0)</span></span>
-                <span style={{ fontSize: 12 }}>📋 <span style={{ color: "#888" }}>Low</span> <span style={{ color: "#555" }}>(0)</span></span>
+            <div style={{ border: "1px solid #2a2a2a", borderRadius: 3, overflow: "hidden", maxWidth: 700 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", background: "#0d0e10", borderBottom: "1px solid #2a2a2a" }}>
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
+                  <div key={d} style={{ padding: "8px 0", textAlign: "center", fontSize: 11, color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{d}</div>
+                ))}
               </div>
-
-              {/* Empty state */}
-              <div style={{ padding: "48px 24px", textAlign: "center" }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>👥</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>No prospect data connected</div>
-                <div style={{ fontSize: 12, color: "#555", marginBottom: 24 }}>Connect Pulse v1 to see leads and prospects here</div>
-                <div style={{ fontSize: 12, color: "#555", textAlign: "left", display: "inline-block" }}>
-                  <div style={{ marginBottom: 6, color: "#59a6bd" }}>This tab will show:</div>
-                  <div>• AI-scored prospect list</div>
-                  <div>• Follow-up queue with Schellie suggestions</div>
-                  <div>• Funnel stage distribution</div>
-                  <div>• Auto-promotion alerts</div>
-                </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+                {calDays.map((day, i) => {
+                  const isToday = day === todayDate;
+                  return (
+                    <div key={i} style={{ height: 44, background: day == null ? "#0a0a0c" : "#111316", border: isToday ? "1px solid #80B602" : "none", borderRight: "1px solid #1a1a1e", borderBottom: "1px solid #1a1a1e", display: "flex", alignItems: "flex-start", justifyContent: "flex-end", padding: "4px 6px", boxSizing: "border-box" }}>
+                      {day != null && <span style={{ fontSize: 11, color: isToday ? "#80B602" : "#444", fontWeight: isToday ? 700 : 400 }}>{day}</span>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
+            <div style={{ marginTop: 12, fontSize: 12, color: "#555", textAlign: "center" }}>No appointments data connected</div>
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 4: COMMUNICATIONS */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === "communications" && (
+        {/* ═══ COMMS ══════════════════════════════════════════════════════════ */}
+        {activeTab === 'comms' && (
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-            {/* Source banner */}
+            {/* Warning banner */}
             <div style={{ background: "#1a1200", border: "1px solid #3f2f00", padding: "8px 24px", fontSize: 12, color: "#8a7a5a", flexShrink: 0 }}>
-              ⚠ Live data not connected — showing sample messages · Zoom / Outlook / Rilla
+              ⚠ Live data not connected · Zoom / Outlook / Rilla
             </div>
-
-            {/* Two-column layout */}
             <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-              {/* Left 70% — Email/SMS/Calls tabs + message list */}
-              <div style={{ flex: "0 0 70%", borderRight: "1px solid #1f1f1f", display: "flex", flexDirection: "column" }}>
-                {/* Comm channel tab bar */}
-                <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #1f1f1f", padding: "0 24px", background: "#111", flexShrink: 0 }}>
+              {/* Left 70% */}
+              <div style={{ flex: "0 0 70%", borderRight: "1px solid #1a1a1e", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #1a1a1e", padding: "0 24px", background: "#0d0e10", flexShrink: 0 }}>
                   {(["Email", "SMS", "Calls"] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => { setActiveCommTab(tab); setSelectedMessage(null); }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        borderBottom: activeCommTab === tab ? "2px solid #59a6bd" : "2px solid transparent",
-                        color: activeCommTab === tab ? "#ededed" : "#555",
-                        fontSize: 13,
-                        fontWeight: activeCommTab === tab ? 600 : 400,
-                        padding: "10px 14px 12px",
-                        cursor: "pointer",
-                        marginBottom: -1,
-                      }}
-                    >
+                    <button key={tab} onClick={() => { setActiveCommTab(tab); setSelectedMessage(null); }} style={{ background: "none", border: "none", borderBottom: activeCommTab === tab ? "2px solid #80B602" : "2px solid transparent", color: activeCommTab === tab ? "#ededed" : "#555", fontSize: 13, fontWeight: activeCommTab === tab ? 600 : 400, padding: "10px 14px 12px", cursor: "pointer", marginBottom: -1 }}>
                       {tab}
                     </button>
                   ))}
                 </div>
-
-                {/* Message list */}
                 <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
                   {(DUMMY_MESSAGES[activeCommTab] ?? []).map((msg) => (
-                    <div
-                      key={msg.id}
-                      onClick={() => setSelectedMessage(msg)}
-                      style={{
-                        background: selectedMessage?.id === msg.id ? "#1a2a3f" : "#111",
-                        border: "1px solid",
-                        borderColor: selectedMessage?.id === msg.id ? "#2a4a6f" : "#1f1f1f",
-                        borderRadius: 8,
-                        padding: "12px 14px",
-                        cursor: "pointer",
-                        marginBottom: 8,
-                        transition: "border-color 0.15s",
-                      }}
-                      onMouseEnter={(e) => { if (selectedMessage?.id !== msg.id) (e.currentTarget as HTMLDivElement).style.borderColor = "#2a3f5a"; }}
-                      onMouseLeave={(e) => { if (selectedMessage?.id !== msg.id) (e.currentTarget as HTMLDivElement).style.borderColor = "#1f1f1f"; }}
-                    >
+                    <div key={msg.id} onClick={() => setSelectedMessage(msg)} style={{ background: selectedMessage?.id === msg.id ? "#1a2a3f" : "#111", border: "1px solid", borderColor: selectedMessage?.id === msg.id ? "#2a4a6f" : "#1f1f1f", borderRadius: 6, padding: "12px 14px", cursor: "pointer", marginBottom: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ background: msg.direction === "IN" ? "#1a2a3f" : "#1a1a1a", color: msg.direction === "IN" ? "#5b80a0" : "#888", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                            {msg.direction === "IN" ? "● IN" : "→ OUT"}
-                          </span>
+                          <span style={{ background: msg.direction === "IN" ? "#1a2a3f" : "#1a1a1a", color: msg.direction === "IN" ? "#5b80a0" : "#888", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, textTransform: "uppercase" }}>{msg.direction === "IN" ? "● IN" : "→ OUT"}</span>
                           <span style={{ fontSize: 13, fontWeight: 600, color: "#ededed" }}>{msg.contact}</span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 11, color: "#555" }}>CSM: {msg.csm}</span>
-                          <span style={{ background: msg.status === "NEW" ? "#3f0d0d" : msg.status === "COMPLETED" ? "#0d2f0d" : "#1a1a1a", color: msg.status === "NEW" ? "#ef4444" : msg.status === "COMPLETED" ? "#00c853" : "#666", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                            {msg.status}
-                          </span>
-                        </div>
+                        <span style={{ fontSize: 11, color: "#555" }}>{msg.timeAgo}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#888", marginBottom: 4, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
-                        &ldquo;{msg.preview}&rdquo;
-                      </div>
-                      <div style={{ fontSize: 11, color: "#555" }}>{msg.community} · {msg.timeAgo}</div>
+                      <div style={{ fontSize: 12, color: "#888", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>&ldquo;{msg.preview}&rdquo;</div>
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* Right 30% — Message detail or Schellie response */}
+              {/* Right 30% */}
               <div style={{ flex: "0 0 30%", overflowY: "auto", padding: 16, background: "#0d0d0d" }}>
-                {selectedMessage ? (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "#ededed" }}>
-                        {selectedMessage.contact}
-                      </span>
-                      <span style={{ background: selectedMessage.direction === "IN" ? "#1a2a3f" : "#1a1a1a", color: selectedMessage.direction === "IN" ? "#5b80a0" : "#888", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        {selectedMessage.direction}
-                      </span>
-                      <span style={{ color: "#555", fontSize: 11 }}>{selectedMessage.timeAgo}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: "#666", marginBottom: 16, fontStyle: "italic" }}>
-                      Subject: {selectedMessage.subject}
-                    </div>
-                    <div style={{ background: "#111", border: "1px solid #1f1f1f", borderRadius: 8, padding: "14px 16px", fontSize: 13, color: "#bbb", lineHeight: 1.7, marginBottom: 16, whiteSpace: "pre-line" }}>
-                      {selectedMessage.body}
-                    </div>
-                    <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
-                      {["Reply", "Mark Complete", "Schedule Follow-up"].map((action) => (
-                        <button key={action} style={{ background: "#161616", border: "1px solid #2a2a2a", color: "#888", borderRadius: 6, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>
-                          {action}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Schellie Suggested Response */}
-                    <div style={{ background: "#0f1a2a", border: "1px solid #1a3f6f", borderRadius: 8, padding: "14px 16px" }}>
-                      <div style={{ fontSize: 11, color: "#5b80a0", fontWeight: 700, marginBottom: 10, letterSpacing: "0.05em" }}>
-                        ✦ Schellie Suggested Response
-                      </div>
-                      <div style={{ fontSize: 12, color: "#8aadcc", lineHeight: 1.7, marginBottom: 14 }}>
-                        {`Hi ${selectedMessage.contact.split(" ")[0]}, thank you for reaching out! ${selectedMessage.direction === "IN" ? "I'd love to help answer your questions and find the perfect home for you at " + community.name + ". Would you be available for a quick call this week?" : "Looking forward to connecting with you soon. Please don't hesitate to reach out with any questions."}`}
-                      </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button style={{ background: "#1a3f6f", border: "1px solid #2a5f9f", color: "#8aadcc", borderRadius: 6, padding: "6px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-                          Use This Response
-                        </button>
-                        <button style={{ background: "#161616", border: "1px solid #2a2a2a", color: "#666", borderRadius: 6, padding: "6px 14px", fontSize: 12, cursor: "pointer" }}>
-                          Edit
-                        </button>
-                      </div>
-                    </div>
+                {/* Schellie box */}
+                <div style={{ background: "#0a1520", border: "1px solid #1a3050", borderRadius: 6, padding: 14, marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: "#5b80a0", fontWeight: 700, marginBottom: 8 }}>✦ Schellie</div>
+                  <div style={{ fontSize: 12, color: "#5b80a0", lineHeight: 1.6 }}>
+                    {selectedMessage
+                      ? `Hi ${selectedMessage.contact.split(" ")[0]}, thank you for reaching out! I'd love to help you find the perfect home at ${community.name}. Would you be available for a quick call this week?`
+                      : "Select a message to see suggested responses."}
                   </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#555", fontSize: 13 }}>
-                    <div style={{ fontSize: 32, marginBottom: 12 }}>💬</div>
-                    <div>Select a message to view details</div>
-                    <div style={{ fontSize: 11, marginTop: 6, color: "#444" }}>Schellie response box will appear here</div>
+                </div>
+                {selectedMessage && (
+                  <div style={{ background: "#111", border: "1px solid #1f1f1f", borderRadius: 6, padding: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#ededed", marginBottom: 6 }}>{selectedMessage.contact}</div>
+                    <div style={{ fontSize: 12, color: "#666", marginBottom: 10, fontStyle: "italic" }}>{selectedMessage.subject}</div>
+                    <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.7, whiteSpace: "pre-line" }}>{selectedMessage.body}</div>
                   </div>
                 )}
               </div>
@@ -1967,64 +1710,120 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 5: CALENDAR */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === "calendar" && (
+        {/* ═══ AMENITIES ══════════════════════════════════════════════════════ */}
+        {activeTab === 'amenities' && (
           <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "#ededed", margin: 0 }}>
-                Appointments — {community.name}
-              </h2>
-              <ComingSoonBanner source="Pulse v1" />
-            </div>
-
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#ededed", marginBottom: 16 }}>{calMonthName}</div>
-
-            {/* Calendar grid */}
-            <div style={{ border: "1px solid #444", borderRadius: 3, overflow: "hidden", maxWidth: 700 }}>
-              {/* Day headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", background: "#161718", borderBottom: "1px solid #444" }}>
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-                  <div key={d} style={{ padding: "8px 0", textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {d}
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: "#ededed", marginBottom: 16 }}>Amenities</h2>
+            {amenityList.length === 0 ? (
+              <div style={{ color: "#555", fontSize: 13 }}>No amenities data available.</div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                {amenityList.map((name, i) => (
+                  <div key={i} style={{ background: "#1a1a1e", border: "1px solid #222", borderRadius: 3, padding: "12px 16px", color: "#aaa", fontSize: 13 }}>
+                    ◆ {name}
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
 
-              {/* Day cells */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
-                {calDays.map((day, i) => {
-                  const isToday = day === todayDate;
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        height: 40,
-                        background: day == null ? "#1d1d1d" : "#161718",
-                        border: isToday ? "1px solid #59a6bd" : "none",
-                        borderRight: "1px solid #444",
-                        borderBottom: "1px solid #444",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        justifyContent: "flex-end",
-                        padding: "4px 6px",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      {day != null && (
-                        <span style={{ fontSize: 11, color: isToday ? "#59a6bd" : "rgba(255,255,255,0.4)", fontWeight: isToday ? 700 : 400 }}>
-                          {day}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+        {/* ═══ DESIGN CENTER ══════════════════════════════════════════════════ */}
+        {activeTab === 'designcenter' && (
+          <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            {community.design_center_url ? (
+              <>
+                <div style={{ background: "#0d0e10", borderBottom: "1px solid #1a1a1e", padding: "8px 24px", fontSize: 12, color: "#888", flexShrink: 0 }}>
+                  Design Center — <a href={community.design_center_url} target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd" }}>{community.design_center_url} ↗</a>
+                </div>
+                <iframe src={community.design_center_url} style={{ width: "100%", flex: 1, border: "none" }} title="Design Center" />
+              </>
+            ) : (
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", color: "#555", gap: 8 }}>
+                <span style={{ fontSize: 32 }}>✦</span>
+                <div style={{ fontSize: 14 }}>No design center URL configured</div>
+                <a href="https://style.schellbrothers.com" target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd", fontSize: 13 }}>Visit style.schellbrothers.com ↗</a>
               </div>
-            </div>
+            )}
+          </div>
+        )}
 
-            <div style={{ marginTop: 16, fontSize: 12, color: "#555", textAlign: "center" }}>
-              No appointments data connected
+        {/* ═══ INFO ═══════════════════════════════════════════════════════════ */}
+        {activeTab === 'info' && (
+          <div style={{ padding: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, maxWidth: 900 }}>
+              {/* Left column */}
+              <div>
+                {/* Location */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", color: "#555", letterSpacing: "0.1em", marginBottom: 8 }}>Location</div>
+                  {community.sales_center_address && <InfoRow label="Sales Center" value={community.sales_center_address} />}
+                  <InfoRow label="City / State" value={[community.city, community.state, community.zip].filter(Boolean).join(', ') || '—'} />
+                  {community.latitude && community.longitude && (
+                    <InfoRow label="Map" value={<a href={`https://maps.google.com/?q=${community.latitude},${community.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd" }}>{community.latitude}, {community.longitude} ↗</a>} />
+                  )}
+                </div>
+
+                {/* Pricing */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", color: "#555", letterSpacing: "0.1em", marginBottom: 8 }}>Pricing</div>
+                  <InfoRow label="Priced From" value={community.price_from ? '$' + community.price_from.toLocaleString() : '—'} />
+                  <InfoRow label="HOA Fee" value={community.hoa_fee ? `$${Number(community.hoa_fee).toLocaleString()} / ${community.hoa_period ?? 'mo'}` : '—'} />
+                </div>
+
+                {/* Schools */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", color: "#555", letterSpacing: "0.1em", marginBottom: 8 }}>Schools</div>
+                  <InfoRow label="District" value={community.school_district ?? '—'} />
+                  <InfoRow label="Elementary" value={community.school_elementary ?? '—'} />
+                  <InfoRow label="Middle" value={community.school_middle ?? '—'} />
+                  <InfoRow label="High School" value={community.school_high ?? '—'} />
+                </div>
+
+                {/* Utilities */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", color: "#555", letterSpacing: "0.1em", marginBottom: 8 }}>Utilities</div>
+                  <InfoRow label="Electric" value={community.electric ?? '—'} />
+                  <InfoRow label="Gas" value={community.gas ?? '—'} />
+                  <InfoRow label="Water" value={community.water ?? '—'} />
+                  <InfoRow label="Sewer" value={community.sewer ?? '—'} />
+                  <InfoRow label="Trash" value={community.trash ?? '—'} />
+                  <InfoRow label="Cable / Internet" value={community.cable_internet ?? '—'} />
+                </div>
+              </div>
+
+              {/* Right column */}
+              <div>
+                {/* Community */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", color: "#555", letterSpacing: "0.1em", marginBottom: 8 }}>Community</div>
+                  <InfoRow label="Total Homesites" value={community.total_homesites ?? '—'} />
+                  <InfoRow label="55+" value={community.is_55_plus ? 'Yes' : community.is_55_plus === false ? 'No' : '—'} />
+                  <InfoRow label="Lot Map" value={community.lot_map_url ? 'Yes' : 'No'} />
+                </div>
+
+                {/* Hours */}
+                {Object.keys(hoursObj).length > 0 && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 10, textTransform: "uppercase", color: "#555", letterSpacing: "0.1em", marginBottom: 8 }}>Hours</div>
+                    {Object.entries(hoursObj).map(([day, time]) => (
+                      <InfoRow key={day} label={day} value={time} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Resources */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 10, textTransform: "uppercase", color: "#555", letterSpacing: "0.1em", marginBottom: 8 }}>Resources</div>
+                  {community.brochure_url && <InfoRow label="Brochure" value={<a href={community.brochure_url} target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd" }}>Download ↗</a>} />}
+                  {community.included_features_url && <InfoRow label="Included Features" value={<a href={community.included_features_url} target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd" }}>View ↗</a>} />}
+                  {community.design_center_url && <InfoRow label="Design Center" value={<a href={community.design_center_url} target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd" }}>Open ↗</a>} />}
+                  {community.website_url && <InfoRow label="Website" value={<a href={community.website_url} target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd" }}>Visit ↗</a>} />}
+                  {!community.brochure_url && !community.included_features_url && !community.design_center_url && !community.website_url && (
+                    <InfoRow label="Links" value="None configured" />
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -2033,6 +1832,8 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN EXPORT
