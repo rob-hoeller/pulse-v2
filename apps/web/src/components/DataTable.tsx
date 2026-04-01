@@ -52,6 +52,10 @@ interface DataTableProps<T extends Record<string, unknown>> {
   onRowClick?: (row: T) => void;
   /** @deprecated — use statConfig instead for filter-reactive stats */
   onFilteredRowsChange?: (rows: T[]) => void;
+  /** Controlled pagination — when provided, DataTable skips its own pagination UI */
+  controlledPage?: number;
+  controlledPageSize?: number;
+  onControlledPageChange?: (page: number) => void;
 }
 
 const thStyle = {
@@ -140,12 +144,13 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
   // The stats to render: dynamic (ribbonStats) takes precedence over static (props.stats)
   const activeStats = ribbonStats ?? props.stats;
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / (pageSize === 9999 ? filtered.length || 1 : pageSize)));
-  const effectivePageSize = pageSize === 9999 ? filtered.length || 1 : pageSize;
-  const paged = filtered.slice(
-    (currentPage - 1) * effectivePageSize,
-    currentPage * effectivePageSize
-  );
+  const isControlled = props.controlledPage !== undefined;
+  const internalEffectivePageSize = pageSize === 9999 ? filtered.length || 1 : pageSize;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / internalEffectivePageSize));
+  const effectivePageSize = isControlled ? (props.controlledPageSize ?? 25) : internalEffectivePageSize;
+  // 0-based page index: controlled uses props.controlledPage directly; internal uses currentPage - 1
+  const effectivePage0 = isControlled ? (props.controlledPage ?? 0) : (currentPage - 1);
+  const paged = filtered.slice(effectivePage0 * effectivePageSize, (effectivePage0 + 1) * effectivePageSize);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -443,8 +448,8 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
     );
   }
 
-  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * effectivePageSize + 1;
-  const rangeEnd = Math.min(currentPage * effectivePageSize, filtered.length);
+  const rangeStart = filtered.length === 0 ? 0 : effectivePage0 * effectivePageSize + 1;
+  const rangeEnd = Math.min((effectivePage0 + 1) * effectivePageSize, filtered.length);
 
   return (
     <div
@@ -484,8 +489,8 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
         </div>
       )}
 
-      {/* Stats ribbon + pagination */}
-      <div
+      {/* Stats ribbon + pagination — hidden when using controlled pagination from TableSubHeader */}
+      {!isControlled && <div
         style={{
           display: "flex",
           alignItems: "center",
@@ -607,7 +612,7 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
             →
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Table */}
       <div

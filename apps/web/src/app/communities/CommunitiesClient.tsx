@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PageShell from "@/components/PageShell";
-import TopBar from "@/components/TopBar";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import SlideOver from "@/components/SlideOver";
 import Badge from "@/components/Badge";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
@@ -78,6 +78,22 @@ interface Props {
   communities: Community[];
   divisions: Division[];
 }
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+const STATS: StatConfig<CommunityTableRow>[] = [
+  { label: "Active",      getValue: (r) => r.filter((x) => x.status === "active" || x.status === "now-selling" || x.status === "last-chance").length },
+  { label: "Coming Soon", getValue: (r) => r.filter((x) => x.status?.includes("coming")).length },
+  { label: "States",      getValue: (r) => new Set(r.map((x) => x.state)).size },
+  {
+    label: "Avg Price",
+    getValue: (r) => {
+      const wp = r.filter((x) => x.price_from);
+      if (!wp.length) return "—";
+      return "$" + Math.round(wp.reduce((s, x) => s + (x.price_from ?? 0), 0) / wp.length / 1000) + "k";
+    },
+  },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -161,11 +177,11 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 function CommunitiesInner({ communities, divisions }: Props) {
   const searchParams = useSearchParams();
-  const { filter, labels } = useGlobalFilter();
+  const { filter } = useGlobalFilter();
 
   const [divisionFilter, setDivisionFilter] = useState<string>(() => {
     if (filter.divisionId) {
-      return divisions.find(d => d.id === filter.divisionId)?.slug ?? "all";
+      return divisions.find((d) => d.id === filter.divisionId)?.slug ?? "all";
     }
     return searchParams.get("division") ?? "all";
   });
@@ -173,15 +189,18 @@ function CommunitiesInner({ communities, divisions }: Props) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Community | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   // Sync local division filter when global filter changes
   useEffect(() => {
     if (filter.divisionId) {
-      const slug = divisions.find(d => d.id === filter.divisionId)?.slug;
+      const slug = divisions.find((d) => d.id === filter.divisionId)?.slug;
       setDivisionFilter(slug ?? "all");
     } else {
       setDivisionFilter(searchParams.get("division") ?? "all");
     }
+    setPage(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.divisionId]);
 
@@ -189,6 +208,13 @@ function CommunitiesInner({ communities, divisions }: Props) {
   const allStates = Array.from(
     new Set(communities.map((c) => c.state).filter(Boolean))
   ).sort() as string[];
+
+  // All rows (unfiltered) for Export All
+  const allRows: CommunityTableRow[] = communities.map((c) => ({
+    ...c,
+    _hoa_display: formatHoa(c.hoa_fee, c.hoa_period),
+    _price_display: formatPrice(c.price_from),
+  }));
 
   // Filter
   const filtered = communities.filter((c) => {
@@ -213,6 +239,9 @@ function CommunitiesInner({ communities, divisions }: Props) {
     _hoa_display: formatHoa(c.hoa_fee, c.hoa_period),
     _price_display: formatPrice(c.price_from),
   }));
+
+  // Reset page on filter change
+  useEffect(() => { setPage(0); }, [search, divisionFilter, stateFilter, statusFilter, filter.communityId, filter.divisionId]);
 
   const tableColumns: Column<CommunityTableRow>[] = [
     {
@@ -278,9 +307,9 @@ function CommunitiesInner({ communities, divisions }: Props) {
   const divisionOptions = divisions.map((d) => ({ value: d.slug, label: d.name }));
   const stateOptions = allStates.map((s) => ({ value: s, label: s }));
 
-  // Inline filters for TopBar
-  const inlineFilters = (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+  // Inline filters for the sub-header area (division/state/status dropdowns)
+  const localFilters = (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 8 }}>
       {!filter.divisionId && (
         <select
           value={divisionFilter}
@@ -315,23 +344,6 @@ function CommunitiesInner({ communities, divisions }: Props) {
         <option value="coming-soon">Coming Soon</option>
         <option value="sold-out">Sold Out</option>
       </select>
-      <input
-        type="text"
-        placeholder="Search communities…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{
-          background: "#161718",
-          border: "1px solid #333",
-          color: search ? "#ededed" : "#888",
-          borderRadius: 3,
-          height: 28,
-          fontSize: 12,
-          padding: "0 8px",
-          width: 180,
-          outline: "none",
-        }}
-      />
     </div>
   );
 
@@ -346,22 +358,41 @@ function CommunitiesInner({ communities, divisions }: Props) {
 
   return (
     <PageShell
-      topBar={<TopBar title="Communities" right={inlineFilters} />}
-      filtersBar={
-        (filter.divisionId || filter.communityId) ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 24px", background: "var(--bg)", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-3)" }}>
-            <span>Filtered:</span>
-            {labels.division && <span style={{ color: "var(--text-2)" }}>{labels.division}</span>}
-            {labels.community && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.community}</span></>}
-            {labels.plan && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.plan}</span></>}
-          </div>
-        ) : undefined
+      topBar={
+        <>
+          {localFilters && (
+            <div style={{
+              display: "flex", alignItems: "center",
+              padding: "0 16px", height: 36, flexShrink: 0,
+              background: "#121314", borderBottom: "1px solid #1a1a1e", gap: 6,
+            }}>
+              {localFilters}
+            </div>
+          )}
+          <TableSubHeader
+            title="Communities"
+            rows={tableRows}
+            totalRows={tableRows.length}
+            stats={STATS}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+            search={search}
+            onSearch={(q) => { setSearch(q); setPage(0); }}
+            searchPlaceholder="Search communities…"
+            onExport={() => exportToCSV(tableRows as unknown as Record<string, unknown>[], "communities")}
+            onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "communities-all")}
+          />
+        </>
       }
     >
       <DataTable<CommunityTableRow>
         columns={tableColumns}
         rows={tableRows}
-        defaultPageSize={100}
+        controlledPage={page}
+        controlledPageSize={pageSize}
+        defaultPageSize={pageSize}
         onRowClick={(row) => setSelected(row)}
         emptyMessage="No communities match the current filter"
         minWidth={1100}

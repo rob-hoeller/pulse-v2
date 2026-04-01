@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PageShell from "@/components/PageShell";
-import TopBar from "@/components/TopBar";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import SlideOver from "@/components/SlideOver";
-import DataTable, { type Column, type StatItem as DataTableStatItem } from "@/components/DataTable";
+import DataTable, { type Column } from "@/components/DataTable";
 import type { DivisionPlan, CommunityPlan, Community, Division } from "./page";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 
@@ -39,6 +39,18 @@ type DivisionPlanTableRow = DivisionPlan & Record<string, unknown> & {
   _community_count: string;
   _price_range: string;
 };
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+const BY_PLAN_STATS: StatConfig<DivisionPlanTableRow>[] = [
+  { label: "Plans",     getValue: (r) => r.length },
+  { label: "Divisions", getValue: (r) => new Set(r.map((x) => x.division_parent_name ?? x._division_name)).size },
+];
+
+const BY_COMMUNITY_STATS: StatConfig<CommunityPlanTableRow>[] = [
+  { label: "Plans",       getValue: (r) => r.length },
+  { label: "Divisions",   getValue: (r) => new Set(r.map((x) => x.division_parent_name ?? x._division_name)).size },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -112,7 +124,7 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
 
 function PlansInner({ divisionPlans, communityPlans, communities, divisions }: Props) {
   const searchParams = useSearchParams();
-  const { filter, labels } = useGlobalFilter();
+  const { filter } = useGlobalFilter();
 
   const [mode, setMode] = useState<Mode>(() => filter.communityId ? "by-community" : "by-plan");
   const [divisionFilter, setDivisionFilter] = useState<string>(() => filter.divisionId ?? "all");
@@ -122,6 +134,9 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
   );
   const [selectedPlan, setSelectedPlan] = useState<DivisionPlan | null>(null);
   const [selectedCommunityPlan, setSelectedCommunityPlan] = useState<CommunityPlan | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   useEffect(() => {
     const savedMode = localStorage.getItem("plans-mode") as Mode | null;
@@ -138,11 +153,16 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
     } else {
       setCommunityFilter(searchParams.get("community") ?? "all");
     }
+    setPage(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.divisionId, filter.communityId]);
 
+  // Reset page on filter changes
+  useEffect(() => { setPage(0); }, [search, divisionFilter, styleFilter, communityFilter, mode]);
+
   const handleModeChange = (m: Mode) => {
     setMode(m);
+    setPage(0);
     localStorage.setItem("plans-mode", m);
   };
 
@@ -162,6 +182,10 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
   const filteredDivisionPlans = divisionPlans.filter((p) => {
     if (divisionFilter !== "all" && p.division_id !== divisionFilter) return false;
     if (styleFilter !== "all" && p.style !== styleFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!(p.marketing_name ?? "").toLowerCase().includes(q)) return false;
+    }
     return true;
   });
 
@@ -190,6 +214,11 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
     if (styleFilter !== "all") {
       const styles = cp.style_filters ?? [];
       if (!styles.includes(styleFilter)) return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      const commName = communityById.get(cp.community_id)?.name ?? "";
+      if (!(cp.plan_name ?? "").toLowerCase().includes(q) && !commName.toLowerCase().includes(q)) return false;
     }
     return true;
   });
@@ -233,10 +262,6 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
     },
   ];
 
-  const byPlanTableStats: DataTableStatItem[] = [
-    { label: "Plans", value: filteredDivisionPlans.length, color: "var(--text)" },
-  ];
-
   // ── Table — By Community ───────────────────────────────────────────────────
 
   const byCommunityTableRows: CommunityPlanTableRow[] = filteredCommunityPlans.map((cp) => {
@@ -271,14 +296,37 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
     { key: "_baths",         label: "Baths",      sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._baths}</span> },
   ];
 
-  const byCommunityTableStats: DataTableStatItem[] = [
-    { label: "Plans",       value: filteredCommunityPlans.length, color: "var(--text)" },
-    { label: "Communities", value: groupedByCommunity.length,     color: "#818cf8" },
-  ];
+  // ── All rows for Export All ────────────────────────────────────────────────
 
-  // ── Inline filters ─────────────────────────────────────────────────────────
+  const allByPlanRows: DivisionPlanTableRow[] = divisionPlans.map((dp) => ({
+    ...dp,
+    _division_name: divisionById.get(dp.division_id)?.name ?? "—",
+    _beds:  formatBedsOrBaths(dp.beds),
+    _baths: formatBedsOrBaths(dp.baths),
+    _sqft:  formatSqft(dp.sqft_min, dp.sqft),
+    _community_count: String(communityPlansForDivPlan(dp).length),
+    _price_range: priceRangeForPlan(dp),
+  }));
 
-  const inlineFilters = (
+  const allByCommunityRows: CommunityPlanTableRow[] = communityPlans.map((cp) => {
+    const comm = communityById.get(cp.community_id);
+    const div = cp.division_id ? divisionById.get(cp.division_id) : (comm ? divisionById.get(comm.division_id) : null);
+    return {
+      ...cp,
+      _community_name: comm?.name ?? "—",
+      _division_name: div?.name ?? "—",
+      _beds:  formatBedsOrBaths(cp.beds),
+      _baths: formatBedsOrBaths(cp.baths),
+      _sqft:  formatSqft(cp.sqft_min, cp.sqft_max),
+      _base_price: formatPrice(cp.base_price),
+      _incentive: cp.incentive_amount && cp.incentive_amount > 0 ? `-${formatPrice(cp.incentive_amount)}` : "—",
+      _net_price: displayPrice(cp),
+    };
+  });
+
+  // ── Local filter dropdowns ─────────────────────────────────────────────────
+
+  const localFilters = (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <ModeToggle mode={mode} onChange={handleModeChange} />
       {!filter.divisionId && (
@@ -306,26 +354,62 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
     ? communityPlansForDivPlan(selectedPlan).map((cp) => ({ plan: cp, community: communityById.get(cp.community_id) }))
     : [];
 
+  const activeRows = mode === "by-plan" ? byPlanTableRows.length : byCommunityTableRows.length;
+
   return (
     <PageShell
-      topBar={<TopBar title="Plans" right={inlineFilters} />}
-      filtersBar={
-        (filter.divisionId || filter.communityId) ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 24px", background: "var(--bg)", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-3)" }}>
-            <span>Filtered:</span>
-            {labels.division && <span style={{ color: "var(--text-2)" }}>{labels.division}</span>}
-            {labels.community && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.community}</span></>}
-            {labels.plan && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.plan}</span></>}
+      topBar={
+        <>
+          <div style={{
+            display: "flex", alignItems: "center",
+            padding: "0 16px", height: 36, flexShrink: 0,
+            background: "#121314", borderBottom: "1px solid #1a1a1e", gap: 6,
+          }}>
+            {localFilters}
           </div>
-        ) : undefined
+          {mode === "by-plan" ? (
+            <TableSubHeader<DivisionPlanTableRow>
+              title="Plans"
+              rows={byPlanTableRows}
+              totalRows={activeRows}
+              stats={BY_PLAN_STATS}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+              search={search}
+              onSearch={(q) => { setSearch(q); setPage(0); }}
+              searchPlaceholder="Search plans…"
+              onExport={() => exportToCSV(byPlanTableRows as unknown as Record<string, unknown>[], "plans")}
+              onExportAll={() => exportToCSV(allByPlanRows as unknown as Record<string, unknown>[], "plans-all")}
+            />
+          ) : (
+            <TableSubHeader<CommunityPlanTableRow>
+              title="Plans"
+              rows={byCommunityTableRows}
+              totalRows={activeRows}
+              stats={BY_COMMUNITY_STATS}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+              search={search}
+              onSearch={(q) => { setSearch(q); setPage(0); }}
+              searchPlaceholder="Search plans or communities…"
+              onExport={() => exportToCSV(byCommunityTableRows as unknown as Record<string, unknown>[], "plans-by-community")}
+              onExportAll={() => exportToCSV(allByCommunityRows as unknown as Record<string, unknown>[], "plans-by-community-all")}
+            />
+          )}
+        </>
       }
     >
       {mode === "by-plan" ? (
         <DataTable<DivisionPlanTableRow>
           columns={byPlanColumns}
           rows={byPlanTableRows}
-          stats={byPlanTableStats}
-          defaultPageSize={100}
+          controlledPage={page}
+          controlledPageSize={pageSize}
+          defaultPageSize={pageSize}
           onRowClick={(row) => setSelectedPlan(row)}
           emptyMessage="No plans"
           minWidth={1000}
@@ -334,8 +418,9 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
         <DataTable<CommunityPlanTableRow>
           columns={byCommunityColumns}
           rows={byCommunityTableRows}
-          stats={byCommunityTableStats}
-          defaultPageSize={100}
+          controlledPage={page}
+          controlledPageSize={pageSize}
+          defaultPageSize={pageSize}
           onRowClick={(row) => setSelectedCommunityPlan(row)}
           emptyMessage="No plans"
           minWidth={1000}

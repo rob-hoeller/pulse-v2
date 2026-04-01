@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import PageShell from "@/components/PageShell";
-import TopBar from "@/components/TopBar";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import DataTable, { type Column } from "@/components/DataTable";
 import type { DivisionStats } from "./page";
 
@@ -13,24 +14,40 @@ interface Props {
   divisions: DivisionStats[];
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type DivisionTableRow = DivisionStats & Record<string, unknown> & {
   _region: string;
   _states: string;
 };
 
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+const STATS: StatConfig<DivisionTableRow>[] = [
+  { label: "Divisions", getValue: (r) => r.length },
+  { label: "States",    getValue: () => 4 },
+];
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DivisionsClient({ divisions }: Props) {
   const router = useRouter();
-  const { filter, labels, setDivision, setLabels } = useGlobalFilter();
+  const { setDivision, setLabels } = useGlobalFilter();
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
-  const rows: DivisionTableRow[] = divisions.map((d) => ({
+  const allRows: DivisionTableRow[] = divisions.map((d) => ({
     ...d,
     _region: d.region || "—",
     _states: d.state_codes?.join(", ") || "—",
   }));
+
+  const rows: DivisionTableRow[] = allRows.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (r.name ?? "").toLowerCase().includes(q) || (r._region ?? "").toLowerCase().includes(q);
+  });
 
   const columns: Column<DivisionTableRow>[] = [
     {
@@ -61,7 +78,7 @@ export default function DivisionsClient({ divisions }: Props) {
       key: "active_count",
       label: "Available Lots",
       sortable: true,
-      render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>—</span>,
+      render: () => <span style={{ color: "#888", fontSize: 13 }}>—</span>,
     },
     {
       key: "is_active",
@@ -83,21 +100,30 @@ export default function DivisionsClient({ divisions }: Props) {
 
   return (
     <PageShell
-      topBar={<TopBar title="Divisions" />}
-      filtersBar={
-        (filter.divisionId || filter.communityId) ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 24px", background: "var(--bg)", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-3)" }}>
-            <span>Filtered:</span>
-            {labels.division && <span style={{ color: "var(--text-2)" }}>{labels.division}</span>}
-            {labels.community && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.community}</span></>}
-          </div>
-        ) : undefined
+      topBar={
+        <TableSubHeader<DivisionTableRow>
+          title="Divisions"
+          rows={rows}
+          totalRows={rows.length}
+          stats={STATS}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+          search={search}
+          onSearch={(q) => { setSearch(q); setPage(0); }}
+          searchPlaceholder="Search divisions…"
+          onExport={() => exportToCSV(rows as unknown as Record<string, unknown>[], "divisions")}
+          onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "divisions-all")}
+        />
       }
     >
       <DataTable<DivisionTableRow>
         columns={columns}
         rows={rows}
-        defaultPageSize={100}
+        controlledPage={page}
+        controlledPageSize={pageSize}
+        defaultPageSize={pageSize}
         onRowClick={handleRowClick}
         emptyMessage="No divisions"
         minWidth={700}

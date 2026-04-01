@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import PageShell from "@/components/PageShell";
-import TopBar from "@/components/TopBar";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import SlideOver, { Section, Row } from "@/components/SlideOver";
 import Badge from "@/components/Badge";
-import DataTable, { type Column, type StatConfigItem } from "@/components/DataTable";
+import DataTable, { type Column } from "@/components/DataTable";
 
 interface Division { id: string; slug: string; name: string; }
 
@@ -29,6 +29,22 @@ interface SpecHome {
 
 interface Props { specHomes: SpecHome[]; divisions: Division[]; }
 
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+const STATS: StatConfig<SpecHome>[] = [
+  { label: "Communities", getValue: (r) => new Set(r.map((x) => x.community_name)).size },
+  { label: "States",      getValue: (r) => new Set(r.map((x) => x.state)).size },
+  {
+    label: "Avg Price",
+    getValue: (r) => {
+      const wp = r.filter((x) => x.net_price && (x.net_price as number) > 0);
+      if (!wp.length) return "—";
+      const avg = wp.reduce((s, x) => s + (x.net_price as number ?? 0), 0) / wp.length;
+      return "$" + Math.round(avg / 1000) + "k";
+    },
+  },
+];
+
 function formatCurrency(n: number | null): string {
   if (n == null) return "—";
   return "$" + n.toLocaleString();
@@ -38,22 +54,27 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
   const { filter, labels } = useGlobalFilter();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<SpecHome | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   // Map global filter divisionId (UUID) → division name → match against division_parent_name
   const globalDivName = filter.divisionId
-    ? divisions.find(d => d.id === filter.divisionId)?.name ?? null
+    ? divisions.find((d) => d.id === filter.divisionId)?.name ?? null
     : null;
 
-  // Apply filters — global filter takes priority, no local div/comm dropdowns
-  const rows = specHomes.filter(r => {
-    // Division filter: match by name since spec_homes uses integer division_parent_id
+  // Reset page on search/filter change
+  useEffect(() => { setPage(0); }, [search, filter.divisionId, filter.communityId]);
+
+  // All rows (unfiltered) for Export All
+  const allRows = specHomes;
+
+  // Apply filters
+  const rows = specHomes.filter((r) => {
     if (globalDivName && r.division_parent_name !== globalDivName) return false;
-    // Community filter: match by community_name since community_id in spec_homes is HB string not UUID
     if (filter.communityId) {
       const commName = labels.community;
       if (commName && r.community_name !== commName) return false;
     }
-    // Search
     if (search) {
       const q = search.toLowerCase();
       if (
@@ -64,21 +85,6 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
     }
     return true;
   });
-
-  const statConfig: StatConfigItem<SpecHome>[] = [
-    { label: "Total",       color: "var(--text-3)", getValue: r => r.length },
-    { label: "Communities", color: "var(--text-2)", getValue: r => new Set(r.map(x => x.community_name)).size },
-    { label: "States",      color: "var(--text-2)", getValue: r => new Set(r.map(x => x.state)).size },
-    {
-      label: "Avg Price", color: "var(--blue)", isString: true,
-      getValue: r => {
-        const wp = r.filter(x => x.net_price && x.net_price > 0);
-        if (!wp.length) return "—";
-        const avg = wp.reduce((s, x) => s + (x.net_price ?? 0), 0) / wp.length;
-        return `$${Math.round(avg / 1000)}k`;
-      },
-    },
-  ];
 
   const columns: Column<SpecHome>[] = [
     { key: "model_marketing_name", label: "Plan Name", sticky: true, sortable: true,
@@ -94,14 +100,14 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
     { key: "bedrooms",  label: "Beds",  render: (_v, r) => <span style={{ color: "#888", fontSize: 12 }}>{r.bedrooms ?? "—"}</span> },
     { key: "bathrooms", label: "Baths", render: (_v, r) => <span style={{ color: "#888", fontSize: 12 }}>{r.bathrooms ?? "—"}</span> },
     { key: "heated_sqft", label: "Sqft",
-      render: (_v, r) => <span style={{ color: "#888", fontSize: 12 }}>{r.heated_sqft ? r.heated_sqft.toLocaleString() : "—"}</span> },
+      render: (_v, r) => <span style={{ color: "#888", fontSize: 12 }}>{r.heated_sqft ? (r.heated_sqft as number).toLocaleString() : "—"}</span> },
     { key: "net_price", label: "Net Price", sortable: true,
       render: (_v, r) => r.net_price
-        ? <span style={{ color: "var(--blue)", fontWeight: 700, fontSize: 13 }}>{r.price_formatted ?? formatCurrency(r.net_price)}</span>
+        ? <span style={{ color: "var(--blue)", fontWeight: 700, fontSize: 13 }}>{r.price_formatted ?? formatCurrency(r.net_price as number)}</span>
         : <span style={{ color: "#444" }}>—</span> },
     { key: "incentive_price", label: "Incentive",
-      render: (_v, r) => r.incentive_price && r.incentive_price > 0
-        ? <Badge variant="active" label={`Save $${r.incentive_price.toLocaleString()}`} customColor="#80B602" customBg="#162800" customBorder="#2a4a00" />
+      render: (_v, r) => r.incentive_price && (r.incentive_price as number) > 0
+        ? <Badge variant="active" label={`Save $${(r.incentive_price as number).toLocaleString()}`} customColor="#80B602" customBg="#162800" customBorder="#2a4a00" />
         : <span style={{ color: "#333" }}>—</span> },
   ];
 
@@ -110,25 +116,29 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
   return (
     <PageShell
       topBar={
-        <TopBar
+        <TableSubHeader<SpecHome>
           title="Quick Delivery"
-          right={
-            <input
-              type="text"
-              placeholder="Search homes, plans, communities…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ background: "#161718", border: "1px solid #333", color: search ? "#ededed" : "#888", borderRadius: 3, height: 28, fontSize: 12, padding: "0 8px", width: 220, outline: "none" }}
-            />
-          }
+          rows={rows}
+          totalRows={rows.length}
+          stats={STATS}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+          search={search}
+          onSearch={(q) => { setSearch(q); setPage(0); }}
+          searchPlaceholder="Search homes, plans, communities…"
+          onExport={() => exportToCSV(rows as unknown as Record<string, unknown>[], "quick-delivery")}
+          onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "quick-delivery-all")}
         />
       }
     >
       <DataTable<SpecHome>
         columns={columns}
         rows={rows}
-        statConfig={statConfig}
-        defaultPageSize={100}
+        controlledPage={page}
+        controlledPageSize={pageSize}
+        defaultPageSize={pageSize}
         onRowClick={setSelected}
         emptyMessage="No quick delivery homes"
         minWidth={1100}
@@ -149,19 +159,19 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
             )}
             <Section title="Pricing">
               <div style={{ fontSize: 22, fontWeight: 700, color: "var(--blue)", marginBottom: 8 }}>
-                {selected.price_formatted ?? formatCurrency(selected.net_price)}
+                {selected.price_formatted ?? formatCurrency(selected.net_price as number | null)}
               </div>
-              <Row label="Base Price" value={selected.base_price_formatted ?? formatCurrency(selected.base_price)} />
-              {selected.incentive_price && selected.incentive_price > 0 && (
-                <Row label="Incentive" value={<span style={{ color: "#80B602" }}>− {selected.incentive_price_formatted ?? formatCurrency(selected.incentive_price)}</span>} />
+              <Row label="Base Price" value={selected.base_price_formatted ?? formatCurrency(selected.base_price as number | null)} />
+              {selected.incentive_price && (selected.incentive_price as number) > 0 && (
+                <Row label="Incentive" value={<span style={{ color: "#80B602" }}>− {selected.incentive_price_formatted ?? formatCurrency(selected.incentive_price as number | null)}</span>} />
               )}
             </Section>
             <Section title="Home Specs">
               <Row label="Plan"        value={selected.model_marketing_name ?? selected.model_name} />
               <Row label="Bedrooms"    value={selected.bedrooms} />
               <Row label="Bathrooms"   value={selected.bathrooms} />
-              <Row label="Heated Sqft" value={selected.heated_sqft ? selected.heated_sqft.toLocaleString() : null} />
-              <Row label="Total Sqft"  value={selected.total_sqft ? selected.total_sqft.toLocaleString() : null} />
+              <Row label="Heated Sqft" value={selected.heated_sqft ? (selected.heated_sqft as number).toLocaleString() : null} />
+              <Row label="Total Sqft"  value={selected.total_sqft ? (selected.total_sqft as number).toLocaleString() : null} />
               <Row label="Lot"         value={selected.lot_block_number ?? selected.lot_number} />
             </Section>
             <Section title="Location">
@@ -173,12 +183,12 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
             </Section>
             {selected.description && (
               <Section title="Description">
-                <p style={{ color: "#888", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{selected.description}</p>
+                <p style={{ color: "#888", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{selected.description as string}</p>
               </Section>
             )}
             <Section title="Actions">
               {selected.virtual_tour_url && (
-                <a href={selected.virtual_tour_url} target="_blank" rel="noopener noreferrer"
+                <a href={selected.virtual_tour_url as string} target="_blank" rel="noopener noreferrer"
                   style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6, border: "1px solid #1a3f1a", backgroundColor: "#1a2e1a", color: "#80B602", fontSize: 13, textDecoration: "none", fontWeight: 500, marginBottom: 8 }}>
                   ▶ Virtual Tour
                 </a>

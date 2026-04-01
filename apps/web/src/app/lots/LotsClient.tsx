@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react";
 import PageShell from "@/components/PageShell";
-import TopBar from "@/components/TopBar";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import SlideOver, { Section, Row } from "@/components/SlideOver";
-import DataTable, { type Column, type StatConfigItem } from "@/components/DataTable";
+import DataTable, { type Column } from "@/components/DataTable";
 import type { LotRow, CommunityRow, DivisionRow } from "./page";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 
@@ -17,6 +17,15 @@ interface Props {
   communities: CommunityRow[];
   divisions: DivisionRow[];
 }
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+const STATS: StatConfig<LotTableRow>[] = [
+  { label: "Available",      getValue: (r) => r.filter((x) => x.lot_status === "Available Homesite").length },
+  { label: "Under Const",    getValue: (r) => r.filter((x) => x.construction_status === "Under Construction").length },
+  { label: "Quick Delivery", getValue: (r) => r.filter((x) => x.lot_status === "Quick Delivery").length },
+  { label: "Future",         getValue: (r) => r.filter((x) => x.lot_status === "Future Homesite").length },
+];
 
 // ─── Lot status config ────────────────────────────────────────────────────────
 
@@ -68,7 +77,7 @@ function filterSelectStyle(active: boolean): React.CSSProperties {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LotsClient({ lots, communities, divisions }: Props) {
-  const { filter, labels } = useGlobalFilter();
+  const { filter } = useGlobalFilter();
 
   const [divFilter, setDivFilter] = useState<string>(() => filter.divisionId ?? "");
   const [commFilter, setCommFilter] = useState<string>(() => filter.communityId ?? "");
@@ -76,6 +85,8 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
   const [constructionFilter, setConstructionFilter] = useState("");
   const [search, setSearch] = useState("");
   const [selectedLot, setSelectedLot] = useState<LotTableRow | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   // Sync local state when global filter changes
   useEffect(() => {
@@ -83,6 +94,7 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
     else setDivFilter("");
     if (filter.communityId) setCommFilter(filter.communityId);
     else setCommFilter("");
+    setPage(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.divisionId, filter.communityId]);
 
@@ -114,6 +126,9 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
     [lots]
   );
 
+  // All rows (unfiltered) for Export All
+  const allRows = useMemo<LotTableRow[]>(() => lots as LotTableRow[], [lots]);
+
   const rows = useMemo<LotTableRow[]>(() => {
     return (lots as LotTableRow[]).filter((l) => {
       if (filter.communityId && l.community_id !== filter.communityId) return false;
@@ -142,12 +157,8 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
     });
   }, [lots, divFilter, commFilter, statusFilter, constructionFilter, search, communityMap, divisionMap, filter]);
 
-  const statConfig: StatConfigItem<LotTableRow>[] = [
-    { label: "Total Lots",   color: "var(--text-3)", getValue: (r) => r.length },
-    { label: "Available",    color: "#80B602",       getValue: (r) => r.filter((l) => l.lot_status === "Available Homesite").length },
-    { label: "Under Const.", color: "#59a6bd",       getValue: (r) => r.filter((l) => l.construction_status && l.construction_status !== "Not Started").length },
-    { label: "Quick Delivery", color: "#59a6bd",     getValue: (r) => r.filter((l) => l.lot_status === "Quick Delivery").length },
-  ];
+  // Reset page on filter change
+  useEffect(() => { setPage(0); }, [search, divFilter, commFilter, statusFilter, constructionFilter]);
 
   function getDivisionName(lot: LotTableRow): string {
     const comm = lot.community_id ? communityMap.get(lot.community_id as string) : null;
@@ -220,8 +231,8 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
     },
   ];
 
-  // Inline filters
-  const inlineFilters = (
+  // Local filter dropdowns
+  const localFilters = (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       {!filter.divisionId && (
         <select
@@ -259,13 +270,6 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
         <option value="">All Construction</option>
         {constructionOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <input
-        type="text"
-        placeholder="Search address or lot…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ background: "#161718", border: "1px solid #333", color: search ? "#ededed" : "#888", borderRadius: 3, height: 28, fontSize: 12, padding: "0 8px", width: 180, outline: "none" }}
-      />
     </div>
   );
 
@@ -273,23 +277,39 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
 
   return (
     <PageShell
-      topBar={<TopBar title="Lots" right={inlineFilters} />}
-      filtersBar={
-        (filter.divisionId || filter.communityId) ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 24px", background: "var(--bg)", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-3)" }}>
-            <span>Filtered:</span>
-            {labels.division && <span style={{ color: "var(--text-2)" }}>{labels.division}</span>}
-            {labels.community && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.community}</span></>}
-            {labels.plan && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.plan}</span></>}
+      topBar={
+        <>
+          <div style={{
+            display: "flex", alignItems: "center",
+            padding: "0 16px", height: 36, flexShrink: 0,
+            background: "#121314", borderBottom: "1px solid #1a1a1e", gap: 6,
+          }}>
+            {localFilters}
           </div>
-        ) : undefined
+          <TableSubHeader
+            title="Lots"
+            rows={rows}
+            totalRows={rows.length}
+            stats={STATS}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+            search={search}
+            onSearch={(q) => { setSearch(q); setPage(0); }}
+            searchPlaceholder="Search address or lot…"
+            onExport={() => exportToCSV(rows as unknown as Record<string, unknown>[], "lots")}
+            onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "lots-all")}
+          />
+        </>
       }
     >
       <DataTable<LotTableRow>
         columns={columns}
         rows={rows}
-        statConfig={statConfig}
-        defaultPageSize={100}
+        controlledPage={page}
+        controlledPageSize={pageSize}
+        defaultPageSize={pageSize}
         onRowClick={setSelectedLot}
         emptyMessage="No lots match the current filters"
         minWidth={1000}

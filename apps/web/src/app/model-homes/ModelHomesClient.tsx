@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import PageShell from "@/components/PageShell";
-import TopBar from "@/components/TopBar";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import SlideOver, { Section, Row } from "@/components/SlideOver";
 import Badge from "@/components/Badge";
-import DataTable, { type Column, type StatConfigItem } from "@/components/DataTable";
+import DataTable, { type Column } from "@/components/DataTable";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -89,6 +89,14 @@ interface Props {
   divisions: Division[];
 }
 
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+const STATS: StatConfig<ModelHomeRow>[] = [
+  { label: "Homes",     getValue: (r) => r.length },
+  { label: "Leaseback", getValue: (r) => r.filter((x) => x.is_leaseback).length },
+  { label: "Divisions", getValue: (r) => new Set(r.map((x) => x.division_parent_name)).size },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(n: number | null): string {
@@ -116,13 +124,13 @@ export default function ModelHomesClient({ modelHomes, divisions }: Props) {
   const { filter, labels } = useGlobalFilter();
 
   const globalDivName = filter.divisionId
-    ? divisions.find(d => d.id === filter.divisionId)?.name ?? null
+    ? divisions.find((d) => d.id === filter.divisionId)?.name ?? null
     : null;
 
   const [divFilter, setDivFilter] = useState<string>(() =>
     globalDivName
-      ? (modelHomes.find(r => r.division_parent_name === globalDivName)
-          ? String(modelHomes.find(r => r.division_parent_name === globalDivName)!.division_parent_id ?? "")
+      ? (modelHomes.find((r) => r.division_parent_name === globalDivName)
+          ? String(modelHomes.find((r) => r.division_parent_name === globalDivName)!.division_parent_id ?? "")
           : "")
       : ""
   );
@@ -130,22 +138,28 @@ export default function ModelHomesClient({ modelHomes, divisions }: Props) {
   const [commFilter, setCommFilter] = useState<string>(() => filter.communityId ? filter.communityId : "");
   const [search, setSearch] = useState("");
   const [selectedHome, setSelectedHome] = useState<ModelHomeRow | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   // Sync when global filter changes
   useEffect(() => {
     const divName = filter.divisionId
-      ? divisions.find(d => d.id === filter.divisionId)?.name ?? null
+      ? divisions.find((d) => d.id === filter.divisionId)?.name ?? null
       : null;
     if (divName) {
-      const match = modelHomes.find(r => r.division_parent_name === divName);
+      const match = modelHomes.find((r) => r.division_parent_name === divName);
       setDivFilter(match ? String(match.division_parent_id ?? "") : "");
     } else {
       setDivFilter("");
     }
     if (filter.communityId) setCommFilter(filter.communityId);
     else setCommFilter("");
+    setPage(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.divisionId, filter.communityId]);
+
+  // Reset page on filter/search change
+  useEffect(() => { setPage(0); }, [search, divFilter, stateFilter, commFilter]);
 
   const allRows: ModelHomeRow[] = modelHomes as ModelHomeRow[];
 
@@ -177,13 +191,6 @@ export default function ModelHomesClient({ modelHomes, divisions }: Props) {
       (r.model_marketing_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (r.address ?? "").toLowerCase().includes(search.toLowerCase())
     );
-
-  const statConfig: StatConfigItem<ModelHomeRow>[] = [
-    { label: "Total",       color: "var(--text-3)", getValue: (r) => r.length },
-    { label: "Communities", color: "var(--text-2)", getValue: (r) => new Set(r.map((x) => x.community_name)).size },
-    { label: "States",      color: "var(--blue)",   getValue: (r) => new Set(r.map((x) => x.state)).size },
-    { label: "Leaseback",   color: "#7a5a8a",       getValue: (r) => r.filter((x) => x.is_leaseback).length },
-  ];
 
   const columns: Column<ModelHomeRow>[] = [
     {
@@ -241,8 +248,8 @@ export default function ModelHomesClient({ modelHomes, divisions }: Props) {
     },
   ];
 
-  // Inline filters
-  const inlineFilters = (
+  // Local filter dropdowns
+  const localFilters = (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       {!filter.divisionId && (
         <select value={divFilter} onChange={(e) => { setDivFilter(e.target.value); setCommFilter(""); }} style={filterSelectStyle(!!divFilter)}>
@@ -262,13 +269,6 @@ export default function ModelHomesClient({ modelHomes, divisions }: Props) {
           {commOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       )}
-      <input
-        type="text"
-        placeholder="Search model homes…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ background: "#161718", border: "1px solid #333", color: search ? "#ededed" : "#888", borderRadius: 3, height: 28, fontSize: 12, padding: "0 8px", width: 180, outline: "none" }}
-      />
     </div>
   );
 
@@ -276,23 +276,39 @@ export default function ModelHomesClient({ modelHomes, divisions }: Props) {
 
   return (
     <PageShell
-      topBar={<TopBar title="Model Homes" right={inlineFilters} />}
-      filtersBar={
-        (filter.divisionId || filter.communityId) ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 24px", background: "var(--bg)", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-3)" }}>
-            <span>Filtered:</span>
-            {labels.division && <span style={{ color: "var(--text-2)" }}>{labels.division}</span>}
-            {labels.community && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.community}</span></>}
-            {labels.plan && <><span>›</span><span style={{ color: "var(--text-2)" }}>{labels.plan}</span></>}
+      topBar={
+        <>
+          <div style={{
+            display: "flex", alignItems: "center",
+            padding: "0 16px", height: 36, flexShrink: 0,
+            background: "#121314", borderBottom: "1px solid #1a1a1e", gap: 6,
+          }}>
+            {localFilters}
           </div>
-        ) : undefined
+          <TableSubHeader<ModelHomeRow>
+            title="Model Homes"
+            rows={rows}
+            totalRows={rows.length}
+            stats={STATS}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+            search={search}
+            onSearch={(q) => { setSearch(q); setPage(0); }}
+            searchPlaceholder="Search model homes…"
+            onExport={() => exportToCSV(rows as unknown as Record<string, unknown>[], "model-homes")}
+            onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "model-homes-all")}
+          />
+        </>
       }
     >
       <DataTable<ModelHomeRow>
         columns={columns}
         rows={rows}
-        statConfig={statConfig}
-        defaultPageSize={100}
+        controlledPage={page}
+        controlledPageSize={pageSize}
+        defaultPageSize={pageSize}
         onRowClick={setSelectedHome}
         emptyMessage="No model homes"
         minWidth={1100}

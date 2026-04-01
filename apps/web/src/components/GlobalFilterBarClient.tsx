@@ -47,7 +47,6 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
     useGlobalFilter();
 
   const [plans, setPlans] = useState<CommunityPlanOption[]>([]);
-  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!filter.communityId) { setPlans([]); return; }
@@ -135,15 +134,8 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
         </div>
       )}
 
-      {/* ── Right side: search + account ── */}
+      {/* ── Right side: bell + account ── */}
       <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:12 }}>
-        <input
-          type="text"
-          placeholder="🔍  Search..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ background:"#1e1f22", border:"1px solid #333", borderRadius:3, color:"#aaa", fontSize:12, padding:"4px 10px", outline:"none", fontFamily:"var(--font-body)", width:180 }}
-        />
         <button style={{ background:"none", border:"none", cursor:"pointer", color:"#555", fontSize:15, padding:0 }}>🔔</button>
         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
           <div style={{ width:26, height:26, borderRadius:"50%", background:"#80B602", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"#fff" }}>L</div>
