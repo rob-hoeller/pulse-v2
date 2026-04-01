@@ -43,51 +43,22 @@ function getLotStatusStyle(status: string | null): { bg: string; color: string; 
 }
 
 function LotStatusBadge({ status }: { status: string | null }) {
-  if (!status) return <span style={{ color: "#333" }}>—</span>;
+  if (!status) return <span style={{ color: "#555" }}>—</span>;
   const s = getLotStatusStyle(status);
+  const label = status.replace(" Homesite","").replace(" Home","");
   return (
-    <span
-      style={{
-        fontSize: 10,
-        padding: "2px 7px",
-        borderRadius: 3,
-        backgroundColor: s.bg,
-        color: s.color,
-        border: `1px solid ${s.border}`,
-        fontWeight: 600,
-        whiteSpace: "nowrap",
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-        display: "inline-block",
-        maxWidth: 120,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-      }}
-    >
-      {status?.replace(" Homesite","").replace(" Home","") ?? ""}
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+      <span style={{ fontSize: 12, color: s.color, fontWeight: 500 }}>{label}</span>
     </span>
   );
 }
 
 function ConstructionBadge({ status }: { status: string | null }) {
-  if (!status) return <span style={{ color: "#333" }}>—</span>;
+  if (!status) return <span style={{ color: "#555" }}>—</span>;
+  const color = status === "Under Construction" ? "#59a6bd" : "#666";
   return (
-    <span
-      style={{
-        fontSize: 10,
-        padding: "2px 8px",
-        borderRadius: 4,
-        backgroundColor: "#0d2229",
-        color: "#59a6bd",
-        border: "1px solid #1a3f50",
-        fontWeight: 600,
-        whiteSpace: "nowrap",
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-      }}
-    >
-      {status?.replace(" Started","").replace("Under ","UC ") ?? ""}
-    </span>
+    <span style={{ fontSize: 12, color, fontWeight: 400 }}>{status}</span>
   );
 }
 
