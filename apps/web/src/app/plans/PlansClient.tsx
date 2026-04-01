@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PageShell from "@/components/PageShell";
