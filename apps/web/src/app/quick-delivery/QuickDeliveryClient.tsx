@@ -103,7 +103,7 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
       render: (_v, r) => <span style={{ color: "#888", fontSize: 12 }}>{r.heated_sqft ? (r.heated_sqft as number).toLocaleString() : "—"}</span> },
     { key: "net_price", label: "Net Price", sortable: true,
       render: (_v, r) => r.net_price
-        ? <span style={{ color: "var(--blue)", fontWeight: 700, fontSize: 13 }}>{r.price_formatted ?? formatCurrency(r.net_price as number)}</span>
+        ? <span style={{ color: "#aaa", fontWeight: 700, fontSize: 13 }}>{r.price_formatted ?? formatCurrency(r.net_price as number)}</span>
         : <span style={{ color: "#444" }}>—</span> },
     { key: "incentive_price", label: "Incentive",
       render: (_v, r) => r.incentive_price && (r.incentive_price as number) > 0

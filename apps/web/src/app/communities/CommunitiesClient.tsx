@@ -296,7 +296,7 @@ function CommunitiesInner({ communities, divisions }: Props) {
       key: "has_model",
       label: "Model Home",
       render: (_v, row) => (
-        <span style={{ color: row.has_model ? "#4ade80" : "#555", fontSize: 12 }}>
+        <span style={{ color: "#888", fontSize: 12 }}>
           {row.has_model ? "Yes" : "—"}
         </span>
       ),

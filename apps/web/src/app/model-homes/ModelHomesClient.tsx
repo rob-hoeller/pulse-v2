@@ -235,7 +235,7 @@ export default function ModelHomesClient({ modelHomes, divisions }: Props) {
       sortable: true,
       render: (_v, row) =>
         row.base_price ? (
-          <span style={{ color: "var(--blue)", fontWeight: 600, fontSize: 13 }}>
+          <span style={{ color: "#aaa", fontWeight: 600, fontSize: 13 }}>
             {row.base_price_formatted ?? formatCurrency(row.base_price as number | null)}
           </span>
         ) : <span style={{ color: "#444" }}>—</span>,

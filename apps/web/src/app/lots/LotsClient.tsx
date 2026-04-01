@@ -211,7 +211,7 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
       align: "right" as const,
       render: (_v, row) =>
         (row.lot_premium as number) > 0 ? (
-          <span style={{ color: "var(--blue)", fontSize: 12, fontWeight: 600 }}>+${(row.lot_premium as number).toLocaleString()}</span>
+          <span style={{ color: "#aaa", fontSize: 12, fontWeight: 600 }}>+${(row.lot_premium as number).toLocaleString()}</span>
         ) : (
           <span style={{ color: "#333" }}>—</span>
         ),
@@ -222,7 +222,7 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
       sortable: true,
       render: (_v, row) =>
         row.foundation ? (
-          <span style={{ fontSize: 11, color: row.foundation === "Basement Only" ? "#a855f7" : row.foundation === "Crawl/Basement" ? "var(--blue)" : "var(--text-3)" }}>
+          <span style={{ fontSize: 11, color: "#888" }}>
             {row.foundation as string}
           </span>
         ) : (
