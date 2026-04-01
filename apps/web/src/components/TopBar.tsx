@@ -16,7 +16,7 @@ export default function TopBar({ title, right, loading }: Props) {
         padding: "0 24px",
         height: 44,
         borderBottom: "1px solid #444444",
-        background: "#2a2b2e",
+        background: "#121314",
         flexShrink: 0,
       }}
     >

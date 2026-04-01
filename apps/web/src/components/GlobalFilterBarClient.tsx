@@ -16,7 +16,7 @@ interface Props {
 }
 
 const selectStyle: React.CSSProperties = {
-  background: "#2a2b2e",
+  background: "#121314",
   border: "1px solid #444",
   borderRadius: 3,
   color: "#666666",
@@ -136,7 +136,7 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
         paddingLeft: 12,
         paddingRight: 12,
         borderBottom: "1px solid #444444",
-        backgroundColor: "#2a2b2e",
+        backgroundColor: "#121314",
         flexShrink: 0,
       }}
     >
