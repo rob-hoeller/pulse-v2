@@ -43,8 +43,6 @@ export default function Sidebar() {
         borderRight: "1px solid #333333",
         background: "#222323",
         height: "100vh",
-        position: "sticky",
-        top: 0,
       }}
     >
       {/* Brand */}
