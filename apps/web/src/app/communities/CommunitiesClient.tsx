@@ -386,7 +386,7 @@ function CommunitiesInner({ communities, divisions }: Props) {
         controlledPageSize={pageSize}
         defaultPageSize={pageSize}
         onRowClick={(row) => setSelected(row)}
-        onFilteredRowsChange={(r) => setFilteredRows(r as Community[])}
+        onFilteredRowsChange={(r) => setFilteredRows(r as unknown[] as Community[])}
         emptyMessage="No communities match the current filter"
         minWidth={1100}
       />

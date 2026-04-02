@@ -128,7 +128,7 @@ export default function DivisionsClient({ divisions }: Props) {
         controlledPageSize={pageSize}
         defaultPageSize={pageSize}
         onRowClick={handleRowClick}
-        onFilteredRowsChange={(r) => setFilteredRows(r as DivisionStats[])}
+        onFilteredRowsChange={(r) => setFilteredRows(r as unknown[] as DivisionStats[])}
         emptyMessage="No divisions"
         minWidth={700}
       />
