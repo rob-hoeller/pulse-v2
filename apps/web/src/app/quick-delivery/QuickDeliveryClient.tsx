@@ -192,4 +192,52 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
                 </>
               );
             })()}
-
+            <Section title="Pricing">
+              <div style={{ fontSize: 22, fontWeight: 700, color: "var(--blue)", marginBottom: 8 }}>
+                {selected.price_formatted ?? formatCurrency(selected.net_price as number | null)}
+              </div>
+              <Row label="Base Price" value={selected.base_price_formatted ?? formatCurrency(selected.base_price as number | null)} />
+              {selected.incentive_price && (selected.incentive_price as number) > 0 && (
+                <Row label="Incentive" value={<span style={{ color: "#80B602" }}>− {selected.incentive_price_formatted ?? formatCurrency(selected.incentive_price as number | null)}</span>} />
+              )}
+            </Section>
+            <Section title="Home Specs">
+              <Row label="Plan"        value={selected.model_marketing_name ?? selected.model_name} />
+              <Row label="Bedrooms"    value={selected.bedrooms} />
+              <Row label="Bathrooms"   value={selected.bathrooms} />
+              <Row label="Heated Sqft" value={selected.heated_sqft ? (selected.heated_sqft as number).toLocaleString() : null} />
+              <Row label="Total Sqft"  value={selected.total_sqft ? (selected.total_sqft as number).toLocaleString() : null} />
+              <Row label="Lot"         value={selected.lot_block_number ?? selected.lot_number} />
+            </Section>
+            <Section title="Location">
+              <Row label="Address"   value={selected.address} />
+              <Row label="City"      value={selected.city} />
+              <Row label="State"     value={selected.state} />
+              <Row label="Community" value={selected.community_name} />
+              <Row label="Division"  value={selected.division_parent_name} />
+            </Section>
+            {selected.description && (
+              <Section title="Description">
+                <p style={{ color: "#888", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{selected.description as string}</p>
+              </Section>
+            )}
+            <Section title="Actions">
+              {selected.virtual_tour_url && (
+                <a href={selected.virtual_tour_url as string} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6, border: "1px solid #1a3f1a", backgroundColor: "#1a2e1a", color: "#80B602", fontSize: 13, textDecoration: "none", fontWeight: 500, marginBottom: 8 }}>
+                  ▶ Virtual Tour
+                </a>
+              )}
+              {selected.url && (
+                <a href={`https://www.schellbrothers.com${selected.url}`} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6, border: "1px solid #1a3f50", backgroundColor: "#0d2229", color: "var(--blue)", fontSize: 13, textDecoration: "none", fontWeight: 500 }}>
+                  ↗ View on schellbrothers.com
+                </a>
+              )}
+            </Section>
+          </>
+        )}
+      </SlideOver>
+    </PageShell>
+  );
+}
