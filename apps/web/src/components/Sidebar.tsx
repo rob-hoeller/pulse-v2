@@ -105,17 +105,7 @@ export default function Sidebar() {
                 </div>
               )}
               <Link
-                href={(() => {
-                if (item.href === "#") return "#";
-                const [basePath, itemQuery] = item.href.split("?");
-                const params = new URLSearchParams();
-                if (filter.divisionId) params.set("div", filter.divisionId);
-                if (filter.communityId) params.set("comm", filter.communityId);
-                if (filter.planModelId) params.set("plan", filter.planModelId);
-                if (itemQuery) new URLSearchParams(itemQuery).forEach((v, k) => params.set(k, v));
-                const qs = params.toString();
-                return qs ? `${basePath}?${qs}` : basePath;
-              })()}
+                href={computedHref}
                 style={{
                   display: "flex",
                   alignItems: "center",
