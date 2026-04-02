@@ -198,7 +198,7 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
     },
     { key: "city",  label: "City",  sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{(row.city as string) ?? "—"}</span> },
     { key: "state", label: "State", sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{(row.state as string) ?? "—"}</span> },
-    { key: "division_parent_name", label: "Division", sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{(row.division_parent_name as string) ?? "—"}</span> },
+    { key: "division_parent_name", label: "Division", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{(row.division_parent_name as string) ?? "—"}</span> },
     {
       key: "lot_block_number",
       label: "Lot",
@@ -233,6 +233,7 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
     {
       key: "transaction_type",
       label: "Status",
+      filterable: true,
       render: (_v, row) =>
         <span style={{ color: "#888", fontSize: 12 }}>{row.transaction_type ?? "—"}</span>,
     },

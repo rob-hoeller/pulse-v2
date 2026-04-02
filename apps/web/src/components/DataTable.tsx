@@ -70,7 +70,7 @@ const thStyle = {
   whiteSpace: "nowrap" as const,
   cursor: "pointer",
   userSelect: "none" as const,
-  backgroundColor: "#0d0e10",
+  backgroundColor: "#222323",
 };
 
 function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) {
@@ -633,7 +633,7 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
           }}
         >
           <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
-            <tr style={{ backgroundColor: "#0d0e10" }}>
+            <tr style={{ backgroundColor: "#222323" }}>
               {props.columns.map((col, i) => renderHeader(col, i))}
             </tr>
           </thead>

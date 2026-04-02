@@ -101,7 +101,7 @@ export default function TableSubHeader<T>({
         padding: "0 16px",
         height: 40,
         flexShrink: 0,
-        background: "#222323",
+        background: "#0d0e10",
         borderBottom: "1px solid #1a1a1e",
         gap: 16,
         overflowX: "auto",

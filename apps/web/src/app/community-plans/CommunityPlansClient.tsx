@@ -88,7 +88,7 @@ export default function CommunityPlansClient({ communityPlans, communities, divi
       render: (_v, r) => <span style={{ color: "#ededed", fontWeight: 500, fontSize: 13 }}>{r.plan_name ?? r.marketing_name ?? "—"}</span> },
     { key: "community_id", label: "Community", sortable: true,
       render: (_v, r) => <span style={{ color: "#888", fontSize: 13 }}>{commMap.get(r.community_id ?? "")?.name ?? "—"}</span> },
-    { key: "division_parent_id", label: "Division", sortable: true,
+    { key: "division_parent_id", label: "Division", sortable: true, filterable: true,
       render: (_v, r) => <span style={{ color: "#888", fontSize: 13 }}>{hbDivMap.get(Number(r.division_parent_id))?.name ?? "—"}</span> },
     { key: "net_price", label: "Net Price", sortable: true,
       render: (_v, r) => <span style={{ color: "#aaa", fontSize: 13, fontWeight: 500 }}>{r.price_formatted ?? (r.net_price ? "$" + r.net_price.toLocaleString() : "—")}</span> },

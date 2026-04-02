@@ -190,6 +190,7 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
       key: "lot_status",
       label: "Status",
       sortable: true,
+      filterable: true,
       render: (_v, row) => row.lot_status
         ? <span style={{ color: "#888", fontSize: 12 }}>{(row.lot_status as string).replace(" Homesite", "").replace(" Home", "")}</span>
         : <span style={{ color: "#555" }}>—</span>,
@@ -198,6 +199,7 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
       key: "construction_status",
       label: "Construction",
       sortable: true,
+      filterable: true,
       render: (_v, row) => row.construction_status
         ? <span style={{ color: "#888", fontSize: 12 }}>{row.construction_status as string}</span>
         : <span style={{ color: "#555" }}>—</span>,
@@ -224,6 +226,7 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
       key: "foundation",
       label: "Foundation",
       sortable: true,
+      filterable: true,
       render: (_v, row) =>
         row.foundation ? (
           <span style={{ fontSize: 11, color: "#888" }}>

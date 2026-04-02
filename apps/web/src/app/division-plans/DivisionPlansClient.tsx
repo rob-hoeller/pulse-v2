@@ -71,9 +71,9 @@ export default function DivisionPlansClient({ divisionPlans, divisions }: Props)
   const columns: Column<DivisionPlan>[] = [
     { key: "marketing_name", label: "Plan Name", sticky: true, sortable: true,
       render: (_v, r) => <span style={{ color: "#ededed", fontWeight: 500, fontSize: 13 }}>{r.marketing_name ?? r.name ?? "—"}</span> },
-    { key: "division_parent_name", label: "Division", sortable: true,
+    { key: "division_parent_name", label: "Division", sortable: true, filterable: true,
       render: (_v, r) => <span style={{ color: "#888", fontSize: 13 }}>{hbDivMap.get(Number(r.division_parent_id))?.name ?? r.division_parent_name ?? "—"}</span> },
-    { key: "plan_type", label: "Type", sortable: true,
+    { key: "plan_type", label: "Type", sortable: true, filterable: true,
       render: (_v, r) => <span style={{ color: "#888", fontSize: 13 }}>{r.plan_type ?? "—"}</span> },
     { key: "min_bedrooms", label: "Beds", sortable: true,
       render: (_v, r) => <span style={{ color: "#888", fontSize: 12 }}>{fmtRange(r.min_bedrooms, r.max_bedrooms)}</span> },

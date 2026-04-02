@@ -268,6 +268,7 @@ function CommunitiesInner({ communities, divisions }: Props) {
       key: "division_name",
       label: "Division",
       sortable: true,
+      filterable: true,
       render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row.division_name}</span>,
     },
     {
@@ -279,6 +280,7 @@ function CommunitiesInner({ communities, divisions }: Props) {
     {
       key: "status",
       label: "Status",
+      filterable: true,
       render: (_v, row) => <span style={{ color: "#888", fontSize: 12 }}>{getStatusLabel(row.status)}</span>,
     },
     {

@@ -100,7 +100,7 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
       render: (_v, r) => <span style={{ color: "#888", fontSize: 13 }}>{r.community_name ?? "—"}</span> },
     { key: "city",  label: "City",  sortable: true, render: (_v, r) => <span style={{ color: "#888", fontSize: 13 }}>{r.city ?? "—"}</span> },
     { key: "state", label: "State", sortable: true, render: (_v, r) => <span style={{ color: "#888", fontSize: 13 }}>{r.state ?? "—"}</span> },
-    { key: "division_parent_name", label: "Division", sortable: true,
+    { key: "division_parent_name", label: "Division", sortable: true, filterable: true,
       render: (_v, r) => <span style={{ color: "#888", fontSize: 13 }}>{r.division_parent_name ?? "—"}</span> },
     { key: "lot_block_number", label: "Lot",
       render: (_v, r) => <span style={{ color: "#888", fontSize: 12 }}>{r.lot_block_number ?? r.lot_number ?? "—"}</span> },

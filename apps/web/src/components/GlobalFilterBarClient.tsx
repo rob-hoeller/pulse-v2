@@ -40,7 +40,7 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
           width: 170,
           height: 44,
           background: "#2a2b2e",
-          border: `1px solid ${isActive ? "#80B602" : "#333"}`,
+          border: `1px solid ${isActive ? "#80B602" : "#444"}`,
           borderRadius: 3,
           padding: "6px 10px",
           cursor: disabled ? "default" : "pointer",
@@ -53,13 +53,13 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
       >
         {/* Top row: label + arrow */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: isActive ? "#80B602" : "#444" }}>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: isActive ? "#80B602" : "#666" }}>
             {label}
           </span>
-          <span style={{ fontSize: 10, color: isActive ? "#80B602" : "#444" }}>▾</span>
+          <span style={{ fontSize: 10, color: isActive ? "#80B602" : "#666" }}>▾</span>
         </div>
         {/* Bottom row: value or count */}
-        <div style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? "#ededed" : "#555", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? "#ededed" : "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {isActive ? displayValue : `${count} available`}
         </div>
       </div>
