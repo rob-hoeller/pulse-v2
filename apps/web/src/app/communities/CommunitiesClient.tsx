@@ -197,7 +197,7 @@ function CommunitiesInner({ communities, divisions }: Props) {
       const slug = divisions.find((d) => d.id === filter.divisionId)?.slug;
       setDivisionFilter(slug ?? "all");
     } else {
-      setDivisionFilter(searchParams.get("division") ?? "all");
+      setDivisionFilter("all");
     }
     setPage(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
