@@ -83,9 +83,23 @@ export default function Sidebar() {
         {NAV_ITEMS.map((item, i) => {
           const prevItem = i > 0 ? NAV_ITEMS[i - 1] : null;
           const isFirstInGroup = !prevItem || prevItem.group !== item.group;
+          const itemBasePath = item.href.split("?")[0];
           const isActive =
-            item.href === pathname ||
-            (item.href !== "/" && item.href !== "#" && pathname.startsWith(item.href));
+            itemBasePath === pathname ||
+            (itemBasePath !== "/" && itemBasePath !== "#" && pathname.startsWith(itemBasePath));
+
+          // Build href preserving global filter params
+          const computedHref = (() => {
+            if (item.href === "#") return "#";
+            const [basePath, itemQuery] = item.href.split("?");
+            const params = new URLSearchParams();
+            if (filter.divisionId) params.set("div", filter.divisionId);
+            if (filter.communityId) params.set("comm", filter.communityId);
+            if (filter.planModelId) params.set("plan", String(filter.planModelId));
+            if (itemQuery) new URLSearchParams(itemQuery).forEach((v, k) => params.set(k, v));
+            const qs = params.toString();
+            return qs ? `${basePath}?${qs}` : basePath;
+          })();
 
           return (
             <div key={item.label}>
