@@ -106,6 +106,9 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.divisionId, filter.communityId]);
 
+  const [filteredRows, setFilteredRows] = useState<LotTableRow[]>([]);
+  useEffect(() => { setFilteredRows(rows); }, [rows]);
+
   const communityMap = useMemo(() => new Map(communities.map((c) => [c.id, c])), [communities]);
   const divisionMap = useMemo(() => new Map(divisions.map((d) => [d.id, d])), [divisions]);
 
@@ -140,10 +143,6 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
   const rows = useMemo<LotTableRow[]>(() => {
     return (lots as LotTableRow[]).filter((l) => {
       if (filter.communityId && l.community_id !== filter.communityId) return false;
-  const [filteredRows, setFilteredRows] = useState<LotTableRow[]>([]);
-  // Keep filteredRows in sync when global rows change
-  useEffect(() => { setFilteredRows(rows); }, [rows]);
-
       if (filter.divisionId && !divFilter) {
         const comm = l.community_id ? communityMap.get(l.community_id as string) : null;
         const div = comm?.division_id ? divisionMap.get(comm.division_id) : null;
