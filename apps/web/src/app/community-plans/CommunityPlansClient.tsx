@@ -36,6 +36,14 @@ function fmtRange(min: number | null, max: number | null): string {
   return `${fmt(min)}–${fmt(max)}`;
 }
 
+
+function s3ToHttps(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  return path.replace("s3://heartbeat-page-designer-production/",
+    "https://heartbeat-page-designer-production.s3.amazonaws.com/");
+}
+
 export default function CommunityPlansClient({ communityPlans, communities, divisions }: Props) {
   const { filter } = useGlobalFilter();
   const [search, setSearch] = useState("");
@@ -139,7 +147,30 @@ export default function CommunityPlansClient({ communityPlans, communities, divi
         width={480}>
         {selected && (
           <>
-            <Section title="Pricing">
+              {/* Elevation image grid */}
+            {Array.isArray(selected.elevations) && (selected.elevations as {kova_name?: string; image_path?: string; [key: string]: unknown}[]).filter(e => e.image_path).length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#555", marginBottom: 8 }}>Elevations</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                  {(selected.elevations as {kova_name?: string; image_path?: string; [key: string]: unknown}[])
+                    .filter(e => e.image_path)
+                    .map((elev, i) => (
+                      <div key={i} style={{ textAlign: "center" }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={s3ToHttps(elev.image_path as string) ?? ""}
+                          alt={elev.kova_name as string ?? `Elevation ${i + 1}`}
+                          style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 3, display: "block", background: "#1a1a1e" }}
+                          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                        <div style={{ fontSize: 10, color: "#555", marginTop: 3 }}>{elev.kova_name as string ?? `Elevation ${i + 1}`}</div>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+          <Section title="Pricing">
               <div style={{ fontSize: 22, fontWeight: 700, color: "#aaa", marginBottom: 8 }}>
                 {selected.price_formatted ?? (selected.net_price ? "$" + selected.net_price.toLocaleString() : "—")}
               </div>
