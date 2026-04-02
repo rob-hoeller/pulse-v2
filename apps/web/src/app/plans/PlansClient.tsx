@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 import PageShell from "@/components/PageShell";
 import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import SlideOver from "@/components/SlideOver";
@@ -540,9 +540,5 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 export default function PlansClient(props: Props) {
-  return (
-    <Suspense>
-      <PlansInner {...props} />
-    </Suspense>
-  );
+  return <PlansInner {...props} />;
 }
