@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { GlobalFilterContext, type GlobalFilter, type GlobalFilterContextValue } from "./GlobalFilterContext";
 
 interface Props {
@@ -8,6 +9,9 @@ interface Props {
 }
 
 export function GlobalFilterProvider({ children }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [labels, setLabels] = useState<{ division?: string; community?: string; plan?: string }>({});
 
   // Read filter from URL on client only (avoids SSR suspense freeze)
@@ -17,7 +21,7 @@ export function GlobalFilterProvider({ children }: Props) {
     planModelId: null,
   });
 
-  // Read filter from URL once on mount only
+  // Sync filter state from URL on mount and navigation
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setFilter({
@@ -25,7 +29,7 @@ export function GlobalFilterProvider({ children }: Props) {
       communityId: params.get("comm"),
       planModelId: params.get("plan"),
     });
-  }, []); // mount only — updateUrl handles subsequent changes
+  }, [pathname]);
 
   const updateUrl = useCallback(
     (updates: Partial<Record<"div" | "comm" | "plan", string | null>>) => {
@@ -38,15 +42,16 @@ export function GlobalFilterProvider({ children }: Props) {
         }
       }
       const query = params.toString();
-      const newUrl = `${window.location.pathname}${query ? `?${query}` : ""}`;
-      window.history.replaceState(null, "", newUrl);
+      const newUrl = `${pathname}${query ? `?${query}` : ""}`;
+      router.replace(newUrl, { scroll: false });
+      // Update local state immediately
       setFilter({
         divisionId: params.get("div"),
         communityId: params.get("comm"),
         planModelId: params.get("plan"),
       });
     },
-    []
+    [router, pathname]
   );
 
   const setDivision = useCallback(

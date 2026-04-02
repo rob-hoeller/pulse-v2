@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import type { DivisionOption, CommunityOption } from "./GlobalFilterBar";
@@ -31,10 +30,6 @@ interface CompoundFilterProps {
 function CompoundFilter({ label, value, displayValue, count, options, onChange, disabled }: CompoundFilterProps) {
   const [open, setOpen] = useState(false);
   const isActive = !!value;
-  const pathname = usePathname();
-
-  // Close dropdown on navigation
-  useEffect(() => { setOpen(false); }, [pathname]);
 
   return (
     <div style={{ position: "relative" }}>

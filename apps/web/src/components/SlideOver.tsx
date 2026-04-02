@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
 
 interface SlideOverProps {
   open: boolean;
@@ -22,14 +21,6 @@ export default function SlideOver({
   children,
   width = 480,
 }: SlideOverProps) {
-  const pathname = usePathname();
-
-  // Close on navigation
-  useEffect(() => {
-    if (open) onClose();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
-
   // Close on Escape
   useEffect(() => {
     if (!open) return;
