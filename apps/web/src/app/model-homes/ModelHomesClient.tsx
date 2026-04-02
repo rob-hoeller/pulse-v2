@@ -305,6 +305,38 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
       >
         {selectedHome && (
           <>
+            {/* Images: exterior elevation first, then interior featured image — both full width */}
+            {(() => {
+              const elevations = (selected?.elevations ?? selectedHome?.elevations) as {kova_name?: string; image_path?: string; [key: string]: unknown}[] | null;
+              const featuredUrl = (selected as {featured_image_url?: string | null})?.featured_image_url ?? (selectedHome as {featured_image_url?: string | null})?.featured_image_url;
+              const firstElev = elevations?.find(e => e.image_path);
+              const elevUrl = firstElev ? s3ToHttps(firstElev.image_path as string) : null;
+              return (
+                <>
+                  {elevUrl && (
+                    <div style={{ marginBottom: 8 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={elevUrl} alt="Exterior Elevation"
+                        style={{ width: "100%", height: 200, objectFit: "cover", borderRadius: 4, display: "block", background: "#1a1a1e" }}
+                        onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }}
+                      />
+                      <div style={{ fontSize: 10, color: "#555", marginTop: 3, textAlign: "center" }}>{firstElev?.kova_name as string ?? "Exterior"}</div>
+                    </div>
+                  )}
+                  {featuredUrl && (
+                    <div style={{ marginBottom: 16 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={featuredUrl} alt="Interior"
+                        style={{ width: "100%", height: 200, objectFit: "cover", borderRadius: 4, display: "block", background: "#1a1a1e" }}
+                        onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }}
+                      />
+                      <div style={{ fontSize: 10, color: "#555", marginTop: 3, textAlign: "center" }}>Interior</div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
             {selectedHome.featured_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={selectedHome.featured_image_url} alt={planName} style={{ width: "100%", borderRadius: 8, marginBottom: 20, objectFit: "cover", maxHeight: 220, display: "block" }} />
