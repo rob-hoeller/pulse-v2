@@ -106,8 +106,6 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.divisionId, filter.communityId]);
 
-  const [filteredRows, setFilteredRows] = useState<LotTableRow[]>([]);
-  useEffect(() => { setFilteredRows(rows); }, [rows]);
 
   const communityMap = useMemo(() => new Map(communities.map((c) => [c.id, c])), [communities]);
   const divisionMap = useMemo(() => new Map(divisions.map((d) => [d.id, d])), [divisions]);
@@ -293,13 +291,17 @@ export default function LotsClient({ lots, communities, divisions }: Props) {
 
   const selectedDivName = selectedLot ? getDivisionName(selectedLot) : "—";
 
+
+  // filteredRows tracks the post-column-filter rows from DataTable
+  const [filteredRows, setFilteredRows] = useState<LotTableRow[]>([]);
+
   return (
     <PageShell
       topBar={
         <TableSubHeader
           title="Lots"
-          rows={filteredRows}
-          totalRows={filteredRows.length}
+          rows={filteredRows.length > 0 ? filteredRows : rows}
+          totalRows={filteredRows.length > 0 ? filteredRows.length : rows.length}
           stats={STATS}
           page={page}
           pageSize={pageSize}
