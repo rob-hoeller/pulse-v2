@@ -36,7 +36,6 @@ export default function DivisionsClient({ divisions }: Props) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  const [filteredRows, setFilteredRows] = useState<DivisionStats[]>([]);
 
   const allRows: DivisionTableRow[] = divisions.map((d) => ({
     ...d,
@@ -128,7 +127,6 @@ export default function DivisionsClient({ divisions }: Props) {
         controlledPageSize={pageSize}
         defaultPageSize={pageSize}
         onRowClick={handleRowClick}
-        onFilteredRowsChange={(r) => setFilteredRows(r as unknown[] as DivisionStats[])}
         emptyMessage="No divisions"
         minWidth={700}
       />

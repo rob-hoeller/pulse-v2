@@ -63,7 +63,6 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
   const [selected, setSelected] = useState<SpecHome | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  const [filteredRows, setFilteredRows] = useState<SpecHome[]>([]);
 
   // Map global filter divisionId (UUID) → HB integer via heartbeat_division_id FK
   const globalHBDivId = filter.divisionId
@@ -148,7 +147,6 @@ export default function QuickDeliveryClient({ specHomes, divisions }: Props) {
         controlledPageSize={pageSize}
         defaultPageSize={pageSize}
         onRowClick={setSelected}
-        onFilteredRowsChange={(r) => setFilteredRows(r as unknown[] as SpecHome[])}
         emptyMessage="No quick delivery homes"
         minWidth={1100}
       />

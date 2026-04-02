@@ -189,7 +189,6 @@ function CommunitiesInner({ communities, divisions }: Props) {
   const [selected, setSelected] = useState<Community | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  const [filteredRows, setFilteredRows] = useState<Community[]>([]);
 
   // Sync local division filter when global filter changes
   useEffect(() => {
@@ -384,7 +383,6 @@ function CommunitiesInner({ communities, divisions }: Props) {
         controlledPageSize={pageSize}
         defaultPageSize={pageSize}
         onRowClick={(row) => setSelected(row)}
-        onFilteredRowsChange={(r) => setFilteredRows(r as unknown[] as Community[])}
         emptyMessage="No communities match the current filter"
         minWidth={1100}
       />

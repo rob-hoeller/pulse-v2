@@ -148,7 +148,6 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
   const [selectedHome, setSelectedHome] = useState<ModelHomeRow | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  const [filteredRows, setFilteredRows] = useState<ModelHome[]>([]);
 
 
 
@@ -293,7 +292,6 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
         controlledPageSize={pageSize}
         defaultPageSize={pageSize}
         onRowClick={setSelectedHome}
-        onFilteredRowsChange={(r) => setFilteredRows(r as unknown[] as ModelHome[])}
         emptyMessage="No model homes"
         minWidth={1100}
       />
