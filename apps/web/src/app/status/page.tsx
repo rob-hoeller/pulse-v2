@@ -6,13 +6,13 @@ export const revalidate = 60;
 type SystemStatus = "online" | "ready" | "unreachable";
 
 const systems = [
-  { emoji: "🦞", name: "Schellie",  description: "Orchestrator — OpenClaw on Mac Mini",          status: "online"  as SystemStatus },
-  { emoji: "🐟", name: "Nemo",      description: "Analysis sandbox — OpenShell NemoClaw",         status: "ready"   as SystemStatus },
-  { emoji: "🪸", name: "GBR",       description: "Execution sandbox — OpenShell",                 status: "ready"   as SystemStatus },
-  { emoji: "⚡", name: "Spark",     description: "Local inference — DGX Spark (192.168.101.178)", status: "ready"   as SystemStatus },
-  { emoji: "🗄️", name: "Supabase",  description: "Data plane — Postgres via Supabase",            status: "ready"   as SystemStatus },
-  { emoji: "🐙", name: "GitHub",    description: "Source control — pulse-v2 repo",                status: "ready"   as SystemStatus },
-  { emoji: "▲",  name: "Vercel",    description: "Deployment — CI/CD pipeline",                   status: "ready"   as SystemStatus },
+  { emoji: "🦞", name: "Schellie",  description: "Orchestrator — OpenClaw on Mac Mini",          status: "online"  as SystemStatus, url: null },
+  { emoji: "🐟", name: "Nemo",      description: "Analysis sandbox — OpenShell NemoClaw",         status: "ready"   as SystemStatus, url: null },
+  { emoji: "🪸", name: "GBR",       description: "Execution sandbox — OpenShell",                 status: "ready"   as SystemStatus, url: null },
+  { emoji: "⚡", name: "Spark",     description: "Local inference — DGX Spark (192.168.101.178)", status: "ready"   as SystemStatus, url: null },
+  { emoji: "🗄️", name: "Supabase",  description: "Data plane — Postgres via Supabase",            status: "ready"   as SystemStatus, url: "https://supabase.com/dashboard/project/mrpxtbuezqrlxybnhyne/editor" },
+  { emoji: "🐙", name: "GitHub",    description: "Source control — pulse-v2 repo",                status: "ready"   as SystemStatus, url: "https://github.com/rob-hoeller/pulse-v2" },
+  { emoji: "▲",  name: "Vercel",    description: "Deployment — CI/CD pipeline",                   status: "ready"   as SystemStatus, url: "https://vercel.com/heartbeat-v2/pulse-v2" },
 ];
 
 const statusMap: Record<SystemStatus, { label: string; dot: string; text: string; pulse: boolean }> = {
@@ -160,7 +160,12 @@ export default async function StatusPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 15 }}>{sys.emoji}</span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#ededed" }}>{sys.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    {sys.url
+                      ? <a href={sys.url} target="_blank" rel="noopener noreferrer" style={{ color: "#ededed", textDecoration: "none" }} onMouseEnter={e => (e.currentTarget.style.color="#59a6bd")} onMouseLeave={e => (e.currentTarget.style.color="#ededed")}>{sys.name} ↗</a>
+                      : <span style={{ color: "#ededed" }}>{sys.name}</span>
+                    }
+                  </div>
                     <div style={{ fontSize: 11, color: "#555", marginTop: 1 }}>{sys.description}</div>
                   </div>
                 </div>
@@ -231,17 +236,7 @@ export default async function StatusPage() {
           </div>
         </div>
       </section>
-
-      {/* Links */}
-      <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
-        <Link href="/" style={{ color: "#59a6bd", textDecoration: "none" }}>← Dashboard</Link>
-        <span style={{ color: "#333" }}>·</span>
-        <a href="https://vercel.com/heartbeat-v2/pulse-v2" target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd", textDecoration: "none" }}>Vercel ↗</a>
-        <span style={{ color: "#333" }}>·</span>
-        <a href="https://github.com/rob-hoeller/pulse-v2" target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd", textDecoration: "none" }}>GitHub ↗</a>
-        <span style={{ color: "#333" }}>·</span>
-        <a href="https://mrpxtbuezqrlxybnhyne.supabase.co" target="_blank" rel="noopener noreferrer" style={{ color: "#59a6bd", textDecoration: "none" }}>Supabase ↗</a>
-      </div>
     </div>
   );
+
 }
