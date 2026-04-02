@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 
 // ── Canonical nav items — single source of truth ─────────────────────────────
@@ -33,6 +32,7 @@ const GROUP_LABELS: Record<string, string> = {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { filter } = useGlobalFilter();
 
   return (
@@ -118,8 +118,8 @@ export default function Sidebar() {
                   {GROUP_LABELS[item.group]}
                 </div>
               )}
-              <Link
-                href={computedHref}
+              <a
+                onClick={(e) => { e.preventDefault(); if (computedHref !== "#") router.push(computedHref); }}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -160,7 +160,7 @@ export default function Sidebar() {
                   {item.icon}
                 </span>
                 {item.label}
-              </Link>
+              </a>
             </div>
           );
         })}
