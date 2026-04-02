@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
 import { GlobalFilterContext, type GlobalFilter, type GlobalFilterContextValue } from "./GlobalFilterContext";
 
 interface Props {
@@ -9,8 +8,6 @@ interface Props {
 }
 
 export function GlobalFilterProvider({ children }: Props) {
-  const pathname = usePathname();
-
   const [labels, setLabels] = useState<{ division?: string; community?: string; plan?: string }>({});
 
   // Read filter from URL on client only (avoids SSR suspense freeze)
@@ -20,7 +17,7 @@ export function GlobalFilterProvider({ children }: Props) {
     planModelId: null,
   });
 
-  // Sync filter state from URL on mount and navigation
+  // Read filter from URL once on mount only
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setFilter({
@@ -28,7 +25,7 @@ export function GlobalFilterProvider({ children }: Props) {
       communityId: params.get("comm"),
       planModelId: params.get("plan"),
     });
-  }, [pathname]);
+  }, []); // mount only — updateUrl handles subsequent changes
 
   const updateUrl = useCallback(
     (updates: Partial<Record<"div" | "comm" | "plan", string | null>>) => {
