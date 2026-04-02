@@ -68,6 +68,7 @@ const thStyle = {
   textTransform: "uppercase" as const,
   letterSpacing: "0.06em",
   borderBottom: "1px solid #444",
+  borderRight: "1px solid #1e1e1e",
   whiteSpace: "nowrap" as const,
   cursor: "pointer",
   userSelect: "none" as const,
@@ -676,11 +677,7 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
                     e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
-                  {/* Row number */}
-                  <td style={{ padding: "10px 8px 10px 12px", fontSize: 11, color: "#3a3a3a", textAlign: "right", whiteSpace: "nowrap", width: 28, fontFamily: "monospace", userSelect: "none" as const }}>
-                    {ri + 1}
-                  </td>
-                  {props.columns.map((col, ci) => {
+{props.columns.map((col, ci) => {
                     const val = row[col.key as string];
                     const isSticky =
                       col.sticky ||
@@ -697,6 +694,7 @@ function DataTable<T extends Record<string, unknown>>(props: DataTableProps<T>) 
                           fontWeight: isSticky ? 500 : 400,
                           whiteSpace: "nowrap",
                           borderBottom: "1px solid #444",
+                          borderRight: "1px solid #1e1e1e",
                           textAlign: col.align ?? "left",
                           ...(isSticky
                             ? {
