@@ -337,12 +337,67 @@ export default function ModelHomesClient({ modelHomes, divisions, communities }:
               );
             })()}
 
-            {selectedHome.featured_image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={selectedHome.featured_image_url} alt={planName} style={{ width: "100%", borderRadius: 8, marginBottom: 20, objectFit: "cover", maxHeight: 220, display: "block" }} />
-            ) : (
-              <div style={{ width: "100%", height: 160, backgroundColor: "var(--surface-2)", borderRadius: 8, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: 32, opacity: 0.2 }}>⌂</span>
-              </div>
+                        <Section title="Pricing">
+              <Row label="Base Price" value={<span style={{ color: "var(--blue)", fontWeight: 600 }}>{selectedHome.base_price_formatted ?? formatCurrency(selectedHome.base_price)}</span>} />
+            </Section>
+
+            <Section title="Home Specs">
+              <Row label="Plan"        value={selectedHome.model_marketing_name ?? selectedHome.model_name} />
+              <Row label="Bedrooms"    value={selectedHome.bedrooms} />
+              <Row label="Bathrooms"   value={selectedHome.bathrooms} />
+              <Row label="Heated Sqft" value={selectedHome.heated_sqft ? (selectedHome.heated_sqft as number).toLocaleString() : null} />
+              <Row label="Total Sqft"  value={selectedHome.total_sqft ? (selectedHome.total_sqft as number).toLocaleString() : null} />
+              <Row label="Lot"         value={selectedHome.lot_block_number ?? selectedHome.lot_number} />
+            </Section>
+
+            <Section title="Location">
+              <Row label="Address"   value={selectedHome.address} />
+              <Row label="City"      value={selectedHome.city} />
+              <Row label="State"     value={selectedHome.state} />
+              <Row label="Zip"       value={selectedHome.zip} />
+              <Row label="Community" value={selectedHome.community_name} />
+              <Row label="Division"  value={selectedHome.division_parent_name} />
+            </Section>
+
+            {selectedHome.hours_string && (
+              <Section title="Hours">
+                <p style={{ color: "#888", fontSize: 13, lineHeight: 1.6, margin: 0, whiteSpace: "pre-line" }}
+                  dangerouslySetInnerHTML={{ __html: (selectedHome.hours_string as string).replace(/<br[^>]*>/g, "\n") }}
+                />
+              </Section>
             )}
 
+            {selectedHome.is_leaseback && (
+              <Section title="Leaseback">
+                <Row label="Start Date"     value={selectedHome.leaseback_start_date} />
+                <Row label="End Date"       value={selectedHome.leaseback_end_date} />
+                <Row label="Days Remaining" value={selectedHome.days_till_lease_end != null ? `${selectedHome.days_till_lease_end} days` : null} />
+              </Section>
+            )}
+
+            {selectedHome.description && (
+              <Section title="Description">
+                <p style={{ color: "#888", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{selectedHome.description as string}</p>
+              </Section>
+            )}
+
+            <Section title="Actions">
+              {selectedHome.virtual_tour_url && (
+                <a href={selectedHome.virtual_tour_url as string} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6, border: "1px solid #1a3f1a", backgroundColor: "#1a2e1a", color: "#5a8a5a", fontSize: 13, textDecoration: "none", fontWeight: 500, marginBottom: 8 }}>
+                  ▶ Virtual Tour
+                </a>
+              )}
+              {selectedHome.url && (
+                <a href={`https://www.schellbrothers.com${selectedHome.url}`} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 6, border: "1px solid #1a3f50", backgroundColor: "#0d2229", color: "var(--blue)", fontSize: 13, textDecoration: "none", fontWeight: 500 }}>
+                  ↗ View on schellbrothers.com
+                </a>
+              )}
+            </Section>
+          </>
+        )}
+      </SlideOver>
+    </PageShell>
+  );
+}
