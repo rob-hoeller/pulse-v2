@@ -21,10 +21,18 @@ interface Props {
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 const STATS: StatConfig<LotTableRow>[] = [
+  // Group 1: Status subtotals (should add up to total)
   { label: "Available",      getValue: (r) => r.filter((x) => x.lot_status === "Available Homesite").length },
-  { label: "Under Const",    getValue: (r) => r.filter((x) => x.construction_status === "Under Construction").length },
-  { label: "Quick Delivery", getValue: (r) => r.filter((x) => x.lot_status === "Quick Delivery").length },
   { label: "Future",         getValue: (r) => r.filter((x) => x.lot_status === "Future Homesite").length },
+  { label: "Model",          getValue: (r) => r.filter((x) => (x.lot_status as string)?.toLowerCase().includes("model")).length },
+  { label: "Quick Delivery", getValue: (r) => r.filter((x) => x.lot_status === "Quick Delivery").length },
+  { label: "Sold",           getValue: (r) => r.filter((x) => x.lot_status === "Sold" || x.lot_status === "Closed").length },
+  // Divider marker — handled by TableSubHeader when label is "|"
+  { label: "|", getValue: () => "" },
+  // Group 2: Construction subtotals
+  { label: "Not Started",    getValue: (r) => r.filter((x) => x.construction_status === "Not Started").length },
+  { label: "Under Const",    getValue: (r) => r.filter((x) => x.construction_status === "Under Construction").length },
+  { label: "Settled",        getValue: (r) => r.filter((x) => x.construction_status === "Settled").length },
 ];
 
 // ─── Lot status config ────────────────────────────────────────────────────────

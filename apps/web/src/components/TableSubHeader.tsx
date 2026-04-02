@@ -151,22 +151,28 @@ export default function TableSubHeader<T>({
             flexShrink: 0,
           }}
         >
-          {stats.map((stat, i) => (
-            <span key={stat.label} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              {i > 0 && (
-                <span style={{ color: "#2a2a2a", margin: "0 4px" }}>·</span>
-              )}
-              <span style={{ fontSize: 11, color: "#666" }}>{stat.label}</span>
-              <span style={{
-                display: "inline-flex", alignItems: "center",
-                background: "#1a1a1e", border: "1px solid #2a2a2a",
-                borderRadius: 3, padding: "1px 6px",
-                fontSize: 11, color: "#aaa", fontWeight: 500,
-              }}>
-                {stat.getValue(rows)}
+          {stats.map((stat, i) => {
+            // "|" = divider line between stat groups
+            if (stat.label === "|") {
+              return <div key={`divider-${i}`} style={{ width: 1, height: 16, background: "#2a2a2a", margin: "0 4px", flexShrink: 0 }} />;
+            }
+            return (
+              <span key={stat.label} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                {i > 0 && stats[i-1]?.label !== "|" && (
+                  <span style={{ color: "#2a2a2a", margin: "0 2px" }}>·</span>
+                )}
+                <span style={{ fontSize: 11, color: "#666" }}>{stat.label}</span>
+                <span style={{
+                  display: "inline-flex", alignItems: "center",
+                  background: "#1a1a1e", border: "1px solid #2a2a2a",
+                  borderRadius: 3, padding: "1px 6px",
+                  fontSize: 11, color: "#aaa", fontWeight: 500,
+                }}>
+                  {stat.getValue(rows)}
+                </span>
               </span>
-            </span>
-          ))}
+            );
+          })}
         </div>
       )}
 
