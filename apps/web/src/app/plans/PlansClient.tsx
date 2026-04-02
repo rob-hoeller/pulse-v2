@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import SlideOver from "@/components/SlideOver";
@@ -124,14 +123,13 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
 // ─── Inner component ──────────────────────────────────────────────────────────
 
 function PlansInner({ divisionPlans, communityPlans, communities, divisions }: Props) {
-  const searchParams = useSearchParams();
   const { filter } = useGlobalFilter();
 
   const [mode, setMode] = useState<Mode>(() => filter.communityId ? "by-community" : "by-plan");
   const [divisionFilter, setDivisionFilter] = useState<string>(() => filter.divisionId ?? "all");
   const [styleFilter, setStyleFilter] = useState("all");
   const [communityFilter, setCommunityFilter] = useState<string>(() =>
-    filter.communityId ?? searchParams.get("community") ?? "all"
+    filter.communityId ?? "all"
   );
   const [selectedPlan, setSelectedPlan] = useState<DivisionPlan | null>(null);
   const [selectedCommunityPlan, setSelectedCommunityPlan] = useState<CommunityPlan | null>(null);
@@ -153,7 +151,7 @@ function PlansInner({ divisionPlans, communityPlans, communities, divisions }: P
       setCommunityFilter(filter.communityId);
       setMode("by-community");
     } else {
-      setCommunityFilter(searchParams.get("community") ?? "all");
+      setCommunityFilter("all");
     }
     setPage(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
