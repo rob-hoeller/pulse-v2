@@ -180,11 +180,9 @@ export default async function StatusPage() {
   weekStart.setHours(0, 0, 0, 0);
   const weekStartET = etDateString(weekStart);
 
-  // Start of current month in ET
-  const monthStart = new Date(now);
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const monthStartET = etDateString(monthStart);
+  // Start of current month in ET — derive from todayET string to avoid UTC/ET confusion
+  // todayET is already "YYYY-MM-DD" in ET, so take the year+month and set day=01
+  const monthStartET = todayET.slice(0, 8) + "01"; // YYYY-MM-01
 
   // 7 months ago for charts
   const sevenMonthsAgo = new Date(now);
@@ -258,12 +256,19 @@ export default async function StatusPage() {
   }
   const thisWeekData = sumDates(weekDates);
 
-  // Build month dates (1st → today)
+  // Build month dates (1st → today) using ET string directly
   const monthDates: string[] = [];
   {
-    const cur = new Date(monthStart);
-    while (etDateString(cur) <= todayET) {
-      monthDates.push(etDateString(cur));
+    // Parse monthStartET "YYYY-MM-DD" as local date to avoid UTC offset issues
+    const [my, mm, md] = monthStartET.split("-").map(Number);
+    const cur = new Date(my, mm - 1, md); // local date, no UTC conversion
+    const [ty, tm, td] = todayET.split("-").map(Number);
+    const todayLocal = new Date(ty, tm - 1, td);
+    while (cur <= todayLocal) {
+      const y = cur.getFullYear();
+      const mo = String(cur.getMonth() + 1).padStart(2, "0");
+      const d = String(cur.getDate()).padStart(2, "0");
+      monthDates.push(`${y}-${mo}-${d}`);
       cur.setDate(cur.getDate() + 1);
     }
   }
