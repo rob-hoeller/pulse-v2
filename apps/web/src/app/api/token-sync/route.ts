@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 export async function POST() {
   return new Promise<NextResponse>((resolve) => {
     exec(
-      "python3 /Users/schellie/.openclaw/workspace/HBx/scripts/hbx-sync-token-usage.py",
+      "/usr/bin/python3 /Users/schellie/.openclaw/workspace/HBx/scripts/hbx-sync-token-usage.py",
       { timeout: 120000 },
       (error, stdout) => {
         if (error) {

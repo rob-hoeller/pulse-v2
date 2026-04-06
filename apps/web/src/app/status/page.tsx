@@ -329,7 +329,7 @@ export default async function StatusPage() {
     const monthLabel = firstDay.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", year: "numeric" });
     monthBuckets.push({ label: monthLabel, dates });
   }
-  monthBuckets.reverse();
+  // monthBuckets: m=0 is current month (already at front), so no reverse needed
   const monthChartData = monthBuckets.map(b => ({ label: b.label, ...sumDates(b.dates) }));
   const maxMonthTokens = Math.max(...monthChartData.map(m => m.total_tokens), 1);
 
@@ -568,7 +568,7 @@ export default async function StatusPage() {
               7-Month Activity
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {[...monthChartData].reverse().map((m, i) => {
+              {monthChartData.map((m, i) => {
                 const isCurrentMonth = i === 0;
                 const bar = tokenBar(m.total_tokens, maxMonthTokens, 16);
                 return (
