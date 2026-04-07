@@ -313,28 +313,30 @@ export default async function StatusPage() {
 
   // ── 7-month chart ─────────────────────────────────────────────────────
   const monthBuckets: { label: string; dates: string[] }[] = [];
-  for (let m = 0; m < 7; m++) {
-    // m=0 = current month, m=6 = 6 months ago
-    const bucketDate = new Date(now);
-    bucketDate.setDate(1);
-    bucketDate.setMonth(bucketDate.getMonth() - m);
-    const year = bucketDate.getFullYear();
-    const month = bucketDate.getMonth(); // 0-indexed
+  {
+    // Derive month buckets from todayET string to avoid UTC/ET timezone bugs
+    const [curYear, curMon] = todayET.split("-").map(Number); // YYYY, MM (1-indexed)
+    for (let m = 0; m < 7; m++) {
+      // Calculate target year/month (m=0 = current month, m=6 = 6 months ago)
+      let targetMon = curMon - m;
+      let targetYear = curYear;
+      while (targetMon <= 0) { targetMon += 12; targetYear--; }
 
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0); // last day of month
+      // Build all dates in this month as YYYY-MM-DD strings
+      const daysInMonth = new Date(targetYear, targetMon, 0).getDate(); // day 0 of next month = last day of this month
+      const dates: string[] = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        const ds = `${targetYear}-${String(targetMon).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        // Only include dates up to today for current month
+        if (ds <= todayET) dates.push(ds);
+        else if (m > 0) dates.push(ds); // past months include all days
+      }
 
-    const dates: string[] = [];
-    const cur = new Date(firstDay);
-    while (cur <= lastDay) {
-      dates.push(etDateString(cur));
-      cur.setDate(cur.getDate() + 1);
+      const monthLabel = new Date(targetYear, targetMon - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      monthBuckets.push({ label: monthLabel, dates });
     }
-
-    const monthLabel = firstDay.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", year: "numeric" });
-    monthBuckets.push({ label: monthLabel, dates });
   }
-  // monthBuckets: m=0 is current month (already at front), so no reverse needed
+  // monthBuckets[0] = current month (Apr), [1] = last month (Mar) — most recent first
   const monthChartData = monthBuckets.map(b => ({ label: b.label, ...sumDates(b.dates) }));
   const maxMonthTokens = Math.max(...monthChartData.map(m => m.total_tokens), 1);
 
