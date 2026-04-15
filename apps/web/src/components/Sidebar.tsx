@@ -23,6 +23,7 @@ export const NAV_ITEMS = [
   { icon: "⚙", label: "Settings",       href: "#",               group: "tools" },
   { icon: "◈", label: "Status",         href: "/status",         group: "tools" },
   { icon: "◧", label: "Docs",           href: "/docs",           group: "tools" },
+  { icon: "⬡", label: "MCP Tools",      href: "/tools/mcp",      group: "tools" },
 ] as const;
 
 const GROUP_LABELS: Record<string, string> = {
