@@ -418,7 +418,7 @@ export default function MCPToolsPage() {
                       whiteSpace: "pre-wrap",
                       wordBreak: "break-word",
                       margin: 0,
-                      maxHeight: 400,
+                      maxHeight: "60vh",
                       overflowY: "auto",
                     }}
                   >
