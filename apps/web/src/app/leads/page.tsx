@@ -9,16 +9,40 @@ export default async function LeadsPage() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 
-  const [{ data: leads }, { data: rawCommunities }] = await Promise.all([
+  const [{ data: leads }, { data: rawCommunities }, { data: divisions }] = await Promise.all([
     supabase
       .from("leads")
-      .select("*")
+      .select("*, contacts(first_name, last_name, email, phone)")
       .order("last_activity_at", { ascending: false }),
     supabase
       .from("communities")
       .select("id, name, slug, divisions(slug, name)")
       .order("name"),
+    supabase.from("divisions").select("id, slug, name").order("name"),
   ]);
+
+  const flatLeads = (leads ?? []).map((l: any) => ({
+    id: l.id,
+    contact_id: l.contact_id,
+    first_name: l.contacts?.first_name ?? l.first_name ?? "—",
+    last_name: l.contacts?.last_name ?? l.last_name ?? "",
+    email: l.contacts?.email ?? l.email ?? null,
+    phone: l.contacts?.phone ?? l.phone ?? null,
+    stage: l.stage ?? l.crm_stage ?? "lead",
+    substage: l.substage ?? null,
+    source: l.source ?? null,
+    community_id: l.community_id ?? null,
+    division_id: l.division_id ?? null,
+    budget_min: l.budget_min ?? null,
+    budget_max: l.budget_max ?? null,
+    desired_move_date: l.desired_move_date ?? null,
+    bedrooms: l.bedrooms ?? null,
+    agent_name: l.agent_name ?? null,
+    last_activity_at: l.last_activity_at ?? l.created_at,
+    notes: l.notes ?? null,
+    is_active: l.is_active ?? true,
+    created_at: l.created_at,
+  }));
 
   const communities = (rawCommunities ?? []).map((c: any) => ({
     id: c.id as string,
@@ -28,5 +52,11 @@ export default async function LeadsPage() {
     division_name: ((c.divisions as any)?.name ?? "") as string,
   }));
 
-  return <LeadsClient leads={leads ?? []} communities={communities} />;
+  return (
+    <LeadsClient
+      leads={flatLeads}
+      communities={communities}
+      divisions={divisions ?? []}
+    />
+  );
 }

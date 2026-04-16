@@ -1,51 +1,50 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PageShell from "@/components/PageShell";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
+import SlideOver, { Section, Row } from "@/components/SlideOver";
+import Badge from "@/components/Badge";
+import { useGlobalFilter } from "@/context/GlobalFilterContext";
+import DataTable, { type Column } from "@/components/DataTable";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Community {
-  id: string;
-  name: string;
-  slug: string | null;
-  division_slug: string;
-  division_name: string;
-}
+interface Community { id: string; name: string; slug: string | null; division_slug: string; division_name: string; }
+interface Division { id: string; slug: string; name: string; }
 
 interface Opportunity {
   id: string;
   contact_id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
   source: string | null;
+  opportunity_source: string | null;
   community_id: string | null;
   division_id: string | null;
   osc_id: string | null;
   osc_route_decision: string | null;
-  opportunity_source: string | null;
   notes: string | null;
   is_active: boolean;
-  last_activity_at: string | null;
+  last_activity_at: string;
   created_at: string;
-  // joined contact fields (if available)
-  first_name?: string;
-  last_name?: string;
-  email?: string | null;
-  phone?: string | null;
 }
+
+type OppRow = Opportunity & Record<string, unknown> & {
+  _name: string;
+  _community: string;
+  _division: string;
+  _status: string;
+  _last_activity: string;
+};
 
 interface Props {
   opportunities: Opportunity[];
   communities: Community[];
+  divisions: Division[];
 }
-
-// ─── Stage config ─────────────────────────────────────────────────────────────
-
-const STAGES = [
-  { key: "new",           label: "New",           color: "#f5a623", bg: "#2a2a1a", border: "#3f3a1f" },
-  { key: "assigned",      label: "Assigned",      color: "#0070f3", bg: "#1a1f2e", border: "#1a2a3f" },
-  { key: "contacted",     label: "Contacted",     color: "#a855f7", bg: "#1f1a2e", border: "#2a1f3f" },
-  { key: "promoted",      label: "Promoted",      color: "#00c853", bg: "#1a2a1a", border: "#1f3f1f" },
-  { key: "demoted",       label: "Demoted",       color: "#ff6b6b", bg: "#2a1a1a", border: "#3f1f1f" },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,365 +60,139 @@ function relativeTime(iso: string | null): string {
   return new Date(iso).toLocaleDateString();
 }
 
-function deriveStage(opp: Opportunity): string {
-  if (opp.osc_route_decision === "promoted_to_prospect") return "promoted";
-  if (opp.osc_route_decision === "demoted_to_lead" || opp.osc_route_decision === "demoted_to_marketing") return "demoted";
-  if (opp.osc_id) return "assigned";
-  return "new";
+function deriveStatus(opp: Opportunity): string {
+  if (opp.osc_route_decision === "promoted_to_prospect") return "Promoted";
+  if (opp.osc_route_decision === "demoted_to_lead" || opp.osc_route_decision === "demoted_to_marketing") return "Demoted";
+  if (opp.osc_id) return "Assigned";
+  return "New";
 }
 
-function stageConfig(key: string) {
-  return STAGES.find(s => s.key === key) ?? STAGES[0];
-}
+// ─── Stats ────────────────────────────────────────────────────────────────────
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+const STATS: StatConfig<OppRow>[] = [
+  { label: "New",      getValue: (r) => r.filter(x => x._status === "New").length },
+  { label: "Assigned", getValue: (r) => r.filter(x => x._status === "Assigned").length },
+  { label: "Promoted", getValue: (r) => r.filter(x => x._status === "Promoted").length },
+  { label: "Demoted",  getValue: (r) => r.filter(x => x._status === "Demoted").length },
+];
 
-function StageBadge({ stage }: { stage: string }) {
-  const cfg = stageConfig(stage);
-  return (
-    <span style={{
-      fontSize: 10, padding: "2px 6px", borderRadius: 4,
-      backgroundColor: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color, whiteSpace: "nowrap",
-    }}>{cfg.label}</span>
-  );
-}
+// ─── Component ────────────────────────────────────────────────────────────────
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div style={{
-      fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em",
-      fontWeight: 600, paddingBottom: 8, borderBottom: "1px solid #1a1a1a", marginBottom: 12,
-    }}>{title}</div>
-  );
-}
+function OpportunitiesInner({ opportunities, communities, divisions }: Props) {
+  const { filter } = useGlobalFilter();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Opportunity | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
-      <span style={{ fontSize: 12, color: "#a1a1a1" }}>{children}</span>
-    </div>
-  );
-}
+  useEffect(() => { setPage(0); }, [search, filter.divisionId, filter.communityId]);
 
-// ─── Slide-over panel ─────────────────────────────────────────────────────────
-
-function SlideOver({ opp, communities, onClose }: { opp: Opportunity; communities: Community[]; onClose: () => void }) {
-  const community = communities.find(c => c.id === opp.community_id);
-  const stage = deriveStage(opp);
-
-  return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 40 }} />
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0, width: 480,
-        backgroundColor: "#0d0d0d", borderLeft: "1px solid #1f1f1f", zIndex: 50,
-        overflowY: "auto", display: "flex", flexDirection: "column",
-      }}>
-        <div style={{
-          padding: "20px 24px 16px", borderBottom: "1px solid #1a1a1a",
-          display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
-          position: "sticky", top: 0, backgroundColor: "#0d0d0d", zIndex: 1,
-        }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 16, fontWeight: 600, color: "#ededed" }}>
-              {opp.first_name ?? "—"} {opp.last_name ?? ""}
-            </span>
-            <StageBadge stage={stage} />
-          </div>
-          <button onClick={onClose} style={{
-            background: "none", border: "none", color: "#555", fontSize: 18,
-            cursor: "pointer", padding: "2px 6px", lineHeight: 1, flexShrink: 0,
-          }}>✕</button>
-        </div>
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
-          <div>
-            <SectionHeader title="Contact" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow label="Email">{opp.email ? <a href={`mailto:${opp.email}`} style={{ color: "#0070f3", textDecoration: "none" }}>{opp.email}</a> : <span style={{ color: "#333" }}>—</span>}</DetailRow>
-              <DetailRow label="Phone">{opp.phone ?? <span style={{ color: "#333" }}>—</span>}</DetailRow>
-              <DetailRow label="Source">{opp.source ?? opp.opportunity_source ?? <span style={{ color: "#333" }}>—</span>}</DetailRow>
-            </div>
-          </div>
-          <div>
-            <SectionHeader title="Routing" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow label="Community">{community?.name ?? <span style={{ color: "#333" }}>—</span>}</DetailRow>
-              <DetailRow label="Division">{community?.division_name ?? <span style={{ color: "#333" }}>—</span>}</DetailRow>
-              <DetailRow label="Route Decision">{opp.osc_route_decision ?? <span style={{ color: "#333" }}>Pending</span>}</DetailRow>
-              <DetailRow label="Last Activity">{opp.last_activity_at ? new Date(opp.last_activity_at).toLocaleString() : "—"}</DetailRow>
-              <DetailRow label="Created">{new Date(opp.created_at).toLocaleString()}</DetailRow>
-            </div>
-          </div>
-          {opp.notes && (
-            <div>
-              <SectionHeader title="Notes" />
-              <p style={{ fontSize: 12, color: "#a1a1a1", lineHeight: 1.6, whiteSpace: "pre-wrap", margin: 0 }}>{opp.notes}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─── Board view ───────────────────────────────────────────────────────────────
-
-function BoardView({ opportunities, communities, stageFilter, onSelect }: {
-  opportunities: Opportunity[]; communities: Community[]; stageFilter: string; onSelect: (o: Opportunity) => void;
-}) {
-  const visibleStages = stageFilter === "all" ? STAGES : STAGES.filter(s => s.key === stageFilter);
-  return (
-    <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 16 }}>
-      {visibleStages.map(stage => {
-        const items = opportunities.filter(o => deriveStage(o) === stage.key);
-        return (
-          <div key={stage.key} style={{
-            flexShrink: 0, width: 280, backgroundColor: "#0d0d0d", borderRadius: 8,
-            border: "1px solid #1f1f1f", display: "flex", flexDirection: "column",
-          }}>
-            <div style={{
-              padding: "10px 12px 8px", display: "flex", alignItems: "center", gap: 8,
-              borderBottom: "1px solid #1a1a1a",
-            }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: stage.color }}>{stage.label}</span>
-              <span style={{
-                fontSize: 10, padding: "1px 6px", borderRadius: 10,
-                backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a", color: "#555",
-              }}>{items.length}</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", padding: 4, gap: 4 }}>
-              {items.length === 0 ? (
-                <div style={{ fontSize: 11, color: "#333", padding: 16, textAlign: "center" }}>No opportunities</div>
-              ) : items.map(opp => {
-                const community = communities.find(c => c.id === opp.community_id);
-                return (
-                  <div key={opp.id} onClick={() => onSelect(opp)} style={{
-                    backgroundColor: "#111111", borderRadius: 6, border: "1px solid #1f1f1f",
-                    padding: 12, margin: 4, cursor: "pointer", transition: "border-color 0.15s",
-                  }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = "#2a2a2a")}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = "#1f1f1f")}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 500, color: "#ededed", marginBottom: 3 }}>
-                      {opp.first_name ?? "Unknown"} {opp.last_name ?? ""}
-                    </div>
-                    {community && <div style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>{community.name}</div>}
-                    {(opp.source || opp.opportunity_source) && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
-                        <span style={{
-                          fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                          backgroundColor: "#161616", border: "1px solid #2a2a2a", color: "#666",
-                        }}>{opp.source ?? opp.opportunity_source}</span>
-                      </div>
-                    )}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                      <span />
-                      <span style={{ fontSize: 10, color: "#444" }}>{relativeTime(opp.last_activity_at ?? opp.created_at)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Table view ───────────────────────────────────────────────────────────────
-
-function TableView({ opportunities, communities, sortCol, sortDir, onSort, onSelect }: {
-  opportunities: Opportunity[]; communities: Community[]; sortCol: string; sortDir: "asc" | "desc";
-  onSort: (col: string) => void; onSelect: (o: Opportunity) => void;
-}) {
-  const sorted = [...opportunities].sort((a, b) => {
-    const aVal = (a as any)[sortCol] ?? "";
-    const bVal = (b as any)[sortCol] ?? "";
-    const cmp = String(aVal).localeCompare(String(bVal));
-    return sortDir === "asc" ? cmp : -cmp;
+  const filtered = opportunities.filter(o => {
+    if (filter.communityId && o.community_id !== filter.communityId) return false;
+    if (filter.divisionId && o.division_id !== filter.divisionId) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!`${o.first_name} ${o.last_name}`.toLowerCase().includes(q) &&
+          !(o.email ?? "").toLowerCase().includes(q) &&
+          !(o.phone ?? "").includes(q)) return false;
+    }
+    return true;
   });
 
-  const thStyle: React.CSSProperties = {
-    padding: "6px 12px", textAlign: "left", fontSize: 11, color: "#666", fontWeight: 500,
-    textTransform: "uppercase", letterSpacing: "0.06em", backgroundColor: "#0a0a0a",
-    whiteSpace: "nowrap", cursor: "pointer", userSelect: "none", borderBottom: "1px solid #1a1a1a",
-  };
-  const tdStyle: React.CSSProperties = {
-    padding: "6px 12px", fontSize: 12, color: "#a1a1a1", borderBottom: "1px solid #111111", whiteSpace: "nowrap",
-  };
+  const tableRows: OppRow[] = filtered.map(o => {
+    const comm = communities.find(c => c.id === o.community_id);
+    const div = divisions.find(d => d.id === o.division_id);
+    return {
+      ...o,
+      _name: `${o.first_name} ${o.last_name}`,
+      _community: comm?.name ?? "—",
+      _division: div?.name ?? comm?.division_name ?? "—",
+      _status: deriveStatus(o),
+      _last_activity: relativeTime(o.last_activity_at),
+    };
+  });
 
-  function SortIcon({ col }: { col: string }) {
-    if (sortCol !== col) return <span style={{ color: "#333", marginLeft: 4 }}>↕</span>;
-    return <span style={{ color: "#555", marginLeft: 4 }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
-  }
+  const allRows = opportunities.map(o => {
+    const comm = communities.find(c => c.id === o.community_id);
+    return { ...o, _name: `${o.first_name} ${o.last_name}`, _community: comm?.name ?? "—", _division: comm?.division_name ?? "—", _status: deriveStatus(o), _last_activity: relativeTime(o.last_activity_at) };
+  });
+
+  const tableColumns: Column<OppRow>[] = [
+    { key: "_name", label: "Name", sortable: true, render: (_v, row) => <span style={{ color: "#ededed", fontWeight: 500 }}>{row._name}</span> },
+    { key: "_status", label: "Status", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 12 }}>{row._status}</span> },
+    { key: "_community", label: "Community", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._community}</span> },
+    { key: "_division", label: "Division", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._division}</span> },
+    { key: "source", label: "Source", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row.source ?? row.opportunity_source ?? "—"}</span> },
+    { key: "osc_route_decision", label: "Route Decision", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row.osc_route_decision ?? "Pending"}</span> },
+    { key: "_last_activity", label: "Last Activity", sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._last_activity}</span> },
+    { key: "created_at", label: "Created", sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{new Date(row.created_at).toLocaleDateString()}</span> },
+  ];
+
+  const community = selected ? communities.find(c => c.id === selected.community_id) : null;
 
   return (
-    <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 120px)", position: "relative" }}>
-      <table style={{ minWidth: 1000, width: "100%", borderCollapse: "collapse" }}>
-        <thead><tr>
-          <th onClick={() => onSort("first_name")} style={{ ...thStyle, position: "sticky", left: 0, zIndex: 2, minWidth: 180 }}>Name <SortIcon col="first_name" /></th>
-          <th style={thStyle}>Stage</th>
-          <th style={thStyle}>Community</th>
-          <th onClick={() => onSort("source")} style={thStyle}>Source <SortIcon col="source" /></th>
-          <th style={thStyle}>Route Decision</th>
-          <th onClick={() => onSort("last_activity_at")} style={thStyle}>Last Activity <SortIcon col="last_activity_at" /></th>
-          <th onClick={() => onSort("created_at")} style={thStyle}>Created <SortIcon col="created_at" /></th>
-        </tr></thead>
-        <tbody>
-          {sorted.map(opp => {
-            const community = communities.find(c => c.id === opp.community_id);
-            return (
-              <tr key={opp.id} onClick={() => onSelect(opp)} style={{ cursor: "pointer" }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#111111")}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-              >
-                <td style={{ ...tdStyle, position: "sticky", left: 0, backgroundColor: "inherit", color: "#ededed", fontWeight: 500, fontSize: 13, zIndex: 1 }}>
-                  {opp.first_name ?? "Unknown"} {opp.last_name ?? ""}
-                </td>
-                <td style={tdStyle}><StageBadge stage={deriveStage(opp)} /></td>
-                <td style={tdStyle}>{community?.name ?? "—"}</td>
-                <td style={tdStyle}>{opp.source ?? opp.opportunity_source ?? "—"}</td>
-                <td style={tdStyle}>{opp.osc_route_decision ?? "Pending"}</td>
-                <td style={tdStyle}>{relativeTime(opp.last_activity_at)}</td>
-                <td style={tdStyle}>{new Date(opp.created_at).toLocaleDateString()}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+    <PageShell
+      topBar={
+        <TableSubHeader
+          title="Opportunities"
+          rows={tableRows}
+          totalRows={tableRows.length}
+          stats={STATS}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={s => { setPageSize(s); setPage(0); }}
+          search={search}
+          onSearch={q => { setSearch(q); setPage(0); }}
+          searchPlaceholder="Search opportunities…"
+          onExport={() => exportToCSV(tableRows as unknown as Record<string, unknown>[], "opportunities")}
+          onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "opportunities-all")}
+        />
+      }
+    >
+      <DataTable<OppRow>
+        columns={tableColumns}
+        rows={tableRows}
+        controlledPage={page}
+        controlledPageSize={pageSize}
+        defaultPageSize={pageSize}
+        onRowClick={row => setSelected(row)}
+        emptyMessage="No opportunities match the current filter"
+        minWidth={1100}
+      />
 
-// ─── Card view ────────────────────────────────────────────────────────────────
-
-function CardView({ opportunities, communities, onSelect }: {
-  opportunities: Opportunity[]; communities: Community[]; onSelect: (o: Opportunity) => void;
-}) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-      {opportunities.map(opp => {
-        const community = communities.find(c => c.id === opp.community_id);
-        const stage = deriveStage(opp);
-        return (
-          <div key={opp.id} onClick={() => onSelect(opp)} style={{
-            backgroundColor: "#111111", borderRadius: 8, border: "1px solid #1f1f1f",
-            padding: 12, cursor: "pointer", transition: "border-color 0.15s",
-            display: "flex", flexDirection: "column", gap: 8,
-          }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = "#2a2a2a")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "#1f1f1f")}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <StageBadge stage={stage} />
-              <span style={{ fontSize: 10, color: "#444" }}>{relativeTime(opp.last_activity_at ?? opp.created_at)}</span>
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#ededed" }}>
-              {opp.first_name ?? "Unknown"} {opp.last_name ?? ""}
-            </div>
-            {community && <div style={{ fontSize: 11, color: "#555" }}>{community.name}</div>}
-            {(opp.source || opp.opportunity_source) && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                <span style={{
-                  fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                  backgroundColor: "#161616", border: "1px solid #2a2a2a", color: "#666",
-                }}>{opp.source ?? opp.opportunity_source}</span>
-              </div>
+      <SlideOver open={!!selected} onClose={() => setSelected(null)}
+        title={selected ? `${selected.first_name} ${selected.last_name}` : ""}
+        subtitle={community?.name ?? undefined}
+        badge={selected ? <Badge variant="custom" label={deriveStatus(selected)} customColor="#f5a623" customBg="#2a2a1a" customBorder="#3f3a1f" /> : undefined}
+        width={480}
+      >
+        {selected && (
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 0 }}>
+            <Section title="Contact">
+              <Row label="Email" value={selected.email ? <a href={`mailto:${selected.email}`} style={{ color: "#7aafdf", textDecoration: "none" }}>{selected.email}</a> : null} />
+              <Row label="Phone" value={selected.phone} />
+              <Row label="Source" value={selected.source ?? selected.opportunity_source} />
+            </Section>
+            <Section title="Routing">
+              <Row label="Community" value={community?.name} />
+              <Row label="Division" value={community?.division_name} />
+              <Row label="Route Decision" value={selected.osc_route_decision ?? "Pending"} />
+              <Row label="Last Activity" value={selected.last_activity_at ? new Date(selected.last_activity_at).toLocaleString() : null} />
+              <Row label="Created" value={new Date(selected.created_at).toLocaleString()} />
+            </Section>
+            {selected.notes && (
+              <Section title="Notes">
+                <p style={{ fontSize: 13, color: "#888", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap" }}>{selected.notes}</p>
+              </Section>
             )}
           </div>
-        );
-      })}
-    </div>
+        )}
+      </SlideOver>
+    </PageShell>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
-export default function OpportunitiesClient({ opportunities, communities }: Props) {
-  const [view, setView] = useState<"board" | "table" | "card">("board");
-  const [selected, setSelected] = useState<Opportunity | null>(null);
-  const [stageFilter, setStageFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [sortCol, setSortCol] = useState("created_at");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("opportunities-view") as "board" | "table" | "card" | null;
-    if (saved && ["board", "table", "card"].includes(saved)) setView(saved);
-  }, []);
-  useEffect(() => { localStorage.setItem("opportunities-view", view); }, [view]);
-
-  const filtered = opportunities
-    .filter(o => stageFilter === "all" || deriveStage(o) === stageFilter)
-    .filter(o => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return `${o.first_name ?? ""} ${o.last_name ?? ""}`.toLowerCase().includes(q) ||
-        (o.email ?? "").toLowerCase().includes(q) || (o.phone ?? "").includes(q);
-    });
-
-  function handleSort(col: string) {
-    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortCol(col); setSortDir("asc"); }
-  }
-
-  const selectStyle: React.CSSProperties = {
-    backgroundColor: "#111", border: "1px solid #2a2a2a", borderRadius: 4,
-    color: "#a1a1a1", fontSize: 12, padding: "4px 8px", outline: "none", cursor: "pointer",
-  };
-  const viewBtnStyle = (active: boolean): React.CSSProperties => ({
-    background: active ? "#1a1a1a" : "none",
-    border: active ? "1px solid #2a2a2a" : "1px solid transparent",
-    borderRadius: 4, color: active ? "#ededed" : "#555", fontSize: 14,
-    width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
-    cursor: "pointer", transition: "all 0.15s",
-  });
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#0a0a0a", color: "#ededed" }}>
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Top bar */}
-        <div style={{
-          padding: "10px 24px", borderBottom: "1px solid #1a1a1a",
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#ededed" }}>Opportunities</span>
-            <span style={{
-              fontSize: 11, padding: "2px 8px", borderRadius: 4,
-              backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a", color: "#555",
-            }}>{filtered.length}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input type="text" placeholder="Search opportunities..." value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{
-                backgroundColor: "#111", border: "1px solid #2a2a2a", borderRadius: 4,
-                fontSize: 12, padding: "4px 10px", color: "#a1a1a1", outline: "none", width: 180,
-              }} />
-            <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} style={selectStyle}>
-              <option value="all">All Stages</option>
-              {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-            <div style={{ display: "flex", gap: 2 }}>
-              <button onClick={() => setView("board")} style={viewBtnStyle(view === "board")} title="Board">◫</button>
-              <button onClick={() => setView("table")} style={viewBtnStyle(view === "table")} title="Table">≡</button>
-              <button onClick={() => setView("card")} style={viewBtnStyle(view === "card")} title="Cards">⊞</button>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
-          {view === "board" && <BoardView opportunities={filtered} communities={communities} stageFilter={stageFilter} onSelect={setSelected} />}
-          {view === "table" && <TableView opportunities={filtered} communities={communities} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onSelect={setSelected} />}
-          {view === "card" && <CardView opportunities={filtered} communities={communities} onSelect={setSelected} />}
-        </div>
-      </main>
-
-      {selected && <SlideOver opp={selected} communities={communities} onClose={() => setSelected(null)} />}
-    </div>
-  );
+export default function OpportunitiesClient(props: Props) {
+  return <OpportunitiesInner {...props} />;
 }

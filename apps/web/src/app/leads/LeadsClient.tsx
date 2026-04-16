@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-
+import PageShell from "@/components/PageShell";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
+import SlideOver, { Section, Row } from "@/components/SlideOver";
+import Badge from "@/components/Badge";
+import { useGlobalFilter } from "@/context/GlobalFilterContext";
+import DataTable, { type Column } from "@/components/DataTable";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,8 +18,15 @@ interface Community {
   division_name: string;
 }
 
+interface Division {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 interface Lead {
   id: string;
+  contact_id: string;
   first_name: string;
   last_name: string;
   email: string | null;
@@ -24,6 +35,7 @@ interface Lead {
   substage: string | null;
   source: string | null;
   community_id: string | null;
+  division_id: string | null;
   budget_min: number | null;
   budget_max: number | null;
   desired_move_date: string | null;
@@ -31,30 +43,35 @@ interface Lead {
   agent_name: string | null;
   last_activity_at: string;
   notes: string | null;
+  is_active: boolean;
   created_at: string;
 }
+
+type LeadRow = Lead & Record<string, unknown> & {
+  _name: string;
+  _community: string;
+  _division: string;
+  _budget: string;
+  _last_activity: string;
+};
 
 interface Props {
   leads: Lead[];
   communities: Community[];
+  divisions: Division[];
 }
-
-// ─── Nav ──────────────────────────────────────────────────────────────────────
-
-// ─── Stage config ─────────────────────────────────────────────────────────────
-
-const STAGES = [
-  { key: "new",            label: "New",            color: "#555",    bg: "#1a1a1a", border: "#2a2a2a" },
-  { key: "contacted",      label: "Contacted",      color: "#f5a623", bg: "#2a2a1a", border: "#3f3a1f" },
-  { key: "touring",        label: "Touring",        color: "#0070f3", bg: "#1a1f2e", border: "#1a2a3f" },
-  { key: "under-contract", label: "Under Contract", color: "#a855f7", bg: "#1f1a2e", border: "#2a1f3f" },
-  { key: "closed-won",     label: "Closed Won",     color: "#00c853", bg: "#1a2a1a", border: "#1f3f1f" },
-  { key: "closed-lost",    label: "Closed Lost",    color: "#ff6b6b", bg: "#2a1a1a", border: "#3f1f1f" },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function relativeTime(iso: string): string {
+function formatBudget(min: number | null, max: number | null): string {
+  if (min == null && max == null) return "—";
+  if (min != null && max != null) return `$${(min / 1000).toFixed(0)}k – $${(max / 1000).toFixed(0)}k`;
+  if (min != null) return `$${(min / 1000).toFixed(0)}k+`;
+  return `up to $${(max! / 1000).toFixed(0)}k`;
+}
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return "—";
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
@@ -65,899 +82,195 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-function formatBudget(min: number | null, max: number | null): string {
-  if (min == null && max == null) return "—";
-  if (min != null && max != null)
-    return `$${(min / 1000).toFixed(0)}k – $${(max / 1000).toFixed(0)}k`;
-  if (min != null) return `$${(min / 1000).toFixed(0)}k+`;
-  return `up to $${(max! / 1000).toFixed(0)}k`;
+function getStageLabel(stage: string): string {
+  const map: Record<string, string> = {
+    marketing: "Marketing", lead: "Lead", opportunity: "Opportunity",
+    new: "New", contacted: "Contacted", touring: "Touring",
+    "under-contract": "Under Contract", "closed-won": "Closed Won", "closed-lost": "Closed Lost",
+  };
+  return map[stage] ?? stage;
 }
 
-function stageConfig(key: string) {
-  return STAGES.find((s) => s.key === key) ?? STAGES[0];
+function isActiveStage(stage: string): boolean {
+  return !["closed-won", "closed-lost"].includes(stage);
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Stats ────────────────────────────────────────────────────────────────────
 
-function StageBadge({ stage }: { stage: string }) {
-  const cfg = stageConfig(stage);
+const STATS: StatConfig<LeadRow>[] = [
+  { label: "Active", getValue: (r) => r.filter(x => x.is_active).length },
+  { label: "New", getValue: (r) => r.filter(x => x.stage === "new" || x.stage === "marketing").length },
+  { label: "Contacted", getValue: (r) => r.filter(x => x.stage === "contacted" || x.stage === "lead").length },
+  {
+    label: "Avg Budget",
+    getValue: (r) => {
+      const wb = r.filter(x => x.budget_min);
+      if (!wb.length) return "—";
+      return "$" + Math.round(wb.reduce((s, x) => s + (x.budget_min ?? 0), 0) / wb.length / 1000) + "k";
+    },
+  },
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+function LeadsInner({ leads, communities, divisions }: Props) {
+  const { filter } = useGlobalFilter();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Lead | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => { setPage(0); }, [search, filter.divisionId, filter.communityId]);
+
+  // Filter
+  const filtered = leads.filter(l => {
+    if (filter.communityId && l.community_id !== filter.communityId) return false;
+    if (filter.divisionId && l.division_id !== filter.divisionId) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!`${l.first_name} ${l.last_name}`.toLowerCase().includes(q) &&
+          !(l.email ?? "").toLowerCase().includes(q) &&
+          !(l.phone ?? "").includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Enrich rows
+  const tableRows: LeadRow[] = filtered.map(l => {
+    const comm = communities.find(c => c.id === l.community_id);
+    const div = divisions.find(d => d.id === l.division_id);
+    return {
+      ...l,
+      _name: `${l.first_name} ${l.last_name}`,
+      _community: comm?.name ?? "—",
+      _division: div?.name ?? comm?.division_name ?? "—",
+      _budget: formatBudget(l.budget_min, l.budget_max),
+      _last_activity: relativeTime(l.last_activity_at),
+    };
+  });
+
+  const allRows = leads.map(l => {
+    const comm = communities.find(c => c.id === l.community_id);
+    const div = divisions.find(d => d.id === l.division_id);
+    return { ...l, _name: `${l.first_name} ${l.last_name}`, _community: comm?.name ?? "—", _division: div?.name ?? "—", _budget: formatBudget(l.budget_min, l.budget_max), _last_activity: relativeTime(l.last_activity_at) };
+  });
+
+  const tableColumns: Column<LeadRow>[] = [
+    {
+      key: "_name", label: "Name", sortable: true,
+      render: (_v, row) => <span style={{ color: "#ededed", fontWeight: 500 }}>{row._name}</span>,
+    },
+    {
+      key: "stage", label: "Stage", sortable: true, filterable: true,
+      render: (_v, row) => <span style={{ color: "#888", fontSize: 12 }}>{getStageLabel(row.stage)}</span>,
+    },
+    {
+      key: "_community", label: "Community", sortable: true, filterable: true,
+      render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._community}</span>,
+    },
+    {
+      key: "_division", label: "Division", sortable: true, filterable: true,
+      render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._division}</span>,
+    },
+    {
+      key: "source", label: "Source", sortable: true, filterable: true,
+      render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row.source ?? "—"}</span>,
+    },
+    {
+      key: "_budget", label: "Budget", sortable: true,
+      render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._budget}</span>,
+    },
+    {
+      key: "agent_name", label: "Agent", sortable: true, filterable: true,
+      render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row.agent_name ?? "—"}</span>,
+    },
+    {
+      key: "_last_activity", label: "Last Activity", sortable: true,
+      render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._last_activity}</span>,
+    },
+    {
+      key: "created_at", label: "Created", sortable: true,
+      render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{new Date(row.created_at).toLocaleDateString()}</span>,
+    },
+  ];
+
+  const community = selected ? communities.find(c => c.id === selected.community_id) : null;
+
   return (
-    <span
-      style={{
-        fontSize: 10,
-        padding: "2px 6px",
-        borderRadius: 4,
-        backgroundColor: cfg.bg,
-        border: `1px solid ${cfg.border}`,
-        color: cfg.color,
-        whiteSpace: "nowrap" as const,
-      }}
+    <PageShell
+      topBar={
+        <TableSubHeader
+          title="Leads"
+          rows={tableRows}
+          totalRows={tableRows.length}
+          stats={STATS}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={s => { setPageSize(s); setPage(0); }}
+          search={search}
+          onSearch={q => { setSearch(q); setPage(0); }}
+          searchPlaceholder="Search leads…"
+          onExport={() => exportToCSV(tableRows as unknown as Record<string, unknown>[], "leads")}
+          onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "leads-all")}
+        />
+      }
     >
-      {cfg.label}
-    </span>
-  );
-}
-
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        {label}
-      </span>
-      <span style={{ fontSize: 12, color: "#a1a1a1" }}>{children}</span>
-    </div>
-  );
-}
-
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div
-      style={{
-        fontSize: 11,
-        color: "#555",
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        fontWeight: 600,
-        paddingBottom: 8,
-        borderBottom: "1px solid #1a1a1a",
-        marginBottom: 12,
-      }}
-    >
-      {title}
-    </div>
-  );
-}
-
-// ─── Slide-over panel ─────────────────────────────────────────────────────────
-
-function SlideOver({
-  lead,
-  communities,
-  onClose,
-}: {
-  lead: Lead;
-  communities: Community[];
-  onClose: () => void;
-}) {
-  const community = communities.find((c) => c.id === lead.community_id);
-
-  return (
-    <>
-      {/* Overlay */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          backgroundColor: "rgba(0,0,0,0.5)",
-          zIndex: 40,
-        }}
+      <DataTable<LeadRow>
+        columns={tableColumns}
+        rows={tableRows}
+        controlledPage={page}
+        controlledPageSize={pageSize}
+        defaultPageSize={pageSize}
+        onRowClick={row => setSelected(row)}
+        emptyMessage="No leads match the current filter"
+        minWidth={1100}
       />
 
-      {/* Panel */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 480,
-          backgroundColor: "#0d0d0d",
-          borderLeft: "1px solid #1f1f1f",
-          zIndex: 50,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-        }}
+      <SlideOver
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected ? `${selected.first_name} ${selected.last_name}` : ""}
+        subtitle={community?.name ?? undefined}
+        badge={selected ? (
+          <Badge variant="custom" label={getStageLabel(selected.stage)}
+            customColor={isActiveStage(selected.stage) ? "#4ade80" : "#888"}
+            customBg={isActiveStage(selected.stage) ? "#1a2a1a" : "#2a2b2e"}
+            customBorder={isActiveStage(selected.stage) ? "#1f3f1f" : "#444"} />
+        ) : undefined}
+        width={480}
       >
-        {/* Header */}
-        <div
-          style={{
-            padding: "20px 24px 16px",
-            borderBottom: "1px solid #1a1a1a",
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 12,
-            position: "sticky",
-            top: 0,
-            backgroundColor: "#0d0d0d",
-            zIndex: 1,
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 16, fontWeight: 600, color: "#ededed" }}>
-              {lead.first_name} {lead.last_name}
-            </span>
-            <StageBadge stage={lead.stage} />
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#555",
-              fontSize: 18,
-              cursor: "pointer",
-              padding: "2px 6px",
-              lineHeight: 1,
-              flexShrink: 0,
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
-          {/* Contact */}
-          <div>
-            <SectionHeader title="Contact" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow label="Email">
-                {lead.email ? (
-                  <a
-                    href={`mailto:${lead.email}`}
-                    style={{ color: "#0070f3", textDecoration: "none" }}
-                  >
-                    {lead.email}
-                  </a>
-                ) : (
-                  <span style={{ color: "#333" }}>—</span>
-                )}
-              </DetailRow>
-              <DetailRow label="Phone">
-                {lead.phone ?? <span style={{ color: "#333" }}>—</span>}
-              </DetailRow>
-              <DetailRow label="Source">
-                {lead.source ?? <span style={{ color: "#333" }}>—</span>}
-              </DetailRow>
-            </div>
-          </div>
-
-          {/* Interest */}
-          <div>
-            <SectionHeader title="Interest" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow label="Community">
-                {community?.name ?? <span style={{ color: "#333" }}>—</span>}
-              </DetailRow>
-              <DetailRow label="Budget">
-                {formatBudget(lead.budget_min, lead.budget_max)}
-              </DetailRow>
-              <DetailRow label="Bedrooms">
-                {lead.bedrooms != null ? String(lead.bedrooms) : <span style={{ color: "#333" }}>—</span>}
-              </DetailRow>
-              <DetailRow label="Desired Move Date">
-                {lead.desired_move_date
-                  ? new Date(lead.desired_move_date).toLocaleDateString()
-                  : <span style={{ color: "#333" }}>—</span>}
-              </DetailRow>
-            </div>
-          </div>
-
-          {/* Assignment */}
-          <div>
-            <SectionHeader title="Assignment" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow label="Agent">
-                {lead.agent_name ?? <span style={{ color: "#333" }}>—</span>}
-              </DetailRow>
-              <DetailRow label="Substage">
-                {lead.substage ?? <span style={{ color: "#333" }}>—</span>}
-              </DetailRow>
-              <DetailRow label="Last Activity">
-                {new Date(lead.last_activity_at).toLocaleString()}
-              </DetailRow>
-              <DetailRow label="Created">
-                {new Date(lead.created_at).toLocaleString()}
-              </DetailRow>
-            </div>
-          </div>
-
-          {/* Notes */}
-          {lead.notes && (
-            <div>
-              <SectionHeader title="Notes" />
-              <p
-                style={{
-                  fontSize: 12,
-                  color: "#a1a1a1",
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
-                  margin: 0,
-                }}
-              >
-                {lead.notes}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─── Board view ───────────────────────────────────────────────────────────────
-
-function BoardView({
-  leads,
-  communities,
-  stageFilter,
-  onSelect,
-}: {
-  leads: Lead[];
-  communities: Community[];
-  stageFilter: string;
-  onSelect: (l: Lead) => void;
-}) {
-  const visibleStages = stageFilter === "all" ? STAGES : STAGES.filter((s) => s.key === stageFilter);
-
-  return (
-    <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 16 }}>
-      {visibleStages.map((stage) => {
-        const stageLeads = leads.filter((l) => l.stage === stage.key);
-        return (
-          <div
-            key={stage.key}
-            style={{
-              flexShrink: 0,
-              width: 280,
-              backgroundColor: "#0d0d0d",
-              borderRadius: 8,
-              border: "1px solid #1f1f1f",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            {/* Column header */}
-            <div
-              style={{
-                padding: "10px 12px 8px",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                borderBottom: "1px solid #1a1a1a",
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 500, color: stage.color }}>
-                {stage.label}
-              </span>
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: "1px 6px",
-                  borderRadius: 10,
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
-                  color: "#555",
-                }}
-              >
-                {stageLeads.length}
-              </span>
-            </div>
-
-            {/* Cards */}
-            <div style={{ display: "flex", flexDirection: "column", padding: 4, gap: 4 }}>
-              {stageLeads.length === 0 ? (
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#333",
-                    padding: 16,
-                    textAlign: "center",
-                  }}
-                >
-                  No leads
-                </div>
-              ) : (
-                stageLeads.map((lead) => {
-                  const community = communities.find((c) => c.id === lead.community_id);
-                  return (
-                    <div
-                      key={lead.id}
-                      onClick={() => onSelect(lead)}
-                      style={{
-                        backgroundColor: "#111111",
-                        borderRadius: 6,
-                        border: "1px solid #1f1f1f",
-                        padding: 12,
-                        margin: 4,
-                        cursor: "pointer",
-                        transition: "border-color 0.15s",
-                      }}
-                      onMouseEnter={(e) =>
-                        ((e.currentTarget as HTMLDivElement).style.borderColor = "#2a2a2a")
-                      }
-                      onMouseLeave={(e) =>
-                        ((e.currentTarget as HTMLDivElement).style.borderColor = "#1f1f1f")
-                      }
-                    >
-                      {/* Name */}
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 500,
-                          color: "#ededed",
-                          marginBottom: 3,
-                        }}
-                      >
-                        {lead.first_name} {lead.last_name}
-                      </div>
-
-                      {/* Community */}
-                      {community && (
-                        <div style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>
-                          {community.name}
-                        </div>
-                      )}
-
-                      {/* Source + substage badges */}
-                      {(lead.source || lead.substage) && (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 4,
-                            marginBottom: 6,
-                          }}
-                        >
-                          {lead.source && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                padding: "2px 6px",
-                                borderRadius: 4,
-                                backgroundColor: "#161616",
-                                border: "1px solid #2a2a2a",
-                                color: "#666",
-                              }}
-                            >
-                              {lead.source}
-                            </span>
-                          )}
-                          {lead.substage && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                padding: "2px 6px",
-                                borderRadius: 4,
-                                backgroundColor: "#161616",
-                                border: "1px solid #2a2a2a",
-                                color: "#666",
-                              }}
-                            >
-                              {lead.substage}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Budget */}
-                      <div style={{ fontSize: 11, color: "#a1a1a1", marginBottom: 4 }}>
-                        {formatBudget(lead.budget_min, lead.budget_max)}
-                      </div>
-
-                      {/* Agent + last activity */}
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginTop: 4,
-                        }}
-                      >
-                        {lead.agent_name ? (
-                          <span style={{ fontSize: 11, color: "#555" }}>{lead.agent_name}</span>
-                        ) : (
-                          <span />
-                        )}
-                        <span style={{ fontSize: 10, color: "#444" }}>
-                          {relativeTime(lead.last_activity_at)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Table view ───────────────────────────────────────────────────────────────
-
-function TableView({
-  leads,
-  communities,
-  sortCol,
-  sortDir,
-  onSort,
-  onSelect,
-}: {
-  leads: Lead[];
-  communities: Community[];
-  sortCol: string;
-  sortDir: "asc" | "desc";
-  onSort: (col: string) => void;
-  onSelect: (l: Lead) => void;
-}) {
-  const sorted = [...leads].sort((a, b) => {
-    const aVal = (a as unknown as Record<string, unknown>)[sortCol] ?? "";
-    const bVal = (b as unknown as Record<string, unknown>)[sortCol] ?? "";
-    const cmp = String(aVal).localeCompare(String(bVal));
-    return sortDir === "asc" ? cmp : -cmp;
-  });
-
-  const thStyle: React.CSSProperties = {
-    padding: "6px 12px",
-    textAlign: "left",
-    fontSize: 11,
-    color: "#666",
-    fontWeight: 500,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    backgroundColor: "#0a0a0a",
-    whiteSpace: "nowrap",
-    cursor: "pointer",
-    userSelect: "none",
-    borderBottom: "1px solid #1a1a1a",
-  };
-
-  const tdStyle: React.CSSProperties = {
-    padding: "6px 12px",
-    fontSize: 12,
-    color: "#a1a1a1",
-    borderBottom: "1px solid #111111",
-    whiteSpace: "nowrap",
-  };
-
-  function SortIcon({ col }: { col: string }) {
-    if (sortCol !== col) return <span style={{ color: "#333", marginLeft: 4 }}>↕</span>;
-    return (
-      <span style={{ color: "#555", marginLeft: 4 }}>{sortDir === "asc" ? "↑" : "↓"}</span>
-    );
-  }
-
-  return (
-    <div
-      style={{
-        overflowX: "auto",
-        overflowY: "auto",
-        maxHeight: "calc(100vh - 120px)",
-        position: "relative",
-      }}
-    >
-      <table
-        style={{
-          minWidth: 1200,
-          width: "100%",
-          borderCollapse: "collapse",
-        }}
-      >
-        <thead>
-          <tr>
-            {/* Sticky Name column */}
-            <th
-              onClick={() => onSort("first_name")}
-              style={{
-                ...thStyle,
-                position: "sticky",
-                left: 0,
-                zIndex: 2,
-                minWidth: 180,
-              }}
-            >
-              Name <SortIcon col="first_name" />
-            </th>
-            <th onClick={() => onSort("stage")} style={thStyle}>
-              Stage <SortIcon col="stage" />
-            </th>
-            <th style={thStyle}>Community</th>
-            <th onClick={() => onSort("agent_name")} style={thStyle}>
-              Agent <SortIcon col="agent_name" />
-            </th>
-            <th onClick={() => onSort("source")} style={thStyle}>
-              Source <SortIcon col="source" />
-            </th>
-            <th onClick={() => onSort("budget_min")} style={thStyle}>
-              Budget <SortIcon col="budget_min" />
-            </th>
-            <th onClick={() => onSort("bedrooms")} style={thStyle}>
-              Beds <SortIcon col="bedrooms" />
-            </th>
-            <th onClick={() => onSort("last_activity_at")} style={thStyle}>
-              Last Activity <SortIcon col="last_activity_at" />
-            </th>
-            <th onClick={() => onSort("created_at")} style={thStyle}>
-              Created <SortIcon col="created_at" />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((lead) => {
-            const community = communities.find((c) => c.id === lead.community_id);
-            return (
-              <tr
-                key={lead.id}
-                onClick={() => onSelect(lead)}
-                style={{ cursor: "pointer" }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLTableRowElement).style.backgroundColor = "#111111")
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent")
-                }
-              >
-                {/* Sticky Name */}
-                <td
-                  style={{
-                    ...tdStyle,
-                    position: "sticky",
-                    left: 0,
-                    backgroundColor: "inherit",
-                    color: "#ededed",
-                    fontWeight: 500,
-                    fontSize: 13,
-                    zIndex: 1,
-                  }}
-                >
-                  {lead.first_name} {lead.last_name}
-                </td>
-                <td style={tdStyle}>
-                  <StageBadge stage={lead.stage} />
-                </td>
-                <td style={tdStyle}>{community?.name ?? "—"}</td>
-                <td style={tdStyle}>{lead.agent_name ?? "—"}</td>
-                <td style={tdStyle}>{lead.source ?? "—"}</td>
-                <td style={tdStyle}>{formatBudget(lead.budget_min, lead.budget_max)}</td>
-                <td style={tdStyle}>{lead.bedrooms ?? "—"}</td>
-                <td style={tdStyle}>{relativeTime(lead.last_activity_at)}</td>
-                <td style={tdStyle}>{new Date(lead.created_at).toLocaleDateString()}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Card view ────────────────────────────────────────────────────────────────
-
-function CardView({
-  leads,
-  communities,
-  onSelect,
-}: {
-  leads: Lead[];
-  communities: Community[];
-  onSelect: (l: Lead) => void;
-}) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-        gap: 12,
-      }}
-    >
-      {leads.map((lead) => {
-        const community = communities.find((c) => c.id === lead.community_id);
-        return (
-          <div
-            key={lead.id}
-            onClick={() => onSelect(lead)}
-            style={{
-              backgroundColor: "#111111",
-              borderRadius: 8,
-              border: "1px solid #1f1f1f",
-              padding: 12,
-              cursor: "pointer",
-              transition: "border-color 0.15s",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-            onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLDivElement).style.borderColor = "#2a2a2a")
-            }
-            onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLDivElement).style.borderColor = "#1f1f1f")
-            }
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <StageBadge stage={lead.stage} />
-              <span style={{ fontSize: 10, color: "#444" }}>
-                {relativeTime(lead.last_activity_at)}
-              </span>
-            </div>
-
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#ededed" }}>
-              {lead.first_name} {lead.last_name}
-            </div>
-
-            {community && (
-              <div style={{ fontSize: 11, color: "#555" }}>{community.name}</div>
-            )}
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {lead.source && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                    backgroundColor: "#161616",
-                    border: "1px solid #2a2a2a",
-                    color: "#666",
-                  }}
-                >
-                  {lead.source}
-                </span>
-              )}
-            </div>
-
-            <div style={{ fontSize: 11, color: "#a1a1a1" }}>
-              {formatBudget(lead.budget_min, lead.budget_max)}
-            </div>
-
-            {lead.agent_name && (
-              <div style={{ fontSize: 11, color: "#555" }}>{lead.agent_name}</div>
+        {selected && (
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 0 }}>
+            <Section title="Contact">
+              <Row label="Email" value={selected.email ? <a href={`mailto:${selected.email}`} style={{ color: "#7aafdf", textDecoration: "none" }}>{selected.email}</a> : null} />
+              <Row label="Phone" value={selected.phone} />
+              <Row label="Source" value={selected.source} />
+            </Section>
+            <Section title="Interest">
+              <Row label="Community" value={community?.name} />
+              <Row label="Budget" value={formatBudget(selected.budget_min, selected.budget_max)} />
+              <Row label="Bedrooms" value={selected.bedrooms != null ? String(selected.bedrooms) : null} />
+              <Row label="Desired Move" value={selected.desired_move_date ? new Date(selected.desired_move_date).toLocaleDateString() : null} />
+            </Section>
+            <Section title="Assignment">
+              <Row label="Agent" value={selected.agent_name} />
+              <Row label="Substage" value={selected.substage} />
+              <Row label="Last Activity" value={selected.last_activity_at ? new Date(selected.last_activity_at).toLocaleString() : null} />
+              <Row label="Created" value={new Date(selected.created_at).toLocaleString()} />
+            </Section>
+            {selected.notes && (
+              <Section title="Notes">
+                <p style={{ fontSize: 13, color: "#888", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap" }}>{selected.notes}</p>
+              </Section>
             )}
           </div>
-        );
-      })}
-    </div>
+        )}
+      </SlideOver>
+    </PageShell>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
-export default function LeadsClient({ leads, communities }: Props) {
-  const [view, setView] = useState<"board" | "table" | "card">("board");
-  const [selected, setSelected] = useState<Lead | null>(null);
-  const [stageFilter, setStageFilter] = useState("all");
-  const [agentFilter, setAgentFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [sortCol, setSortCol] = useState("last_activity_at");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  // Persist view to localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("leads-view") as "board" | "table" | "card" | null;
-    if (saved && ["board", "table", "card"].includes(saved)) {
-      setView(saved);
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("leads-view", view);
-  }, [view]);
-
-  // Unique agents
-  const agents = Array.from(
-    new Set(leads.map((l) => l.agent_name).filter((a): a is string => a != null))
-  ).sort();
-
-  // Filtered data
-  const filtered = leads
-    .filter((l) => stageFilter === "all" || l.stage === stageFilter)
-    .filter((l) => agentFilter === "all" || l.agent_name === agentFilter)
-    .filter((l) => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return (
-        `${l.first_name} ${l.last_name}`.toLowerCase().includes(q) ||
-        (l.email ?? "").toLowerCase().includes(q) ||
-        (l.phone ?? "").includes(q)
-      );
-    });
-
-  function handleSort(col: string) {
-    if (sortCol === col) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortCol(col);
-      setSortDir("asc");
-    }
-  }
-
-  const selectStyle: React.CSSProperties = {
-    backgroundColor: "#111",
-    border: "1px solid #2a2a2a",
-    borderRadius: 4,
-    color: "#a1a1a1",
-    fontSize: 12,
-    padding: "4px 8px",
-    outline: "none",
-    cursor: "pointer",
-  };
-
-  const viewBtnStyle = (active: boolean): React.CSSProperties => ({
-    background: active ? "#1a1a1a" : "none",
-    border: active ? "1px solid #2a2a2a" : "1px solid transparent",
-    borderRadius: 4,
-    color: active ? "#ededed" : "#555",
-    fontSize: 14,
-    width: 28,
-    height: 28,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    transition: "all 0.15s",
-  });
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#0a0a0a", color: "#ededed" }}>
-      {/* ── Main ── */}
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Top bar */}
-        <div
-          style={{
-            padding: "10px 24px",
-            borderBottom: "1px solid #1a1a1a",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexShrink: 0,
-          }}
-        >
-          {/* Title + count */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#ededed" }}>Leads</span>
-            <span
-              style={{
-                fontSize: 11,
-                padding: "2px 8px",
-                borderRadius: 4,
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #2a2a2a",
-                color: "#555",
-              }}
-            >
-              {filtered.length}
-            </span>
-          </div>
-
-          {/* Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {/* Search */}
-            <input
-              type="text"
-              placeholder="Search leads..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                backgroundColor: "#111",
-                border: "1px solid #2a2a2a",
-                borderRadius: 4,
-                fontSize: 12,
-                padding: "4px 10px",
-                color: "#a1a1a1",
-                outline: "none",
-                width: 180,
-              }}
-            />
-
-            {/* Stage filter */}
-            <select
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="all">All Stages</option>
-              {STAGES.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-
-            {/* Agent filter */}
-            <select
-              value={agentFilter}
-              onChange={(e) => setAgentFilter(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="all">All Agents</option>
-              {agents.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-
-            {/* View toggle */}
-            <div style={{ display: "flex", gap: 2 }}>
-              <button
-                onClick={() => setView("board")}
-                style={viewBtnStyle(view === "board")}
-                title="Board"
-              >
-                ◫
-              </button>
-              <button
-                onClick={() => setView("table")}
-                style={viewBtnStyle(view === "table")}
-                title="Table"
-              >
-                ≡
-              </button>
-              <button
-                onClick={() => setView("card")}
-                style={viewBtnStyle(view === "card")}
-                title="Cards"
-              >
-                ⊞
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Content area */}
-        <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
-          {view === "board" && (
-            <BoardView
-              leads={filtered}
-              communities={communities}
-              stageFilter={stageFilter}
-              onSelect={setSelected}
-            />
-          )}
-          {view === "table" && (
-            <TableView
-              leads={filtered}
-              communities={communities}
-              sortCol={sortCol}
-              sortDir={sortDir}
-              onSort={handleSort}
-              onSelect={setSelected}
-            />
-          )}
-          {view === "card" && (
-            <CardView
-              leads={filtered}
-              communities={communities}
-              onSelect={setSelected}
-            />
-          )}
-        </div>
-      </main>
-
-      {/* ── Slide-over ── */}
-      {selected && (
-        <SlideOver
-          lead={selected}
-          communities={communities}
-          onClose={() => setSelected(null)}
-        />
-      )}
-    </div>
-  );
+export default function LeadsClient(props: Props) {
+  return <LeadsInner {...props} />;
 }

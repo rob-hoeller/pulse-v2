@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PageShell from "@/components/PageShell";
+import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
+import SlideOver, { Section, Row } from "@/components/SlideOver";
+import Badge from "@/components/Badge";
+import { useGlobalFilter } from "@/context/GlobalFilterContext";
+import DataTable, { type Column } from "@/components/DataTable";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Community {
-  id: string;
-  name: string;
-  slug: string | null;
-  division_slug: string;
-  division_name: string;
-}
+interface Community { id: string; name: string; slug: string | null; division_slug: string; division_name: string; }
+interface Division { id: string; slug: string; name: string; }
 
 interface Prospect {
   id: string;
@@ -22,6 +23,7 @@ interface Prospect {
   crm_stage: string;
   community_id: string | null;
   community_name: string | null;
+  division_id: string | null;
   floor_plan_name: string | null;
   csm_id: string | null;
   budget_min: number | null;
@@ -34,18 +36,20 @@ interface Prospect {
   created_at: string;
 }
 
+type ProspectRow = Prospect & Record<string, unknown> & {
+  _name: string;
+  _community: string;
+  _division: string;
+  _stage_label: string;
+  _budget: string;
+  _last_activity: string;
+};
+
 interface Props {
   prospects: Prospect[];
   communities: Community[];
+  divisions: Division[];
 }
-
-// ─── Stage config ─────────────────────────────────────────────────────────────
-
-const STAGES = [
-  { key: "prospect_c", label: "Prospect C",  color: "#f5a623", bg: "#2a2a1a", border: "#3f3a1f" },
-  { key: "prospect_b", label: "Prospect B",  color: "#0070f3", bg: "#1a1f2e", border: "#1a2a3f" },
-  { key: "prospect_a", label: "Prospect A",  color: "#00c853", bg: "#1a2a1a", border: "#1f3f1f" },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,353 +72,159 @@ function formatBudget(min: number | null, max: number | null): string {
   return `up to $${(max! / 1000).toFixed(0)}k`;
 }
 
-function stageConfig(key: string) {
-  return STAGES.find(s => s.key === key) ?? STAGES[0];
+function getStageLabel(stage: string): string {
+  const map: Record<string, string> = { prospect_c: "Prospect C", prospect_b: "Prospect B", prospect_a: "Prospect A" };
+  return map[stage] ?? stage;
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function StageBadge({ stage }: { stage: string }) {
-  const cfg = stageConfig(stage);
-  return (
-    <span style={{
-      fontSize: 10, padding: "2px 6px", borderRadius: 4,
-      backgroundColor: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color, whiteSpace: "nowrap",
-    }}>{cfg.label}</span>
-  );
+function getStageColor(stage: string): { color: string; bg: string; border: string } {
+  const map: Record<string, { color: string; bg: string; border: string }> = {
+    prospect_c: { color: "#f5a623", bg: "#2a2a1a", border: "#3f3a1f" },
+    prospect_b: { color: "#0070f3", bg: "#1a1f2e", border: "#1a2a3f" },
+    prospect_a: { color: "#00c853", bg: "#1a2a1a", border: "#1f3f1f" },
+  };
+  return map[stage] ?? { color: "#888", bg: "#2a2b2e", border: "#444" };
 }
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div style={{
-      fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.08em",
-      fontWeight: 600, paddingBottom: 8, borderBottom: "1px solid #1a1a1a", marginBottom: 12,
-    }}>{title}</div>
-  );
-}
+// ─── Stats ────────────────────────────────────────────────────────────────────
 
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
-      <span style={{ fontSize: 12, color: "#a1a1a1" }}>{children}</span>
-    </div>
-  );
-}
+const STATS: StatConfig<ProspectRow>[] = [
+  { label: "Prospect A", getValue: (r) => r.filter(x => x.crm_stage === "prospect_a").length },
+  { label: "Prospect B", getValue: (r) => r.filter(x => x.crm_stage === "prospect_b").length },
+  { label: "Prospect C", getValue: (r) => r.filter(x => x.crm_stage === "prospect_c").length },
+  {
+    label: "Avg Budget",
+    getValue: (r) => {
+      const wb = r.filter(x => x.budget_min);
+      if (!wb.length) return "—";
+      return "$" + Math.round(wb.reduce((s, x) => s + (x.budget_min ?? 0), 0) / wb.length / 1000) + "k";
+    },
+  },
+];
 
-// ─── Slide-over panel ─────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
-function SlideOver({ prospect, communities, onClose }: { prospect: Prospect; communities: Community[]; onClose: () => void }) {
-  const community = communities.find(c => c.id === prospect.community_id);
+function ProspectsInner({ prospects, communities, divisions }: Props) {
+  const { filter } = useGlobalFilter();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Prospect | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
-  return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 40 }} />
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0, width: 480,
-        backgroundColor: "#0d0d0d", borderLeft: "1px solid #1f1f1f", zIndex: 50,
-        overflowY: "auto", display: "flex", flexDirection: "column",
-      }}>
-        <div style={{
-          padding: "20px 24px 16px", borderBottom: "1px solid #1a1a1a",
-          display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
-          position: "sticky", top: 0, backgroundColor: "#0d0d0d", zIndex: 1,
-        }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 16, fontWeight: 600, color: "#ededed" }}>
-              {prospect.first_name} {prospect.last_name}
-            </span>
-            <StageBadge stage={prospect.crm_stage} />
-          </div>
-          <button onClick={onClose} style={{
-            background: "none", border: "none", color: "#555", fontSize: 18,
-            cursor: "pointer", padding: "2px 6px", lineHeight: 1, flexShrink: 0,
-          }}>✕</button>
-        </div>
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
-          <div>
-            <SectionHeader title="Contact" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow label="Email">{prospect.email ? <a href={`mailto:${prospect.email}`} style={{ color: "#0070f3", textDecoration: "none" }}>{prospect.email}</a> : <span style={{ color: "#333" }}>—</span>}</DetailRow>
-              <DetailRow label="Phone">{prospect.phone ?? <span style={{ color: "#333" }}>—</span>}</DetailRow>
-            </div>
-          </div>
-          <div>
-            <SectionHeader title="Interest" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow label="Community">{community?.name ?? prospect.community_name ?? <span style={{ color: "#333" }}>—</span>}</DetailRow>
-              <DetailRow label="Floor Plan">{prospect.floor_plan_name ?? <span style={{ color: "#333" }}>—</span>}</DetailRow>
-              <DetailRow label="Budget">{formatBudget(prospect.budget_min, prospect.budget_max)}</DetailRow>
-              <DetailRow label="Contract Date">{prospect.contract_date ? new Date(prospect.contract_date).toLocaleDateString() : <span style={{ color: "#333" }}>—</span>}</DetailRow>
-              <DetailRow label="Est. Move-In">{prospect.estimated_move_in ? new Date(prospect.estimated_move_in).toLocaleDateString() : <span style={{ color: "#333" }}>—</span>}</DetailRow>
-            </div>
-          </div>
-          <div>
-            <SectionHeader title="Activity" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow label="Last Activity">{prospect.last_activity_at ? new Date(prospect.last_activity_at).toLocaleString() : "—"}</DetailRow>
-              <DetailRow label="Created">{new Date(prospect.created_at).toLocaleString()}</DetailRow>
-            </div>
-          </div>
-          {prospect.notes && (
-            <div>
-              <SectionHeader title="Notes" />
-              <p style={{ fontSize: 12, color: "#a1a1a1", lineHeight: 1.6, whiteSpace: "pre-wrap", margin: 0 }}>{prospect.notes}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
+  useEffect(() => { setPage(0); }, [search, filter.divisionId, filter.communityId]);
 
-// ─── Board view ───────────────────────────────────────────────────────────────
-
-function BoardView({ prospects, communities, stageFilter, onSelect }: {
-  prospects: Prospect[]; communities: Community[]; stageFilter: string; onSelect: (p: Prospect) => void;
-}) {
-  const visibleStages = stageFilter === "all" ? STAGES : STAGES.filter(s => s.key === stageFilter);
-  return (
-    <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 16 }}>
-      {visibleStages.map(stage => {
-        const items = prospects.filter(p => p.crm_stage === stage.key);
-        return (
-          <div key={stage.key} style={{
-            flexShrink: 0, width: 280, backgroundColor: "#0d0d0d", borderRadius: 8,
-            border: "1px solid #1f1f1f", display: "flex", flexDirection: "column",
-          }}>
-            <div style={{
-              padding: "10px 12px 8px", display: "flex", alignItems: "center", gap: 8,
-              borderBottom: "1px solid #1a1a1a",
-            }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: stage.color }}>{stage.label}</span>
-              <span style={{
-                fontSize: 10, padding: "1px 6px", borderRadius: 10,
-                backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a", color: "#555",
-              }}>{items.length}</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", padding: 4, gap: 4 }}>
-              {items.length === 0 ? (
-                <div style={{ fontSize: 11, color: "#333", padding: 16, textAlign: "center" }}>No prospects</div>
-              ) : items.map(p => (
-                <div key={p.id} onClick={() => onSelect(p)} style={{
-                  backgroundColor: "#111111", borderRadius: 6, border: "1px solid #1f1f1f",
-                  padding: 12, margin: 4, cursor: "pointer", transition: "border-color 0.15s",
-                }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = "#2a2a2a")}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = "#1f1f1f")}
-                >
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#ededed", marginBottom: 3 }}>
-                    {p.first_name} {p.last_name}
-                  </div>
-                  {p.community_name && <div style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>{p.community_name}</div>}
-                  {p.floor_plan_name && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
-                      <span style={{
-                        fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                        backgroundColor: "#161616", border: "1px solid #2a2a2a", color: "#666",
-                      }}>{p.floor_plan_name}</span>
-                    </div>
-                  )}
-                  <div style={{ fontSize: 11, color: "#a1a1a1", marginBottom: 4 }}>
-                    {formatBudget(p.budget_min, p.budget_max)}
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                    <span />
-                    <span style={{ fontSize: 10, color: "#444" }}>{relativeTime(p.last_activity_at)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Table view ───────────────────────────────────────────────────────────────
-
-function TableView({ prospects, communities, sortCol, sortDir, onSort, onSelect }: {
-  prospects: Prospect[]; communities: Community[]; sortCol: string; sortDir: "asc" | "desc";
-  onSort: (col: string) => void; onSelect: (p: Prospect) => void;
-}) {
-  const sorted = [...prospects].sort((a, b) => {
-    const aVal = (a as any)[sortCol] ?? "";
-    const bVal = (b as any)[sortCol] ?? "";
-    const cmp = String(aVal).localeCompare(String(bVal));
-    return sortDir === "asc" ? cmp : -cmp;
+  const filtered = prospects.filter(p => {
+    if (filter.communityId && p.community_id !== filter.communityId) return false;
+    if (filter.divisionId && p.division_id !== filter.divisionId) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!`${p.first_name} ${p.last_name}`.toLowerCase().includes(q) &&
+          !(p.email ?? "").toLowerCase().includes(q) &&
+          !(p.phone ?? "").includes(q)) return false;
+    }
+    return true;
   });
 
-  const thStyle: React.CSSProperties = {
-    padding: "6px 12px", textAlign: "left", fontSize: 11, color: "#666", fontWeight: 500,
-    textTransform: "uppercase", letterSpacing: "0.06em", backgroundColor: "#0a0a0a",
-    whiteSpace: "nowrap", cursor: "pointer", userSelect: "none", borderBottom: "1px solid #1a1a1a",
-  };
-  const tdStyle: React.CSSProperties = {
-    padding: "6px 12px", fontSize: 12, color: "#a1a1a1", borderBottom: "1px solid #111111", whiteSpace: "nowrap",
-  };
+  const tableRows: ProspectRow[] = filtered.map(p => {
+    const comm = communities.find(c => c.id === p.community_id);
+    const div = divisions.find(d => d.id === p.division_id);
+    return {
+      ...p,
+      _name: `${p.first_name} ${p.last_name}`,
+      _community: comm?.name ?? p.community_name ?? "—",
+      _division: div?.name ?? comm?.division_name ?? "—",
+      _stage_label: getStageLabel(p.crm_stage),
+      _budget: formatBudget(p.budget_min, p.budget_max),
+      _last_activity: relativeTime(p.last_activity_at),
+    };
+  });
 
-  function SortIcon({ col }: { col: string }) {
-    if (sortCol !== col) return <span style={{ color: "#333", marginLeft: 4 }}>↕</span>;
-    return <span style={{ color: "#555", marginLeft: 4 }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
-  }
+  const allRows = prospects.map(p => {
+    const comm = communities.find(c => c.id === p.community_id);
+    return { ...p, _name: `${p.first_name} ${p.last_name}`, _community: comm?.name ?? "—", _division: comm?.division_name ?? "—", _stage_label: getStageLabel(p.crm_stage), _budget: formatBudget(p.budget_min, p.budget_max), _last_activity: relativeTime(p.last_activity_at) };
+  });
+
+  const tableColumns: Column<ProspectRow>[] = [
+    { key: "_name", label: "Name", sortable: true, render: (_v, row) => <span style={{ color: "#ededed", fontWeight: 500 }}>{row._name}</span> },
+    { key: "_stage_label", label: "Stage", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 12 }}>{row._stage_label}</span> },
+    { key: "_community", label: "Community", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._community}</span> },
+    { key: "_division", label: "Division", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._division}</span> },
+    { key: "floor_plan_name", label: "Floor Plan", sortable: true, filterable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row.floor_plan_name ?? "—"}</span> },
+    { key: "_budget", label: "Budget", sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._budget}</span> },
+    { key: "contract_date", label: "Contract Date", sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row.contract_date ? new Date(row.contract_date).toLocaleDateString() : "—"}</span> },
+    { key: "_last_activity", label: "Last Activity", sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{row._last_activity}</span> },
+    { key: "created_at", label: "Created", sortable: true, render: (_v, row) => <span style={{ color: "#888", fontSize: 13 }}>{new Date(row.created_at).toLocaleDateString()}</span> },
+  ];
+
+  const community = selected ? communities.find(c => c.id === selected.community_id) : null;
+  const stageCfg = selected ? getStageColor(selected.crm_stage) : null;
 
   return (
-    <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 120px)", position: "relative" }}>
-      <table style={{ minWidth: 1100, width: "100%", borderCollapse: "collapse" }}>
-        <thead><tr>
-          <th onClick={() => onSort("first_name")} style={{ ...thStyle, position: "sticky", left: 0, zIndex: 2, minWidth: 180 }}>Name <SortIcon col="first_name" /></th>
-          <th style={thStyle}>Stage</th>
-          <th style={thStyle}>Community</th>
-          <th style={thStyle}>Floor Plan</th>
-          <th onClick={() => onSort("budget_min")} style={thStyle}>Budget <SortIcon col="budget_min" /></th>
-          <th onClick={() => onSort("contract_date")} style={thStyle}>Contract Date <SortIcon col="contract_date" /></th>
-          <th onClick={() => onSort("last_activity_at")} style={thStyle}>Last Activity <SortIcon col="last_activity_at" /></th>
-          <th onClick={() => onSort("created_at")} style={thStyle}>Created <SortIcon col="created_at" /></th>
-        </tr></thead>
-        <tbody>
-          {sorted.map(p => (
-            <tr key={p.id} onClick={() => onSelect(p)} style={{ cursor: "pointer" }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#111111")}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              <td style={{ ...tdStyle, position: "sticky", left: 0, backgroundColor: "inherit", color: "#ededed", fontWeight: 500, fontSize: 13, zIndex: 1 }}>
-                {p.first_name} {p.last_name}
-              </td>
-              <td style={tdStyle}><StageBadge stage={p.crm_stage} /></td>
-              <td style={tdStyle}>{p.community_name ?? "—"}</td>
-              <td style={tdStyle}>{p.floor_plan_name ?? "—"}</td>
-              <td style={tdStyle}>{formatBudget(p.budget_min, p.budget_max)}</td>
-              <td style={tdStyle}>{p.contract_date ? new Date(p.contract_date).toLocaleDateString() : "—"}</td>
-              <td style={tdStyle}>{relativeTime(p.last_activity_at)}</td>
-              <td style={tdStyle}>{new Date(p.created_at).toLocaleDateString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+    <PageShell
+      topBar={
+        <TableSubHeader
+          title="Prospects"
+          rows={tableRows}
+          totalRows={tableRows.length}
+          stats={STATS}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={s => { setPageSize(s); setPage(0); }}
+          search={search}
+          onSearch={q => { setSearch(q); setPage(0); }}
+          searchPlaceholder="Search prospects…"
+          onExport={() => exportToCSV(tableRows as unknown as Record<string, unknown>[], "prospects")}
+          onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "prospects-all")}
+        />
+      }
+    >
+      <DataTable<ProspectRow>
+        columns={tableColumns}
+        rows={tableRows}
+        controlledPage={page}
+        controlledPageSize={pageSize}
+        defaultPageSize={pageSize}
+        onRowClick={row => setSelected(row)}
+        emptyMessage="No prospects match the current filter"
+        minWidth={1200}
+      />
 
-// ─── Card view ────────────────────────────────────────────────────────────────
-
-function CardView({ prospects, communities, onSelect }: {
-  prospects: Prospect[]; communities: Community[]; onSelect: (p: Prospect) => void;
-}) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-      {prospects.map(p => (
-        <div key={p.id} onClick={() => onSelect(p)} style={{
-          backgroundColor: "#111111", borderRadius: 8, border: "1px solid #1f1f1f",
-          padding: 12, cursor: "pointer", transition: "border-color 0.15s",
-          display: "flex", flexDirection: "column", gap: 8,
-        }}
-          onMouseEnter={e => (e.currentTarget.style.borderColor = "#2a2a2a")}
-          onMouseLeave={e => (e.currentTarget.style.borderColor = "#1f1f1f")}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <StageBadge stage={p.crm_stage} />
-            <span style={{ fontSize: 10, color: "#444" }}>{relativeTime(p.last_activity_at)}</span>
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#ededed" }}>{p.first_name} {p.last_name}</div>
-          {p.community_name && <div style={{ fontSize: 11, color: "#555" }}>{p.community_name}</div>}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {p.floor_plan_name && (
-              <span style={{
-                fontSize: 10, padding: "2px 6px", borderRadius: 4,
-                backgroundColor: "#161616", border: "1px solid #2a2a2a", color: "#666",
-              }}>{p.floor_plan_name}</span>
+      <SlideOver open={!!selected} onClose={() => setSelected(null)}
+        title={selected ? `${selected.first_name} ${selected.last_name}` : ""}
+        subtitle={community?.name ?? selected?.community_name ?? undefined}
+        badge={selected && stageCfg ? <Badge variant="custom" label={getStageLabel(selected.crm_stage)} customColor={stageCfg.color} customBg={stageCfg.bg} customBorder={stageCfg.border} /> : undefined}
+        width={480}
+      >
+        {selected && (
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 0 }}>
+            <Section title="Contact">
+              <Row label="Email" value={selected.email ? <a href={`mailto:${selected.email}`} style={{ color: "#7aafdf", textDecoration: "none" }}>{selected.email}</a> : null} />
+              <Row label="Phone" value={selected.phone} />
+            </Section>
+            <Section title="Interest">
+              <Row label="Community" value={community?.name ?? selected.community_name} />
+              <Row label="Floor Plan" value={selected.floor_plan_name} />
+              <Row label="Budget" value={formatBudget(selected.budget_min, selected.budget_max)} />
+              <Row label="Contract Date" value={selected.contract_date ? new Date(selected.contract_date).toLocaleDateString() : null} />
+              <Row label="Est. Move-In" value={selected.estimated_move_in ? new Date(selected.estimated_move_in).toLocaleDateString() : null} />
+            </Section>
+            <Section title="Activity">
+              <Row label="Last Activity" value={selected.last_activity_at ? new Date(selected.last_activity_at).toLocaleString() : null} />
+              <Row label="Created" value={new Date(selected.created_at).toLocaleString()} />
+            </Section>
+            {selected.notes && (
+              <Section title="Notes">
+                <p style={{ fontSize: 13, color: "#888", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap" }}>{selected.notes}</p>
+              </Section>
             )}
           </div>
-          <div style={{ fontSize: 11, color: "#a1a1a1" }}>{formatBudget(p.budget_min, p.budget_max)}</div>
-        </div>
-      ))}
-    </div>
+        )}
+      </SlideOver>
+    </PageShell>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
-export default function ProspectsClient({ prospects, communities }: Props) {
-  const [view, setView] = useState<"board" | "table" | "card">("board");
-  const [selected, setSelected] = useState<Prospect | null>(null);
-  const [stageFilter, setStageFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [sortCol, setSortCol] = useState("last_activity_at");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("prospects-view") as "board" | "table" | "card" | null;
-    if (saved && ["board", "table", "card"].includes(saved)) setView(saved);
-  }, []);
-  useEffect(() => { localStorage.setItem("prospects-view", view); }, [view]);
-
-  const filtered = prospects
-    .filter(p => stageFilter === "all" || p.crm_stage === stageFilter)
-    .filter(p => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      return `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
-        (p.email ?? "").toLowerCase().includes(q) || (p.phone ?? "").includes(q);
-    });
-
-  function handleSort(col: string) {
-    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortCol(col); setSortDir("asc"); }
-  }
-
-  const selectStyle: React.CSSProperties = {
-    backgroundColor: "#111", border: "1px solid #2a2a2a", borderRadius: 4,
-    color: "#a1a1a1", fontSize: 12, padding: "4px 8px", outline: "none", cursor: "pointer",
-  };
-  const viewBtnStyle = (active: boolean): React.CSSProperties => ({
-    background: active ? "#1a1a1a" : "none",
-    border: active ? "1px solid #2a2a2a" : "1px solid transparent",
-    borderRadius: 4, color: active ? "#ededed" : "#555", fontSize: 14,
-    width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
-    cursor: "pointer", transition: "all 0.15s",
-  });
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#0a0a0a", color: "#ededed" }}>
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{
-          padding: "10px 24px", borderBottom: "1px solid #1a1a1a",
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#ededed" }}>Prospects</span>
-            <span style={{
-              fontSize: 11, padding: "2px 8px", borderRadius: 4,
-              backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a", color: "#555",
-            }}>{filtered.length}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input type="text" placeholder="Search prospects..." value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{
-                backgroundColor: "#111", border: "1px solid #2a2a2a", borderRadius: 4,
-                fontSize: 12, padding: "4px 10px", color: "#a1a1a1", outline: "none", width: 180,
-              }} />
-            <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} style={selectStyle}>
-              <option value="all">All Stages</option>
-              {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-            <div style={{ display: "flex", gap: 2 }}>
-              <button onClick={() => setView("board")} style={viewBtnStyle(view === "board")} title="Board">◫</button>
-              <button onClick={() => setView("table")} style={viewBtnStyle(view === "table")} title="Table">≡</button>
-              <button onClick={() => setView("card")} style={viewBtnStyle(view === "card")} title="Cards">⊞</button>
-            </div>
-          </div>
-        </div>
-        <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
-          {view === "board" && <BoardView prospects={filtered} communities={communities} stageFilter={stageFilter} onSelect={setSelected} />}
-          {view === "table" && <TableView prospects={filtered} communities={communities} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} onSelect={setSelected} />}
-          {view === "card" && <CardView prospects={filtered} communities={communities} onSelect={setSelected} />}
-        </div>
-      </main>
-      {selected && <SlideOver prospect={selected} communities={communities} onClose={() => setSelected(null)} />}
-    </div>
-  );
+export default function ProspectsClient(props: Props) {
+  return <ProspectsInner {...props} />;
 }

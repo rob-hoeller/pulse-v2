@@ -9,7 +9,7 @@ export default async function CustomersPage() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 
-  const [{ data: homeOwners }, { data: rawCommunities }] = await Promise.all([
+  const [{ data: homeOwners }, { data: rawCommunities }, { data: divisions }] = await Promise.all([
     supabase
       .from("home_owners")
       .select("*, contacts(first_name, last_name, email, phone), communities(name), floor_plans(marketing_name)")
@@ -18,9 +18,9 @@ export default async function CustomersPage() {
       .from("communities")
       .select("id, name, slug, divisions(slug, name)")
       .order("name"),
+    supabase.from("divisions").select("id, slug, name").order("name"),
   ]);
 
-  // Flatten joined data for client
   const flatCustomers = (homeOwners ?? []).map((h: any) => ({
     id: h.id,
     contact_id: h.contact_id,
@@ -30,6 +30,7 @@ export default async function CustomersPage() {
     phone: h.contacts?.phone ?? null,
     community_id: h.community_id,
     community_name: h.communities?.name ?? null,
+    division_id: h.division_id ?? null,
     floor_plan_name: h.floor_plans?.marketing_name ?? null,
     purchase_price: h.purchase_price,
     settlement_date: h.settlement_date,
@@ -46,5 +47,11 @@ export default async function CustomersPage() {
     division_name: ((c.divisions as any)?.name ?? "") as string,
   }));
 
-  return <CustomersClient customers={flatCustomers} communities={communities} />;
+  return (
+    <CustomersClient
+      customers={flatCustomers}
+      communities={communities}
+      divisions={divisions ?? []}
+    />
+  );
 }
