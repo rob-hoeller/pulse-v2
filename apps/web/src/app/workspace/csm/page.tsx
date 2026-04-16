@@ -119,6 +119,10 @@ export default async function CsmPage({
     { data: lots },
     { data: modelHomes },
     { data: specHomes },
+    { data: leadsData },
+    { data: oppsData },
+    { data: prospectsData },
+    { data: customersData },
   ] = await Promise.all([
     supabase.from("divisions").select("*").order("name"),
     supabase
@@ -130,6 +134,10 @@ export default async function CsmPage({
       .select("id,community_id,lot_number,lot_status,construction_status,is_available,lot_premium,address"),
     supabase.from("model_homes").select("id,community_id,community_name,name,address,city,state,model_name,model_marketing_name,image_url,virtual_tour_url,page_url,open_hours,leaseback"),
     supabase.from("spec_homes").select("id,community_id,community_name,plan_name,address,city,state,beds,baths,sqft,list_price,image_url,page_url"),
+    supabase.from("leads").select("id,community_id,stage").neq("stage", "opportunity"),
+    supabase.from("leads").select("id,community_id").eq("stage", "opportunity"),
+    supabase.from("prospects").select("id,community_id,stage"),
+    supabase.from("home_owners").select("id,community_id"),
   ]);
 
   return (
@@ -140,6 +148,20 @@ export default async function CsmPage({
       lots={lots ?? []}
       modelHomes={modelHomes ?? []}
       specHomes={specHomes ?? []}
+      crmCounts={{
+        leads: (leadsData ?? []).length,
+        opportunities: (oppsData ?? []).length,
+        prospects: (prospectsData ?? []).length,
+        customers: (customersData ?? []).length,
+        leadsByCommunity: (leadsData ?? []).reduce((acc: Record<string, number>, l: any) => {
+          if (l.community_id) acc[l.community_id] = (acc[l.community_id] || 0) + 1;
+          return acc;
+        }, {}),
+        prospectsByCommunity: (prospectsData ?? []).reduce((acc: Record<string, number>, p: any) => {
+          if (p.community_id) acc[p.community_id] = (acc[p.community_id] || 0) + 1;
+          return acc;
+        }, {}),
+      }}
     />
   );
 }

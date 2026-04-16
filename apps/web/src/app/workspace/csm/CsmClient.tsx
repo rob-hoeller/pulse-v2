@@ -341,12 +341,22 @@ function FunnelPlaceholder() {
 // CORP VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
 
+interface CrmCounts {
+  leads: number;
+  opportunities: number;
+  prospects: number;
+  customers: number;
+  leadsByCommunity: Record<string, number>;
+  prospectsByCommunity: Record<string, number>;
+}
+
 interface CorpViewProps {
   divisions: Division[];
   communities: Community[];
   lots: LotRow[];
   modelHomes: ModelHome[];
   specHomes: SpecHome[];
+  crmCounts?: CrmCounts;
 }
 
 // ─── HBv1 Funnel Placeholder (Corp / Division) ────────────────────────────────
@@ -398,7 +408,7 @@ function HBv1FunnelPlaceholder() {
   );
 }
 
-function CorpView({ divisions, communities, lots, modelHomes, specHomes }: CorpViewProps) {
+function CorpView({ divisions, communities, lots, modelHomes, specHomes, crmCounts }: CorpViewProps) {
   const router = useRouter();
 
   const availableLots = lots.filter((l) => l.is_available);
@@ -459,9 +469,9 @@ function CorpView({ divisions, communities, lots, modelHomes, specHomes }: CorpV
             { label: "Communities", value: communities.length, accent: "#59a6bd" },
             { label: "Plans", value: "—", accent: "#59a6bd" },
             { label: "Available Lots", value: availableLots.length || "—", accent: "#80B602" },
-            { label: "Leads", value: "—", accent: "#a855f7", cs: true },
-            { label: "Prospects", value: "—", accent: "#f59e0b", cs: true },
-            { label: "Contracts", value: "—", accent: "#80B602", cs: true },
+            { label: "Leads", value: crmCounts?.leads ?? "—", accent: "#a855f7" },
+            { label: "Prospects", value: crmCounts?.prospects ?? "—", accent: "#f59e0b" },
+            { label: "Contracts", value: crmCounts?.customers ?? "—", accent: "#00c853" },
           ].map((s) => {
             const tintMap: Record<string, string> = {
               "#59a6bd": "rgb(0,27,35)",
@@ -502,7 +512,7 @@ function CorpView({ divisions, communities, lots, modelHomes, specHomes }: CorpV
                   fontFamily: "var(--font-body)",
                   fontSize: 28,
                   fontWeight: 700,
-                  color: s.cs ? "#333" : "#ffffff",
+                  color: (s as any).cs ? "#333" : "#ffffff",
                   lineHeight: 1.1,
                 }}
               >
@@ -563,7 +573,7 @@ function CorpView({ divisions, communities, lots, modelHomes, specHomes }: CorpV
             return (
               <div
                 key={div.id}
-                onClick={() => router.push(`/?div=${div.id}`)}
+                onClick={() => router.push(`/workspace/csm?div=${div.id}`)}
                 style={{
                   background: "#1d1d1d",
                   border: "1px solid #555",
@@ -636,13 +646,13 @@ function CorpView({ divisions, communities, lots, modelHomes, specHomes }: CorpV
                   </div>
                 </div>
 
-                {/* Leads / Prospects placeholder */}
+                {/* Leads / Prospects counts */}
                 <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-body)" }}>
-                    Leads: —
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: "var(--font-body)" }}>
+                    Leads: {crmCounts ? Array.from(divCommIds).reduce((s, cid) => s + (crmCounts.leadsByCommunity[cid] || 0), 0) : "—"}
                   </span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-body)" }}>
-                    Prospects: —
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: "var(--font-body)" }}>
+                    Prospects: {crmCounts ? Array.from(divCommIds).reduce((s, cid) => s + (crmCounts.prospectsByCommunity[cid] || 0), 0) : "—"}
                   </span>
                 </div>
               </div>
@@ -708,7 +718,7 @@ function DivisionView({ communities, divisionPlans, lots, divisions, selectedDiv
         }}
       >
         <button
-          onClick={() => router.push("/")}
+          onClick={() => router.push("/workspace/csm")}
           style={{
             background: "none",
             border: "none",
@@ -837,7 +847,7 @@ function DivisionView({ communities, divisionPlans, lots, divisions, selectedDiv
                       fontFamily: "var(--font-body)",
                       fontSize: 28,
                       fontWeight: 700,
-                      color: s.cs ? "#333" : "#ffffff",
+                      color: (s as any).cs ? "#333" : "#ffffff",
                       lineHeight: 1.1,
                     }}
                   >
@@ -905,7 +915,7 @@ function DivisionView({ communities, divisionPlans, lots, divisions, selectedDiv
                   return (
                     <div
                       key={comm.id}
-                      onClick={() => router.push(`/?comm=${comm.id}`)}
+                      onClick={() => router.push(`/workspace/csm?comm=${comm.id}`)}
                       style={{
                         display: "grid",
                         gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
@@ -973,7 +983,7 @@ function DivisionView({ communities, divisionPlans, lots, divisions, selectedDiv
                         ? comm.amenities.split(";").map((a: string) => a.trim()).filter(Boolean)
                         : null
                     }
-                    onClick={() => router.push(`/?comm=${comm.id}`)}
+                    onClick={() => router.push(`/workspace/csm?comm=${comm.id}`)}
                   />
                 );
               })}
@@ -1376,11 +1386,11 @@ function CommunityView({ community, plans, lots, specHomes, divisions }: Communi
       <div style={{ background: "#0d0e10", borderBottom: "1px solid #222", padding: "16px 24px", flexShrink: 0 }}>
         {/* Breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <button onClick={() => router.push("/")} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 12, padding: 0 }}>← Corp</button>
+          <button onClick={() => router.push("/workspace/csm")} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 12, padding: 0 }}>← Corp</button>
           {division && (
             <>
               <span style={{ color: "#333" }}>·</span>
-              <button onClick={() => router.push(`/?div=${division.id}`)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 12, padding: 0 }}>{division.name}</button>
+              <button onClick={() => router.push(`/workspace/csm?div=${division.id}`)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 12, padding: 0 }}>{division.name}</button>
             </>
           )}
         </div>
