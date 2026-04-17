@@ -19,6 +19,7 @@ interface QueueItem {
   division_id: string | null;
   source: string | null;
   opportunity_source: string | null;
+  queue_source: string | null;
   notes: string | null;
   budget_min: number | null;
   budget_max: number | null;
@@ -29,7 +30,27 @@ interface QueueItem {
   communities: { name: string } | null;
 }
 
+interface TaskItem {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: string | null;
+  channel: string | null;
+  status: string;
+  due_at: string | null;
+  snoozed_until: string | null;
+  completed_at: string | null;
+  ai_suggestion: string | null;
+  contact_id: string | null;
+  opportunity_id: string | null;
+  division_id: string | null;
+  created_at: string;
+  contacts: { first_name: string; last_name: string } | null;
+}
+
 interface CommunityRef { id: string; name: string; }
+
+type QueueBucket = "new_inbound" | "re_engaged" | "demoted" | "ai_surfaced" | "customer";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +85,37 @@ function sourceLabel(src: string | null): string {
   return map[src ?? ""] ?? src ?? "—";
 }
 
+function classifyBucket(item: QueueItem): QueueBucket {
+  const qs = item.queue_source;
+  if (qs === "demoted") return "demoted";
+  if (qs === "ai_surfaced" || item.opportunity_source === "ai_auto_promote") return "ai_surfaced";
+  if (qs === "re_engaged") return "re_engaged";
+  if (qs === "customer") return "customer";
+  // Default: new inbound (web forms, calls, texts, walk-ins, etc.)
+  return "new_inbound";
+}
+
+const BUCKET_META: { id: QueueBucket; icon: string; label: string; description: string }[] = [
+  { id: "new_inbound", icon: "🆕", label: "New Inbound", description: "Brand new web forms, calls" },
+  { id: "re_engaged", icon: "📋", label: "Re-engaged", description: "Existing leads showing new activity" },
+  { id: "demoted", icon: "↓", label: "Demoted", description: "Prospects pushed back by CSM" },
+  { id: "ai_surfaced", icon: "🤖", label: "AI Surfaced", description: "Scoring spikes, behavioral signals" },
+  { id: "customer", icon: "👤", label: "Customer", description: "Existing homeowners reaching out" },
+];
+
+function channelIcon(ch: string | null): string {
+  const map: Record<string, string> = {
+    call: "📞", phone: "📞", email: "📧", text: "💬", sms: "💬", chat: "💬",
+  };
+  return map[ch ?? ""] ?? "📋";
+}
+
+function priorityBadge(p: string | null): { color: string; bg: string; label: string } {
+  if (p === "high") return { color: "#fca5a5", bg: "#7f1d1d", label: "🔴 High" };
+  if (p === "medium") return { color: "#fbbf24", bg: "#422006", label: "🟡 Medium" };
+  return { color: "#86efac", bg: "#052e16", label: "🟢 Low" };
+}
+
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
@@ -72,13 +124,13 @@ function EmptyState() {
       <div style={{ fontSize: 48, opacity: 0.3 }}>◎</div>
       <div style={{ fontSize: 16, fontWeight: 600, color: "#a1a1aa" }}>OSC Command Center</div>
       <div style={{ fontSize: 13, color: "#71717a", textAlign: "center", maxWidth: 400, lineHeight: 1.6 }}>
-        Select a <strong style={{ color: "#80B602" }}>Division</strong> to load your Queue and Communication Hub.
+        Select a <strong style={{ color: "#80B602" }}>Division</strong> to load your Queue and Action Items.
       </div>
     </div>
   );
 }
 
-// ─── Action Modal ─────────────────────────────────────────────────────────────
+// ─── Action Modal (Promote/Demote) ───────────────────────────────────────────
 
 type ActionType = "promote" | "demote" | null;
 
@@ -188,6 +240,59 @@ function ActionModal({
   );
 }
 
+// ─── Snooze Picker ────────────────────────────────────────────────────────────
+
+function SnoozePicker({ onSnooze, onClose }: { onSnooze: (until: string) => void; onClose: () => void }) {
+  const options = [
+    { label: "1 hour", ms: 3600000 },
+    { label: "4 hours", ms: 14400000 },
+    { label: "Tomorrow 9am", ms: 0 },
+    { label: "Next Monday 9am", ms: 0 },
+  ];
+
+  function computeTime(opt: { label: string; ms: number }): string {
+    if (opt.ms > 0) return new Date(Date.now() + opt.ms).toISOString();
+    const now = new Date();
+    if (opt.label.startsWith("Tomorrow")) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + 1);
+      d.setHours(9, 0, 0, 0);
+      return d.toISOString();
+    }
+    // Next Monday
+    const d = new Date(now);
+    const dayOfWeek = d.getDay();
+    const daysUntilMon = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+    d.setDate(d.getDate() + daysUntilMon);
+    d.setHours(9, 0, 0, 0);
+    return d.toISOString();
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 50 }} />
+      <div style={{
+        position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 51,
+        backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8,
+        padding: 4, minWidth: 160, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      }}>
+        {options.map(opt => (
+          <button key={opt.label} onClick={() => onSnooze(computeTime(opt))} style={{
+            display: "block", width: "100%", padding: "8px 12px", textAlign: "left",
+            background: "none", border: "none", color: "#a1a1aa", fontSize: 12,
+            cursor: "pointer", borderRadius: 4,
+          }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#27272a")}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            ⏰ {opt.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
 // ─── Queue Card ───────────────────────────────────────────────────────────────
 
 function QueueCard({
@@ -256,7 +361,7 @@ function QueueCard({
               <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{item.notes}</div>
             </div>
           )}
-          {/* AI Recommendation stub */}
+          {/* AI Recommendation */}
           <div style={{
             marginTop: 8, padding: "10px 14px", backgroundColor: "#052e16", border: "1px solid #166534",
             borderRadius: 6,
@@ -281,88 +386,111 @@ function QueueCard({
   );
 }
 
-// ─── Comm Hub ─────────────────────────────────────────────────────────────────
+// ─── Task Card ────────────────────────────────────────────────────────────────
 
-type CommTab = "urgent" | "needs_response" | "calls" | "texts" | "emails";
-
-function CommHub() {
-  const [tab, setTab] = useState<CommTab>("urgent");
-  const tabs: { id: CommTab; label: string; count: number }[] = [
-    { id: "urgent", label: "Urgent", count: 3 },
-    { id: "needs_response", label: "Needs Response", count: 5 },
-    { id: "calls", label: "Calls", count: 2 },
-    { id: "texts", label: "Texts", count: 4 },
-    { id: "emails", label: "Emails", count: 8 },
-  ];
-
-  const dummyMessages = [
-    { name: "Robert Clark", channel: "📞", preview: "Voicemail: Hi, I'm calling about Cardinal Grove pricing...", time: "12m ago", badge: "urgent" },
-    { name: "Sarah Martinez", channel: "💬", preview: "Are there any lots available near the pond?", time: "25m ago", badge: "needs_response" },
-    { name: "David Thompson", channel: "📧", preview: "RE: Cardinal Grove Tour — Can we reschedule to Saturday?", time: "1h ago", badge: "needs_response" },
-    { name: "Jennifer Wilson", channel: "📞", preview: "Missed call (2 min ago)", time: "2m ago", badge: "urgent" },
-    { name: "Michael Brown", channel: "💬", preview: "What's the difference between the Hadley and Stonefield?", time: "45m ago", badge: null },
-  ];
+function TaskCard({
+  task, onComplete, onSnooze,
+}: {
+  task: TaskItem;
+  onComplete: () => void;
+  onSnooze: (until: string) => void;
+}) {
+  const [showSnooze, setShowSnooze] = useState(false);
+  const pb = priorityBadge(task.priority);
+  const contactName = task.contacts
+    ? `${task.contacts.first_name} ${task.contacts.last_name}`
+    : null;
 
   return (
-    <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, overflow: "hidden" }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid #27272a", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Communication Hub</span>
+    <div style={{
+      backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8,
+      padding: "12px 14px", transition: "border-color 0.15s", position: "relative",
+    }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+    >
+      {/* Header: title + priority */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", flex: 1 }}>
+          {channelIcon(task.channel)} {task.title}
+        </span>
+        <span style={{
+          fontSize: 9, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
+          backgroundColor: pb.bg, color: pb.color,
+        }}>{pb.label}</span>
       </div>
-      {/* Tabs */}
-      <div style={{ display: "flex", borderBottom: "1px solid #27272a" }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "8px 14px", fontSize: 11, fontWeight: tab === t.id ? 600 : 400,
-            color: tab === t.id ? "#fafafa" : "#52525b",
-            borderBottom: tab === t.id ? "2px solid #fafafa" : "2px solid transparent",
-            background: "none", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 4,
-          }}>
-            {t.label}
-            <span style={{
-              fontSize: 10, padding: "0 4px", borderRadius: 3,
-              backgroundColor: t.id === "urgent" ? "#7f1d1d" : "#27272a",
-              color: t.id === "urgent" ? "#fca5a5" : "#71717a",
-            }}>{t.count}</span>
-          </button>
-        ))}
-      </div>
-      {/* Messages */}
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {dummyMessages.map((msg, i) => (
-          <div key={i} style={{
-            padding: "10px 16px", borderBottom: "1px solid #1e1e21", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 12,
-          }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#1e1e21")}
-            onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-          >
-            {/* Avatar */}
-            <div style={{
-              width: 32, height: 32, borderRadius: "50%", backgroundColor: "#27272a",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 11, fontWeight: 600, color: "#a1a1aa", flexShrink: 0,
-            }}>
-              {msg.name.split(" ").map(n => n[0]).join("")}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "#fafafa" }}>{msg.name}</span>
-                <span style={{ fontSize: 10, color: "#52525b" }}>{msg.channel}</span>
-                {msg.badge === "urgent" && (
-                  <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, backgroundColor: "#7f1d1d", color: "#fca5a5", fontWeight: 600 }}>URGENT</span>
-                )}
-                {msg.badge === "needs_response" && (
-                  <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, backgroundColor: "#422006", color: "#fbbf24", fontWeight: 600 }}>NEEDS RESPONSE</span>
-                )}
-              </div>
-              <div style={{ fontSize: 11, color: "#71717a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msg.preview}</div>
-            </div>
-            <span style={{ fontSize: 10, color: "#52525b", flexShrink: 0 }}>{msg.time}</span>
-          </div>
-        ))}
+
+      {/* Contact + due */}
+      {contactName && (
+        <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 4 }}>
+          {contactName}
+        </div>
+      )}
+
+      {/* AI suggestion */}
+      {task.ai_suggestion && (
+        <div style={{
+          fontSize: 11, color: "#86efac", backgroundColor: "#052e16", border: "1px solid #166534",
+          borderRadius: 4, padding: "6px 10px", marginBottom: 8, lineHeight: 1.5,
+        }}>
+          🤖 {task.ai_suggestion}
+        </div>
+      )}
+
+      {task.description && !task.ai_suggestion && (
+        <div style={{ fontSize: 11, color: "#71717a", marginBottom: 8, lineHeight: 1.4 }}>
+          {task.description}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", position: "relative" }}>
+        {task.channel === "call" || task.channel === "phone" ? (
+          <ActionBtn label="📞 Call" />
+        ) : null}
+        {task.channel === "email" ? (
+          <ActionBtn label="📧 Email" />
+        ) : null}
+        {task.channel === "text" || task.channel === "sms" ? (
+          <ActionBtn label="💬 Text" />
+        ) : null}
+        {!task.channel && (
+          <>
+            <ActionBtn label="📞 Call" />
+            <ActionBtn label="📧 Email" />
+            <ActionBtn label="💬 Text" />
+          </>
+        )}
+        <button onClick={onComplete} style={{
+          padding: "4px 10px", borderRadius: 4, border: "1px solid #166534",
+          backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
+        }}>✓ Complete</button>
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setShowSnooze(!showSnooze)} style={{
+            padding: "4px 10px", borderRadius: 4, border: "1px solid #27272a",
+            backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer",
+          }}>⏰ Snooze</button>
+          {showSnooze && (
+            <SnoozePicker
+              onSnooze={(until) => { setShowSnooze(false); onSnooze(until); }}
+              onClose={() => setShowSnooze(false)}
+            />
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function ActionBtn({ label }: { label: string }) {
+  return (
+    <button style={{
+      padding: "4px 10px", borderRadius: 4, border: "1px solid #27272a",
+      backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer",
+    }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+    >{label}</button>
   );
 }
 
@@ -371,46 +499,81 @@ function CommHub() {
 export default function OscClient() {
   const { filter, labels } = useGlobalFilter();
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [communities, setCommunities] = useState<CommunityRef[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionItem, setActionItem] = useState<QueueItem | null>(null);
   const [actionType, setActionType] = useState<ActionType>(null);
+  const [activeBucket, setActiveBucket] = useState<QueueBucket>("new_inbound");
 
-  const fetchQueue = useCallback(async () => {
+  // ── Fetch queue + tasks ──
+  const fetchData = useCallback(async () => {
     if (!filter.divisionId) return;
     setLoading(true);
 
-    // Get communities for this division
+    // Communities for this division
     const { data: comms } = await supabase
       .from("communities").select("id, name").eq("division_id", filter.divisionId).order("name");
     setCommunities(comms ?? []);
 
-    // Get queue items (opportunities with crm_stage = 'queue') for this division
+    // Queue items
     const { data: items } = await supabase
       .from("opportunities")
-      .select("id, contact_id, crm_stage, community_id, division_id, source, opportunity_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
+      .select("id, contact_id, crm_stage, community_id, division_id, source, opportunity_source, queue_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
       .eq("crm_stage", "queue")
       .eq("division_id", filter.divisionId)
       .order("last_activity_at", { ascending: false });
 
-    // Supabase returns arrays for single-FK joins — flatten to single objects
-    const flat = (items ?? []).map((item: any) => ({
+    const flat = (items ?? []).map((item: Record<string, unknown>) => ({
       ...item,
-      contacts: Array.isArray(item.contacts) ? item.contacts[0] ?? null : item.contacts,
-      communities: Array.isArray(item.communities) ? item.communities[0] ?? null : item.communities,
-    }));
+      contacts: Array.isArray(item.contacts) ? (item.contacts as Record<string, unknown>[])[0] ?? null : item.contacts,
+      communities: Array.isArray(item.communities) ? (item.communities as Record<string, unknown>[])[0] ?? null : item.communities,
+    })) as QueueItem[];
     setQueueItems(flat);
+
+    // Tasks
+    const now = new Date().toISOString();
+    const { data: taskData } = await supabase
+      .from("tasks")
+      .select("id, title, description, priority, channel, status, due_at, snoozed_until, completed_at, ai_suggestion, contact_id, opportunity_id, division_id, created_at, contacts(first_name, last_name)")
+      .eq("division_id", filter.divisionId)
+      .eq("status", "pending")
+      .or(`snoozed_until.is.null,snoozed_until.lte.${now}`)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    const flatTasks = (taskData ?? []).map((t: Record<string, unknown>) => ({
+      ...t,
+      contacts: Array.isArray(t.contacts) ? (t.contacts as Record<string, unknown>[])[0] ?? null : t.contacts,
+    })) as TaskItem[];
+    setTasks(flatTasks);
+
     setLoading(false);
   }, [filter.divisionId]);
 
   useEffect(() => {
     if (!filter.divisionId) {
       setQueueItems([]);
+      setTasks([]);
       setCommunities([]);
       return;
     }
-    fetchQueue();
-  }, [filter.divisionId, fetchQueue]);
+    fetchData();
+  }, [filter.divisionId, fetchData]);
+
+  // ── Bucketed queue ──
+  const bucketCounts: Record<QueueBucket, number> = {
+    new_inbound: 0, re_engaged: 0, demoted: 0, ai_surfaced: 0, customer: 0,
+  };
+  const bucketedItems: Record<QueueBucket, QueueItem[]> = {
+    new_inbound: [], re_engaged: [], demoted: [], ai_surfaced: [], customer: [],
+  };
+  for (const item of queueItems) {
+    const bucket = classifyBucket(item);
+    bucketCounts[bucket]++;
+    bucketedItems[bucket].push(item);
+  }
+  const currentBucketItems = bucketedItems[activeBucket];
 
   // ── Execute promotion/demotion ──
   async function handleAction(oppId: string, newStage: string, communityId: string | null, reason: string) {
@@ -427,7 +590,6 @@ export default function OscClient() {
       console.error("Stage transition failed:", error);
       alert(`Error: ${error.message}`);
     } else {
-      // Log the transition manually (trigger handles it too, but let's add the reason)
       const item = queueItems.find(q => q.id === oppId);
       if (item) {
         await supabase.from("stage_transitions").insert({
@@ -444,9 +606,38 @@ export default function OscClient() {
 
     setActionItem(null);
     setActionType(null);
-    fetchQueue(); // Refresh the queue
+    fetchData();
   }
 
+  // ── Complete task ──
+  async function handleCompleteTask(taskId: string) {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error("Task completion failed:", error);
+      alert(`Error: ${error.message}`);
+    }
+    fetchData();
+  }
+
+  // ── Snooze task ──
+  async function handleSnoozeTask(taskId: string, until: string) {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ snoozed_until: until })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error("Task snooze failed:", error);
+      alert(`Error: ${error.message}`);
+    }
+    fetchData();
+  }
+
+  // ── No division selected ──
   if (!filter.divisionId) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#09090b", color: "#fafafa" }}>
@@ -461,7 +652,7 @@ export default function OscClient() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#09090b", color: "#fafafa" }}>
-      {/* Top bar */}
+      {/* ── Top Bar ── */}
       <div style={{
         padding: "10px 24px", borderBottom: "1px solid #27272a",
         display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
@@ -486,15 +677,15 @@ export default function OscClient() {
         </div>
       </div>
 
-      {/* Content */}
+      {/* ── Content ── */}
       <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
         {loading ? (
-          <div style={{ textAlign: "center", color: "#52525b", padding: 48 }}>Loading queue...</div>
+          <div style={{ textAlign: "center", color: "#52525b", padding: 48 }}>Loading...</div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, alignItems: "start" }}>
-            {/* LEFT: Queue */}
+            {/* ── LEFT: Sub-bucketed Queue ── */}
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Queue</span>
                 <span style={{
                   fontSize: 10, padding: "1px 6px", borderRadius: 4,
@@ -504,16 +695,43 @@ export default function OscClient() {
                 }}>{queueItems.length === 0 ? "✓ Clear" : `${queueItems.length} pending`}</span>
               </div>
 
-              {queueItems.length === 0 ? (
+              {/* Bucket tabs */}
+              <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12 }}>
+                {BUCKET_META.map(b => {
+                  const isActive = activeBucket === b.id;
+                  const count = bucketCounts[b.id];
+                  return (
+                    <button key={b.id} onClick={() => setActiveBucket(b.id)} style={{
+                      padding: "8px 12px", fontSize: 11, fontWeight: isActive ? 600 : 400,
+                      color: isActive ? "#fafafa" : "#52525b",
+                      borderBottom: isActive ? "2px solid #fafafa" : "2px solid transparent",
+                      background: "none", border: "none", borderBottomStyle: "solid",
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                      whiteSpace: "nowrap",
+                    }}>
+                      <span>{b.icon}</span>
+                      <span>{b.label}</span>
+                      <span style={{
+                        fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600,
+                        backgroundColor: count > 0 ? "#7f1d1d" : "#27272a",
+                        color: count > 0 ? "#fca5a5" : "#71717a",
+                      }}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Queue items for active bucket */}
+              {currentBucketItems.length === 0 ? (
                 <div style={{
-                  padding: 48, textAlign: "center", backgroundColor: "#052e16", border: "1px solid #166534",
-                  borderRadius: 8, color: "#4ade80", fontSize: 14, fontWeight: 500,
+                  padding: 32, textAlign: "center", backgroundColor: "#18181b", border: "1px solid #27272a",
+                  borderRadius: 8, color: "#52525b", fontSize: 12,
                 }}>
-                  ✓ Queue is clear — all contacts routed
+                  No items in {BUCKET_META.find(b => b.id === activeBucket)?.label ?? "this bucket"}
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {queueItems.map(item => (
+                  {currentBucketItems.map(item => (
                     <QueueCard
                       key={item.id}
                       item={item}
@@ -525,15 +743,42 @@ export default function OscClient() {
               )}
             </div>
 
-            {/* RIGHT: Comm Hub */}
+            {/* ── RIGHT: Action Items (Tasks) ── */}
             <div>
-              <CommHub />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Action Items</span>
+                <span style={{
+                  fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600,
+                  backgroundColor: tasks.length > 0 ? "#422006" : "#052e16",
+                  color: tasks.length > 0 ? "#fbbf24" : "#4ade80",
+                }}>{tasks.length} pending</span>
+              </div>
+
+              {tasks.length === 0 ? (
+                <div style={{
+                  padding: 32, textAlign: "center", backgroundColor: "#052e16", border: "1px solid #166534",
+                  borderRadius: 8, color: "#4ade80", fontSize: 12, fontWeight: 500,
+                }}>
+                  ✓ All tasks complete
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {tasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onComplete={() => handleCompleteTask(task.id)}
+                      onSnooze={(until) => handleSnoozeTask(task.id, until)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Action Modal */}
+      {/* ── Action Modal ── */}
       {actionItem && actionType && (
         <ActionModal
           item={actionItem}
