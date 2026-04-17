@@ -1,12 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 import PageShell from "@/components/PageShell";
 import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/TableSubHeader";
 import SlideOver, { Section, Row } from "@/components/SlideOver";
 import Badge from "@/components/Badge";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import DataTable, { type Column } from "@/components/DataTable";
+
+// ─── Supabase client (for client-side fetches) ───────────────────────────────
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_XGwL4p2FD0Af58_sidErwg_In1FU_9o"
+);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,7 +23,7 @@ interface Division { id: string; slug: string; name: string; }
 
 interface Customer {
   id: string;
-  contact_id: string;
+  contact_id: string | null;
   first_name: string;
   last_name: string;
   email: string | null;
@@ -23,11 +31,22 @@ interface Customer {
   community_id: string | null;
   community_name: string | null;
   division_id: string | null;
+  division_name: string | null;
   floor_plan_name: string | null;
   purchase_price: number | null;
   settlement_date: string | null;
   move_in_date: string | null;
   post_sale_stage: string;
+  last_activity_at: string | null;
+  created_at: string;
+}
+
+interface StageTransition {
+  id: string;
+  from_stage: string | null;
+  to_stage: string | null;
+  triggered_by: string | null;
+  reason: string | null;
   created_at: string;
 }
 
@@ -54,6 +73,7 @@ function formatPrice(price: number | null): string {
 
 function getStageLabel(stage: string): string {
   const map: Record<string, string> = {
+    homeowner: "Homeowner",
     sold_not_started: "Sold — Not Started",
     under_construction: "Under Construction",
     settled: "Settled",
@@ -63,6 +83,7 @@ function getStageLabel(stage: string): string {
 
 function getStageColor(stage: string): { color: string; bg: string; border: string } {
   const map: Record<string, { color: string; bg: string; border: string }> = {
+    homeowner: { color: "#00c853", bg: "#1a2a1a", border: "#1f3f1f" },
     sold_not_started: { color: "#f5a623", bg: "#2a2a1a", border: "#3f3a1f" },
     under_construction: { color: "#0070f3", bg: "#1a1f2e", border: "#1a2a3f" },
     settled: { color: "#00c853", bg: "#1a2a1a", border: "#1f3f1f" },
@@ -73,9 +94,7 @@ function getStageColor(stage: string): { color: string; bg: string; border: stri
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 const STATS: StatConfig<CustomerRow>[] = [
-  { label: "Sold — Not Started", getValue: (r) => r.filter(x => x.post_sale_stage === "sold_not_started").length },
-  { label: "Under Construction", getValue: (r) => r.filter(x => x.post_sale_stage === "under_construction").length },
-  { label: "Settled", getValue: (r) => r.filter(x => x.post_sale_stage === "settled").length },
+  { label: "Total", getValue: (r) => r.length },
   {
     label: "Avg Price",
     getValue: (r) => {
@@ -94,8 +113,25 @@ function CustomersInner({ customers, communities, divisions }: Props) {
   const [selected, setSelected] = useState<Customer | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [history, setHistory] = useState<StageTransition[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => { setPage(0); }, [search, filter.divisionId, filter.communityId]);
+
+  // Fetch stage transition history when a row is selected
+  useEffect(() => {
+    if (!selected) { setHistory([]); return; }
+    setHistoryLoading(true);
+    supabase
+      .from("stage_transitions")
+      .select("id, from_stage, to_stage, triggered_by, reason, created_at")
+      .eq("opportunity_id", selected.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setHistory(data ?? []);
+        setHistoryLoading(false);
+      });
+  }, [selected]);
 
   const filtered = customers.filter(c => {
     if (filter.communityId && c.community_id !== filter.communityId) return false;
@@ -116,7 +152,7 @@ function CustomersInner({ customers, communities, divisions }: Props) {
       ...c,
       _name: `${c.first_name} ${c.last_name}`,
       _community: comm?.name ?? c.community_name ?? "—",
-      _division: div?.name ?? comm?.division_name ?? "—",
+      _division: div?.name ?? c.division_name ?? comm?.division_name ?? "—",
       _stage_label: getStageLabel(c.post_sale_stage),
       _price: formatPrice(c.purchase_price),
     };
@@ -124,7 +160,7 @@ function CustomersInner({ customers, communities, divisions }: Props) {
 
   const allRows = customers.map(c => {
     const comm = communities.find(x => x.id === c.community_id);
-    return { ...c, _name: `${c.first_name} ${c.last_name}`, _community: comm?.name ?? "—", _division: comm?.division_name ?? "—", _stage_label: getStageLabel(c.post_sale_stage), _price: formatPrice(c.purchase_price) };
+    return { ...c, _name: `${c.first_name} ${c.last_name}`, _community: comm?.name ?? c.community_name ?? "—", _division: c.division_name ?? comm?.division_name ?? "—", _stage_label: getStageLabel(c.post_sale_stage), _price: formatPrice(c.purchase_price) };
   });
 
   const tableColumns: Column<CustomerRow>[] = [
@@ -187,6 +223,7 @@ function CustomersInner({ customers, communities, divisions }: Props) {
             </Section>
             <Section title="Home">
               <Row label="Community" value={community?.name ?? selected.community_name} />
+              <Row label="Division" value={selected.division_name} />
               <Row label="Floor Plan" value={selected.floor_plan_name} />
               <Row label="Purchase Price" value={formatPrice(selected.purchase_price)} />
             </Section>
@@ -194,6 +231,27 @@ function CustomersInner({ customers, communities, divisions }: Props) {
               <Row label="Settlement" value={selected.settlement_date ? new Date(selected.settlement_date).toLocaleDateString() : null} />
               <Row label="Move-In" value={selected.move_in_date ? new Date(selected.move_in_date).toLocaleDateString() : null} />
               <Row label="Created" value={new Date(selected.created_at).toLocaleString()} />
+            </Section>
+            <Section title="History">
+              {historyLoading ? (
+                <p style={{ fontSize: 12, color: "#555", margin: 0 }}>Loading…</p>
+              ) : history.length === 0 ? (
+                <p style={{ fontSize: 12, color: "#555", margin: 0 }}>No stage transitions recorded</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {history.map(t => (
+                    <div key={t.id} style={{ fontSize: 12, color: "#888", lineHeight: 1.5 }}>
+                      <span style={{ color: "#aaa" }}>{t.from_stage ?? "—"}</span>
+                      <span style={{ color: "#555", margin: "0 6px" }}>→</span>
+                      <span style={{ color: "#ededed" }}>{t.to_stage ?? "—"}</span>
+                      {t.triggered_by && <span style={{ color: "#555", marginLeft: 8 }}>by {t.triggered_by}</span>}
+                      {t.reason && <span style={{ color: "#555", marginLeft: 8 }}>— {t.reason}</span>}
+                      <br />
+                      <span style={{ color: "#444", fontSize: 11 }}>{new Date(t.created_at).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Section>
           </div>
         )}

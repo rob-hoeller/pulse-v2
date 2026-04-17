@@ -9,11 +9,12 @@ export default async function CustomersPage() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 
-  const [{ data: homeOwners }, { data: rawCommunities }, { data: divisions }] = await Promise.all([
+  const [{ data: opps }, { data: rawCommunities }, { data: divisions }] = await Promise.all([
     supabase
-      .from("home_owners")
-      .select("*, contacts(first_name, last_name, email, phone), communities(name, division_id), floor_plans(marketing_name)")
-      .order("created_at", { ascending: false }),
+      .from("opportunities")
+      .select("*, contacts(first_name, last_name, email, phone), communities(name), divisions(name), floor_plans(marketing_name)")
+      .eq("crm_stage", "homeowner")
+      .order("last_activity_at", { ascending: false }),
     supabase
       .from("communities")
       .select("id, name, slug, divisions(slug, name)")
@@ -21,23 +22,24 @@ export default async function CustomersPage() {
     supabase.from("divisions").select("id, slug, name").order("name"),
   ]);
 
-  // Flatten — home_owners uses contact_id FK to contacts table
-  const flatCustomers = (homeOwners ?? []).map((h: any) => ({
-    id: h.id,
-    contact_id: h.contact_id,
-    first_name: h.contacts?.first_name ?? "—",
-    last_name: h.contacts?.last_name ?? "",
-    email: h.contacts?.email ?? null,
-    phone: h.contacts?.phone ?? null,
-    community_id: h.community_id,
-    community_name: h.communities?.name ?? null,
-    division_id: h.division_id ?? h.communities?.division_id ?? null,
-    floor_plan_name: h.floor_plans?.marketing_name ?? null,
-    purchase_price: h.purchase_price,
-    settlement_date: h.settlement_date,
-    move_in_date: h.move_in_date,
-    post_sale_stage: h.post_sale_stage ?? "sold_not_started",
-    created_at: h.created_at,
+  const flatCustomers = (opps ?? []).map((o: any) => ({
+    id: o.id,
+    contact_id: o.contact_id ?? null as string | null,
+    first_name: o.contacts?.first_name ?? "—",
+    last_name: o.contacts?.last_name ?? "",
+    email: o.contacts?.email ?? null,
+    phone: o.contacts?.phone ?? null,
+    community_id: o.community_id ?? null,
+    community_name: o.communities?.name ?? null,
+    division_id: o.division_id ?? null,
+    division_name: o.divisions?.name ?? null,
+    floor_plan_name: o.floor_plans?.marketing_name ?? null,
+    purchase_price: o.purchase_price ?? null,
+    settlement_date: o.settlement_date ?? null,
+    move_in_date: o.move_in_date ?? null,
+    post_sale_stage: "homeowner",
+    last_activity_at: o.last_activity_at ?? o.created_at,
+    created_at: o.created_at,
   }));
 
   const communities = (rawCommunities ?? []).map((c: any) => ({

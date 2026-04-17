@@ -9,11 +9,12 @@ export default async function ProspectsPage() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 
-  const [{ data: prospects }, { data: rawCommunities }, { data: divisions }] = await Promise.all([
+  const [{ data: opps }, { data: rawCommunities }, { data: divisions }] = await Promise.all([
     supabase
-      .from("prospects")
-      .select("*, communities(name, division_id)")
-      .order("last_contacted_at", { ascending: false }),
+      .from("opportunities")
+      .select("*, contacts(first_name, last_name, email, phone), communities(name), divisions(name), floor_plans(marketing_name)")
+      .in("crm_stage", ["prospect_c", "prospect_b", "prospect_a"])
+      .order("last_activity_at", { ascending: false }),
     supabase
       .from("communities")
       .select("id, name, slug, divisions(slug, name)")
@@ -21,28 +22,28 @@ export default async function ProspectsPage() {
     supabase.from("divisions").select("id, slug, name").order("name"),
   ]);
 
-  // Flatten — prospects table has first_name/last_name directly (v1 schema)
-  const flatProspects = (prospects ?? []).map((p: any) => ({
-    id: p.id,
-    contact_id: null as string | null,
-    first_name: p.first_name ?? "—",
-    last_name: p.last_name ?? "",
-    email: p.email ?? null,
-    phone: p.phone ?? null,
-    crm_stage: p.stage ?? "prospect_c",
-    community_id: p.community_id,
-    community_name: p.communities?.name ?? null,
-    division_id: p.communities?.division_id ?? null,
-    floor_plan_name: null,
-    csm_id: p.assigned_osc_id ?? null,
-    budget_min: p.budget_min,
-    budget_max: p.budget_max,
-    contract_date: null,
-    estimated_move_in: p.desired_move_in,
-    last_activity_at: p.last_contacted_at,
-    notes: null,
-    is_active: true,
-    created_at: p.created_at,
+  const flatProspects = (opps ?? []).map((o: any) => ({
+    id: o.id,
+    contact_id: o.contact_id ?? null as string | null,
+    first_name: o.contacts?.first_name ?? "—",
+    last_name: o.contacts?.last_name ?? "",
+    email: o.contacts?.email ?? null,
+    phone: o.contacts?.phone ?? null,
+    crm_stage: o.crm_stage,
+    community_id: o.community_id ?? null,
+    community_name: o.communities?.name ?? null,
+    division_id: o.division_id ?? null,
+    division_name: o.divisions?.name ?? null,
+    floor_plan_name: o.floor_plans?.marketing_name ?? null,
+    csm_id: null,
+    budget_min: o.budget_min ?? null,
+    budget_max: o.budget_max ?? null,
+    contract_date: o.contract_date ?? null,
+    estimated_move_in: o.desired_move_in ?? null,
+    last_activity_at: o.last_activity_at ?? o.created_at,
+    notes: o.notes ?? null,
+    is_active: o.is_active ?? true,
+    created_at: o.created_at,
   }));
 
   const communities = (rawCommunities ?? []).map((c: any) => ({

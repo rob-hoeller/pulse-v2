@@ -9,11 +9,11 @@ export default async function QueuePage() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 
-  const [{ data: leads }, { data: rawCommunities }, { data: divisions }] = await Promise.all([
+  const [{ data: opps }, { data: rawCommunities }, { data: divisions }] = await Promise.all([
     supabase
-      .from("leads")
-      .select("*, communities(name, division_id)")
-      .eq("stage", "opportunity")
+      .from("opportunities")
+      .select("*, contacts(first_name, last_name, email, phone), communities(name), divisions(name)")
+      .eq("crm_stage", "queue")
       .order("last_activity_at", { ascending: false }),
     supabase
       .from("communities")
@@ -22,24 +22,25 @@ export default async function QueuePage() {
     supabase.from("divisions").select("id, slug, name").order("name"),
   ]);
 
-  // Leads table has first_name/last_name directly; opportunities are leads with stage='opportunity'
-  const flatOpps = (leads ?? []).map((l: any) => ({
-    id: l.id,
-    contact_id: null,
-    first_name: l.first_name ?? "—",
-    last_name: l.last_name ?? "",
-    email: l.email ?? null,
-    phone: l.phone ?? null,
-    source: l.source ?? null,
-    opportunity_source: l.substage ?? null,
-    community_id: l.community_id ?? null,
-    division_id: l.communities?.division_id ?? null,
+  const flatOpps = (opps ?? []).map((o: any) => ({
+    id: o.id,
+    contact_id: o.contact_id ?? null,
+    first_name: o.contacts?.first_name ?? "—",
+    last_name: o.contacts?.last_name ?? "",
+    email: o.contacts?.email ?? null,
+    phone: o.contacts?.phone ?? null,
+    source: o.source ?? null,
+    opportunity_source: o.opportunity_source ?? null,
+    community_id: o.community_id ?? null,
+    community_name: o.communities?.name ?? null,
+    division_id: o.division_id ?? null,
+    division_name: o.divisions?.name ?? null,
     osc_id: null,
     osc_route_decision: null,
-    notes: l.notes ?? null,
-    is_active: true,
-    last_activity_at: l.last_activity_at ?? l.created_at,
-    created_at: l.created_at,
+    notes: o.notes ?? null,
+    is_active: o.is_active ?? true,
+    last_activity_at: o.last_activity_at ?? o.created_at,
+    created_at: o.created_at,
   }));
 
   const communities = (rawCommunities ?? []).map((c: any) => ({
