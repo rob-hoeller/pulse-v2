@@ -478,7 +478,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
           top: 0,
           right: 0,
           bottom: 0,
-          width: 480,
+          width: 580,
           background: "#111",
           borderLeft: "1px solid #1f1f1f",
           zIndex: 50,
