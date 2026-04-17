@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
+import OpportunityPanel, { type OpportunityPanelData } from "@/components/OpportunityPanel";
 import PipelineDetailView, { type PipelineItem } from "@/components/PipelineDetailView";
 
 const supabase = createClient(
@@ -428,10 +429,12 @@ function SnoozePicker({ onSnooze, onClose }: { onSnooze: (until: string) => void
 // ─── Queue Card ───────────────────────────────────────────────────────────────
 
 function QueueCard({
-  item, onAssign, divisionName,
+  item, onAssign, onNameClick, onQuickAssign, divisionName,
 }: {
   item: QueueItem;
   onAssign: () => void;
+  onNameClick: () => void;
+  onQuickAssign: () => void;
   divisionName: string;
 }) {
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
@@ -452,7 +455,7 @@ function QueueCard({
         alignItems: "center", gap: 12,
       }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#fafafa" }}>{name}</div>
+          <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{name}</div>
           <div style={{ fontSize: 10, color: "#52525b", marginTop: 2 }}>
             {divisionName}{item.communities?.name ? ` · ${item.communities.name}` : ""} · {item.opportunity_source ?? item.source ?? "webform"}
           </div>
@@ -481,10 +484,14 @@ function QueueCard({
           <div>{item.last_activity_at ? new Date(item.last_activity_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + new Date(item.last_activity_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "—"}</div>
           <div style={{ fontSize: 10, color: "#3f3f46" }}>{relativeTime(item.last_activity_at)}</div>
         </div>
-        <button onClick={e => { e.stopPropagation(); onAssign(); }} style={{
-          padding: "4px 10px", borderRadius: 4, border: "1px solid #3f3f46",
-          backgroundColor: "#18181b", color: "#a1a1aa", fontSize: 11, fontWeight: 600, cursor: "pointer",
+        <button onClick={e => { e.stopPropagation(); onQuickAssign(); }} title="Quick assign with AI suggestion" style={{
+          padding: "4px 10px", borderRadius: 4, border: "1px solid #166534",
+          backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
         }}>→ Assign</button>
+        <button onClick={e => { e.stopPropagation(); onAssign(); }} title="Custom assign" style={{
+          padding: "4px 6px", borderRadius: 4, border: "1px solid #3f3f46",
+          backgroundColor: "#18181b", color: "#71717a", fontSize: 11, cursor: "pointer",
+        }}>⋯</button>
       </div>
 
       {/* Expanded details */}
@@ -888,6 +895,7 @@ export default function OscClient() {
   const [communities, setCommunities] = useState<CommunityRef[]>([]);
   const [loading, setLoading] = useState(false);
   const [assignItem, setAssignItem] = useState<QueueItem | null>(null);
+  const [panelItem, setPanelItem] = useState<QueueItem | null>(null);
   const [activeBucket, setActiveBucket] = useState<QueueBucket>("new_inbound");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [oscUsers, setOscUsers] = useState<TeamUser[]>([]);
@@ -1267,6 +1275,17 @@ export default function OscClient() {
                       item={item}
                       divisionName={labels.division ?? ""}
                       onAssign={() => { setAssignItem(item); }}
+                      onNameClick={() => { setPanelItem(item); }}
+                      onQuickAssign={() => {
+                        // Quick assign with AI suggestion — determine default lane
+                        const src = item.opportunity_source ?? item.source;
+                        const defaultStage = src === "subscribe_region" ? "lead_div"
+                          : (src === "schedule_appt" || src === "schedule_visit") ? "prospect_c"
+                          : item.community_id ? "lead_com" : "lead_div";
+                        handleAction(item.id, defaultStage,
+                          defaultStage === "lead_div" ? null : item.community_id,
+                          "AI-suggested quick assign");
+                      }}
                     />
                   ))}
                 </div>
