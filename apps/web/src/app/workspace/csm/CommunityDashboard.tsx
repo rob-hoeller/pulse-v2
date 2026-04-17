@@ -19,6 +19,99 @@ interface CommunityViewProps {
   divisions: { id: string; name: string; slug: string }[];
 }
 
+interface MonthGoal {
+  month: string;
+  sales: number;
+  goal: number;
+}
+
+interface StubMessage {
+  id: string;
+  name: string;
+  initials: string;
+  channel: "call" | "text" | "email";
+  badges: ("urgent" | "needs-response")[];
+  preview: string;
+  aiSuggestion?: string;
+  time: string;
+}
+
+// ─── Stubbed Data ─────────────────────────────────────────────────────────────
+
+const MONTH_GOALS: MonthGoal[] = [
+  { month: "JAN", sales: 3, goal: 4 },
+  { month: "FEB", sales: 5, goal: 4 },
+  { month: "MAR", sales: 4, goal: 4 },
+  { month: "APR", sales: 2, goal: 4 },
+  { month: "MAY", sales: 0, goal: 4 },
+  { month: "JUN", sales: 0, goal: 5 },
+  { month: "JUL", sales: 0, goal: 5 },
+  { month: "AUG", sales: 0, goal: 5 },
+  { month: "SEP", sales: 0, goal: 4 },
+  { month: "OCT", sales: 0, goal: 4 },
+  { month: "NOV", sales: 0, goal: 3 },
+  { month: "DEC", sales: 0, goal: 3 },
+];
+
+const STUB_MESSAGES: StubMessage[] = [
+  {
+    id: "m1",
+    name: "Sarah Mitchell",
+    initials: "SM",
+    channel: "call",
+    badges: ["urgent"],
+    preview: "Called about lot 42 pricing — wants to schedule a walkthrough this weekend.",
+    aiSuggestion: "Confirm availability for Saturday 10am and send lot premium sheet.",
+    time: "12m ago",
+  },
+  {
+    id: "m2",
+    name: "James Rivera",
+    initials: "JR",
+    channel: "email",
+    badges: ["needs-response"],
+    preview: "Re: HOA fees and community amenities — requesting updated brochure.",
+    aiSuggestion: "Send latest community brochure PDF and HOA breakdown.",
+    time: "1h ago",
+  },
+  {
+    id: "m3",
+    name: "Karen & Tom Wells",
+    initials: "KW",
+    channel: "text",
+    badges: ["urgent", "needs-response"],
+    preview: "Can we move our appointment to next Tuesday? Also have questions about the Ashton plan.",
+    time: "2h ago",
+  },
+  {
+    id: "m4",
+    name: "David Chen",
+    initials: "DC",
+    channel: "call",
+    badges: [],
+    preview: "Follow-up call completed — confirmed interest in QD home on lot 18.",
+    time: "3h ago",
+  },
+  {
+    id: "m5",
+    name: "Lisa Patel",
+    initials: "LP",
+    channel: "email",
+    badges: ["needs-response"],
+    preview: "Asking about 55+ eligibility requirements and available floor plans.",
+    aiSuggestion: "Share eligibility guide and link to virtual tours for Captiva and Sanibel plans.",
+    time: "5h ago",
+  },
+];
+
+type CommTab = "urgent" | "needs-response" | "call" | "text" | "email";
+
+const CHANNEL_ICONS: Record<string, string> = {
+  call: "📞",
+  text: "💬",
+  email: "✉️",
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatPrice(n: number | null): string {
@@ -158,6 +251,256 @@ function MiniTable({ headers, rows }: { headers: string[]; rows: React.ReactNode
 
 type DrillPanel = null | "plans" | "lots" | "leads" | "prospects" | "customers" | "appointments" | "qd";
 
+// ─── Sales Goal Strip ─────────────────────────────────────────────────────────
+
+function SalesGoalStrip() {
+  const ytdSales = MONTH_GOALS.reduce((s, m) => s + m.sales, 0);
+  const ytdGoal = MONTH_GOALS.reduce((s, m) => s + m.goal, 0);
+
+  return (
+    <div style={{ padding: "16px 24px" }}>
+      <div style={{
+        display: "flex",
+        alignItems: "stretch",
+        gap: 0,
+        border: "1px solid #27272a",
+        borderRadius: 8,
+        overflow: "hidden",
+        backgroundColor: "#09090b",
+      }}>
+        {/* YTD Summary */}
+        <div style={{
+          padding: "12px 20px",
+          borderRight: "1px solid #27272a",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          minWidth: 120,
+          gap: 2,
+        }}>
+          <span style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>YTD</span>
+          <span style={{ fontSize: 18, fontWeight: 600, color: "#fafafa" }}>Sales: {ytdSales}</span>
+          <span style={{ fontSize: 11, color: "#52525b" }}>Goal: {ytdSales} / {ytdGoal}</span>
+        </div>
+        {/* Monthly columns */}
+        {MONTH_GOALS.map((m) => {
+          const met = m.sales >= m.goal && m.goal > 0;
+          return (
+            <div key={m.month} style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "10px 4px",
+              borderRight: "1px solid #18181b",
+              borderBottom: `2px solid ${met ? "#22c55e" : "#27272a"}`,
+              minWidth: 0,
+            }}>
+              <span style={{ fontSize: 10, color: "#52525b", fontWeight: 500, letterSpacing: "0.05em" }}>{m.month}</span>
+              <span style={{ fontSize: 16, fontWeight: 600, color: m.sales > 0 ? "#fafafa" : "#3f3f46", marginTop: 2 }}>{m.sales}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Communication Hub ────────────────────────────────────────────────────────
+
+function CommunicationHub() {
+  const [activeTab, setActiveTab] = useState<CommTab>("urgent");
+
+  const filteredMessages = STUB_MESSAGES.filter((msg) => {
+    switch (activeTab) {
+      case "urgent": return msg.badges.includes("urgent");
+      case "needs-response": return msg.badges.includes("needs-response");
+      case "call": return msg.channel === "call";
+      case "text": return msg.channel === "text";
+      case "email": return msg.channel === "email";
+      default: return true;
+    }
+  });
+
+  const tabs: { key: CommTab; label: string }[] = [
+    { key: "urgent", label: "Urgent" },
+    { key: "needs-response", label: "Needs Response" },
+    { key: "call", label: "Call" },
+    { key: "text", label: "Text" },
+    { key: "email", label: "Email" },
+  ];
+
+  return (
+    <div style={{ flex: "0 0 60%", minWidth: 0 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#fafafa", marginBottom: 12 }}>Communication Hub</div>
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            style={{
+              padding: "6px 14px",
+              fontSize: 11,
+              fontWeight: 500,
+              borderRadius: 6,
+              border: `1px solid ${activeTab === t.key ? "#3f3f46" : "#27272a"}`,
+              backgroundColor: activeTab === t.key ? "#27272a" : "transparent",
+              color: activeTab === t.key ? "#fafafa" : "#71717a",
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {/* Message list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {filteredMessages.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", fontSize: 12, color: "#3f3f46", border: "1px solid #27272a", borderRadius: 8 }}>
+            No messages in this category
+          </div>
+        ) : (
+          filteredMessages.map((msg) => (
+            <div
+              key={msg.id}
+              style={{
+                padding: "12px 16px",
+                backgroundColor: "#18181b",
+                borderRadius: 8,
+                border: "1px solid #27272a",
+                cursor: "pointer",
+                transition: "border-color 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#3f3f46")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#27272a")}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                {/* Avatar */}
+                <div style={{
+                  width: 32, height: 32, borderRadius: "50%",
+                  backgroundColor: "#27272a", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 600, color: "#a1a1aa", flexShrink: 0,
+                }}>
+                  {msg.initials}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: "#fafafa" }}>{msg.name}</span>
+                    {msg.badges.includes("urgent") && (
+                      <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, backgroundColor: "#450a0a", color: "#fca5a5", fontWeight: 500 }}>Urgent</span>
+                    )}
+                    {msg.badges.includes("needs-response") && (
+                      <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, backgroundColor: "#172554", color: "#93c5fd", fontWeight: 500 }}>Needs Response</span>
+                    )}
+                    <span style={{ fontSize: 11, marginLeft: "auto", flexShrink: 0 }}>{CHANNEL_ICONS[msg.channel] ?? ""}</span>
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, color: "#52525b", flexShrink: 0 }}>{msg.time}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{msg.preview}</div>
+              {msg.aiSuggestion && (
+                <div style={{
+                  marginTop: 8, padding: "8px 12px", borderRadius: 6,
+                  backgroundColor: "#052e16", border: "1px solid #14532d",
+                  fontSize: 11, color: "#86efac", lineHeight: 1.4,
+                }}>
+                  <span style={{ fontWeight: 600, marginRight: 4 }}>AI:</span>{msg.aiSuggestion}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── AI Scoring Panel ─────────────────────────────────────────────────────────
+
+function AIScoringPanel({ prospects }: { prospects: any[] }) {
+  const high = prospects.filter((p: any) => p.stage === "prospect_a");
+  const medium = prospects.filter((p: any) => p.stage === "prospect_b");
+  const low = prospects.filter((p: any) => p.stage === "prospect_c");
+  const total = prospects.length || 1;
+
+  const tiers = [
+    { label: "High Priority", count: high.length, color: "#ef4444", bg: "#450a0a", items: high },
+    { label: "Medium", count: medium.length, color: "#eab308", bg: "#422006", items: medium },
+    { label: "Low", count: low.length, color: "#22c55e", bg: "#052e16", items: low },
+  ];
+
+  return (
+    <div style={{ flex: "0 0 40%", minWidth: 0 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#fafafa", marginBottom: 12 }}>AI Prospect Scoring</div>
+      <div style={{
+        padding: 16, backgroundColor: "#18181b", borderRadius: 8, border: "1px solid #27272a",
+        display: "flex", flexDirection: "column", gap: 12,
+      }}>
+        {/* Tier bars */}
+        {tiers.map((tier) => (
+          <div key={tier.label}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: "#a1a1aa", fontWeight: 500 }}>{tier.label}</span>
+              <span style={{ fontSize: 11, color: "#71717a" }}>{tier.count}</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, backgroundColor: "#27272a", overflow: "hidden" }}>
+              <div style={{
+                height: "100%",
+                width: `${Math.round((tier.count / total) * 100)}%`,
+                backgroundColor: tier.color,
+                borderRadius: 3,
+                transition: "width 0.3s",
+              }} />
+            </div>
+          </div>
+        ))}
+
+        {/* Divider */}
+        <div style={{ borderTop: "1px solid #27272a", margin: "4px 0" }} />
+
+        {/* Prospect list */}
+        {high.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 10, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>High Priority Prospects</span>
+            {high.map((p: any, i: number) => (
+              <div key={p.id ?? i} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "8px 10px", borderRadius: 6, backgroundColor: "#09090b", border: "1px solid #27272a",
+              }}>
+                <span style={{ fontSize: 12, color: "#fafafa", fontWeight: 500 }}>{p.first_name} {p.last_name}</span>
+                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#450a0a", color: "#fca5a5", fontWeight: 500 }}>A</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: 16, textAlign: "center", fontSize: 12, color: "#3f3f46" }}>No high priority prospects</div>
+        )}
+
+        {medium.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 10, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Medium Priority</span>
+            {medium.slice(0, 3).map((p: any, i: number) => (
+              <div key={p.id ?? i} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "8px 10px", borderRadius: 6, backgroundColor: "#09090b", border: "1px solid #27272a",
+              }}>
+                <span style={{ fontSize: 12, color: "#fafafa", fontWeight: 500 }}>{p.first_name} {p.last_name}</span>
+                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#422006", color: "#fde047", fontWeight: 500 }}>B</span>
+              </div>
+            ))}
+            {medium.length > 3 && (
+              <span style={{ fontSize: 11, color: "#52525b", textAlign: "center" }}>+{medium.length - 3} more</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 function CommunityView({ community, plans, lots, modelHome, specHomes, divisions }: CommunityViewProps) {
@@ -214,6 +557,9 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
         )}
       </div>
 
+      {/* Sales Goal Strip */}
+      <SalesGoalStrip />
+
       {/* Metric grid */}
       <div style={{ padding: "16px 24px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
@@ -230,6 +576,12 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
           <MetricCard label="Customers" value={customers.length} onClick={() => toggleDrill("customers")} active={drill === "customers"} />
           <MetricCard label="Appointments" value="—" subtitle="Coming soon" />
         </div>
+      </div>
+
+      {/* Communication Hub + AI Scoring */}
+      <div style={{ padding: "0 24px 24px", display: "flex", gap: 16 }}>
+        <CommunicationHub />
+        <AIScoringPanel prospects={prospects} />
       </div>
 
       {/* Drill-down panel */}
