@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
-
-// ─── Supabase client ──────────────────────────────────────────────────────────
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
@@ -13,35 +11,25 @@ const supabase = createClient(
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Opportunity {
+interface QueueItem {
   id: string;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  phone: string | null;
-  source: string | null;
-  substage: string | null;
+  contact_id: string;
+  crm_stage: string;
   community_id: string | null;
-  last_activity_at: string | null;
-  created_at: string;
+  division_id: string | null;
+  source: string | null;
+  opportunity_source: string | null;
   notes: string | null;
-}
-
-interface LeadRow {
-  id: string;
-  first_name: string;
-  last_name: string;
-  stage: string;
-  source: string | null;
-  community_id: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  engagement_score: number | null;
   last_activity_at: string | null;
   created_at: string;
+  contacts: { first_name: string; last_name: string; email: string | null; phone: string | null } | null;
+  communities: { name: string } | null;
 }
 
-interface CommunityRef {
-  id: string;
-  name: string;
-}
+interface CommunityRef { id: string; name: string; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,173 +45,322 @@ function relativeTime(iso: string | null): string {
   return new Date(iso).toLocaleDateString();
 }
 
+function formatBudget(min: number | null, max: number | null): string {
+  if (min == null && max == null) return "—";
+  const fmt = (n: number) => `$${(n / 1000).toFixed(0)}K`;
+  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)}`;
+  if (min != null) return `${fmt(min)}+`;
+  return `up to ${fmt(max!)}`;
+}
+
+function sourceLabel(src: string | null): string {
+  const map: Record<string, string> = {
+    called_osc: "📞 Called", texted_osc: "💬 Texted", webform_interest: "🌐 Web Form",
+    schedule_appt: "📅 Appt Request", ai_auto_promote: "🤖 AI Surfaced",
+    website: "🌐 Website", realtor: "🏠 Realtor", walk_in: "🚶 Walk-in",
+    event: "🎪 Event", phone: "📞 Phone", referral: "👤 Referral",
+    zillow: "🏠 Zillow", social_media: "📱 Social",
+  };
+  return map[src ?? ""] ?? src ?? "—";
+}
+
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      height: "100%", gap: 16, color: "#555", padding: 48,
-    }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 16, padding: 48 }}>
       <div style={{ fontSize: 48, opacity: 0.3 }}>◎</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: "#888" }}>OSC Command Center</div>
-      <div style={{ fontSize: 13, color: "#555", textAlign: "center", maxWidth: 400, lineHeight: 1.6 }}>
-        Select a <strong style={{ color: "#80B602" }}>Division</strong> from the global filter above
-        to view the opportunity inbox and lead pipeline for that division.
-      </div>
-      <div style={{
-        marginTop: 8, fontSize: 11, color: "#444", padding: "8px 16px",
-        backgroundColor: "#161616", borderRadius: 6, border: "1px solid #2a2a2a",
-      }}>
-        Division → Opportunities + Leads load automatically
+      <div style={{ fontSize: 16, fontWeight: 600, color: "#a1a1aa" }}>OSC Command Center</div>
+      <div style={{ fontSize: 13, color: "#71717a", textAlign: "center", maxWidth: 400, lineHeight: 1.6 }}>
+        Select a <strong style={{ color: "#80B602" }}>Division</strong> to load your Queue and Communication Hub.
       </div>
     </div>
   );
 }
 
-// ─── Division Dashboard ───────────────────────────────────────────────────────
+// ─── Action Modal ─────────────────────────────────────────────────────────────
 
-function DivisionDashboard({
-  divisionName, opportunities, leads, communities,
+type ActionType = "promote" | "demote" | null;
+
+function ActionModal({
+  item, action, communities, onClose, onExecute,
 }: {
-  divisionName: string;
-  opportunities: Opportunity[];
-  leads: LeadRow[];
+  item: QueueItem;
+  action: ActionType;
   communities: CommunityRef[];
+  onClose: () => void;
+  onExecute: (oppId: string, newStage: string, communityId: string | null, reason: string) => void;
 }) {
-  const commMap = Object.fromEntries(communities.map(c => [c.id, c.name]));
+  const [targetStage, setTargetStage] = useState(action === "promote" ? "prospect_c" : "lead");
+  const [targetCommunity, setTargetCommunity] = useState(item.community_id ?? "");
+  const [reason, setReason] = useState("");
 
-  const thStyle: React.CSSProperties = {
-    padding: "6px 12px", textAlign: "left", fontSize: 11, color: "#666",
-    fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em",
-    backgroundColor: "#0d0e10", borderBottom: "1px solid #1a1a1a", whiteSpace: "nowrap",
-  };
-  const tdStyle: React.CSSProperties = {
-    padding: "8px 12px", fontSize: 12, color: "#a1a1a1",
-    borderBottom: "1px solid #1a1a1a", whiteSpace: "nowrap",
-  };
+  const promoteOptions = [
+    { value: "prospect_c", label: "Prospect C — 30-90 day horizon" },
+    { value: "prospect_b", label: "Prospect B — Intent within 30 days" },
+    { value: "prospect_a", label: "Prospect A — Contract this week" },
+  ];
+  const demoteOptions = [
+    { value: "lead", label: "Lead — Keep nurturing in community" },
+    { value: "marketing", label: "Marketing — Division-level only" },
+  ];
+  const options = action === "promote" ? promoteOptions : demoteOptions;
+  const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      {/* Header */}
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", zIndex: 50, backdropFilter: "blur(2px)" }} />
       <div style={{
-        padding: "12px 24px", borderBottom: "1px solid #1a1a1a",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: 480, backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 12,
+        zIndex: 51, overflow: "hidden",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: "#ededed" }}>{divisionName}</span>
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid #27272a" }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "#fafafa" }}>
+            {action === "promote" ? "Promote" : "Demote"}: {name}
+          </div>
+          <div style={{ fontSize: 12, color: "#71717a", marginTop: 4 }}>
+            Currently in Queue{item.communities?.name ? ` — ${item.communities.name}` : ""}
+          </div>
         </div>
-        <span style={{ fontSize: 12, color: "#555" }}>
-          {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-        </span>
+        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Target stage */}
+          <div>
+            <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
+              Move to
+            </label>
+            <select value={targetStage} onChange={e => setTargetStage(e.target.value)} style={{
+              width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
+              borderRadius: 6, color: "#fafafa", fontSize: 13, outline: "none",
+            }}>
+              {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+
+          {/* Community (for promote) */}
+          {action === "promote" && (
+            <div>
+              <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
+                Community
+              </label>
+              <select value={targetCommunity} onChange={e => setTargetCommunity(e.target.value)} style={{
+                width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
+                borderRadius: 6, color: "#fafafa", fontSize: 13, outline: "none",
+              }}>
+                <option value="">Select community...</option>
+                {communities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Reason */}
+          <div>
+            <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
+              Reason
+            </label>
+            <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2}
+              placeholder={action === "promote" ? "e.g., Toured model, very interested in Hadley plan" : "e.g., Not ready to build for 12+ months"}
+              style={{
+                width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
+                borderRadius: 6, color: "#a1a1aa", fontSize: 12, outline: "none", resize: "none",
+              }} />
+          </div>
+        </div>
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #27272a", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button onClick={onClose} style={{
+            padding: "8px 16px", borderRadius: 6, border: "1px solid #27272a",
+            backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 12, cursor: "pointer",
+          }}>Cancel</button>
+          <button
+            onClick={() => onExecute(item.id, targetStage, action === "promote" ? targetCommunity : item.community_id, reason)}
+            disabled={action === "promote" && !targetCommunity}
+            style={{
+              padding: "8px 16px", borderRadius: 6, border: "none",
+              backgroundColor: action === "promote" ? "#166534" : "#991b1b",
+              color: "#fafafa", fontSize: 12, fontWeight: 600, cursor: "pointer",
+              opacity: (action === "promote" && !targetCommunity) ? 0.4 : 1,
+            }}>
+            {action === "promote" ? "↑ Promote" : "↓ Demote"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Queue Card ───────────────────────────────────────────────────────────────
+
+function QueueCard({
+  item, onPromote, onDemote,
+}: {
+  item: QueueItem;
+  onPromote: () => void;
+  onDemote: () => void;
+}) {
+  const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div style={{
+      backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8,
+      overflow: "hidden", transition: "border-color 0.15s",
+    }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+    >
+      {/* Main row */}
+      <div onClick={() => setExpanded(!expanded)} style={{
+        padding: "12px 16px", cursor: "pointer",
+        display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto",
+        alignItems: "center", gap: 16,
+      }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "#fafafa" }}>{name}</div>
+          <div style={{ fontSize: 11, color: "#52525b", marginTop: 2 }}>
+            {item.communities?.name ?? "No community"} · {sourceLabel(item.opportunity_source ?? item.source)}
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "#71717a" }}>{item.contacts?.phone ?? "—"}</div>
+        <div style={{ fontSize: 11, color: "#71717a" }}>{formatBudget(item.budget_min, item.budget_max)}</div>
+        <div style={{ fontSize: 11, color: "#52525b" }}>{relativeTime(item.last_activity_at)}</div>
+        <button onClick={e => { e.stopPropagation(); onPromote(); }} style={{
+          padding: "4px 10px", borderRadius: 4, border: "1px solid #166534",
+          backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
+        }}>↑ Promote</button>
+        <button onClick={e => { e.stopPropagation(); onDemote(); }} style={{
+          padding: "4px 10px", borderRadius: 4, border: "1px solid #991b1b",
+          backgroundColor: "#1c1917", color: "#f87171", fontSize: 11, fontWeight: 600, cursor: "pointer",
+        }}>↓ Demote</button>
       </div>
 
-      {/* Stats */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 20, padding: "10px 24px",
-        backgroundColor: "#0d0d0d", borderBottom: "1px solid #1a1a1a",
-      }}>
-        {[
-          { label: "Opportunities", value: opportunities.length, color: "#f5a623" },
-          { label: "Leads", value: leads.length, color: "#a855f7" },
-          { label: "Communities", value: communities.length, color: "#59a6bd" },
-        ].map(s => (
-          <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11, color: "#555" }}>{s.label}:</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{s.value}</span>
+      {/* Expanded details */}
+      {expanded && (
+        <div style={{ padding: "0 16px 12px", borderTop: "1px solid #27272a", paddingTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <div>
+              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Email</span>
+              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.contacts?.email ?? "—"}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Source</span>
+              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{sourceLabel(item.source)}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Created</span>
+              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{new Date(item.created_at).toLocaleDateString()}</div>
+            </div>
           </div>
+          {item.notes && (
+            <div style={{ marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Notes</span>
+              <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{item.notes}</div>
+            </div>
+          )}
+          {/* AI Recommendation stub */}
+          <div style={{
+            marginTop: 8, padding: "10px 14px", backgroundColor: "#052e16", border: "1px solid #166534",
+            borderRadius: 6,
+          }}>
+            <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+              🤖 AI Recommendation
+            </div>
+            <div style={{ fontSize: 12, color: "#86efac", lineHeight: 1.5 }}>
+              {item.opportunity_source === "webform_interest"
+                ? `Responded via web form. Suggest calling within 5 minutes — speed-to-lead is critical. Reference their community interest in ${item.communities?.name ?? "the community"}.`
+                : item.opportunity_source === "called_osc"
+                ? "Inbound caller — high intent. Schedule a model home visit within the next 48 hours."
+                : item.opportunity_source === "texted_osc"
+                ? "Texted the sales line. Reply within 2 minutes with a warm greeting and availability for a call."
+                : `Review this contact's activity and engagement. ${item.budget_min ? `Budget range ${formatBudget(item.budget_min, item.budget_max)} fits available inventory.` : "Budget not yet captured — ask during first contact."}`
+              }
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Comm Hub ─────────────────────────────────────────────────────────────────
+
+type CommTab = "urgent" | "needs_response" | "calls" | "texts" | "emails";
+
+function CommHub() {
+  const [tab, setTab] = useState<CommTab>("urgent");
+  const tabs: { id: CommTab; label: string; count: number }[] = [
+    { id: "urgent", label: "Urgent", count: 3 },
+    { id: "needs_response", label: "Needs Response", count: 5 },
+    { id: "calls", label: "Calls", count: 2 },
+    { id: "texts", label: "Texts", count: 4 },
+    { id: "emails", label: "Emails", count: 8 },
+  ];
+
+  const dummyMessages = [
+    { name: "Robert Clark", channel: "📞", preview: "Voicemail: Hi, I'm calling about Cardinal Grove pricing...", time: "12m ago", badge: "urgent" },
+    { name: "Sarah Martinez", channel: "💬", preview: "Are there any lots available near the pond?", time: "25m ago", badge: "needs_response" },
+    { name: "David Thompson", channel: "📧", preview: "RE: Cardinal Grove Tour — Can we reschedule to Saturday?", time: "1h ago", badge: "needs_response" },
+    { name: "Jennifer Wilson", channel: "📞", preview: "Missed call (2 min ago)", time: "2m ago", badge: "urgent" },
+    { name: "Michael Brown", channel: "💬", preview: "What's the difference between the Hadley and Stonefield?", time: "45m ago", badge: null },
+  ];
+
+  return (
+    <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, overflow: "hidden" }}>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid #27272a", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Communication Hub</span>
+      </div>
+      {/* Tabs */}
+      <div style={{ display: "flex", borderBottom: "1px solid #27272a" }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: "8px 14px", fontSize: 11, fontWeight: tab === t.id ? 600 : 400,
+            color: tab === t.id ? "#fafafa" : "#52525b",
+            borderBottom: tab === t.id ? "2px solid #fafafa" : "2px solid transparent",
+            background: "none", border: "none", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 4,
+          }}>
+            {t.label}
+            <span style={{
+              fontSize: 10, padding: "0 4px", borderRadius: 3,
+              backgroundColor: t.id === "urgent" ? "#7f1d1d" : "#27272a",
+              color: t.id === "urgent" ? "#fca5a5" : "#71717a",
+            }}>{t.count}</span>
+          </button>
         ))}
       </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, overflow: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 24 }}>
-
-        {/* Opportunity Inbox */}
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#ededed", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-            <span>Opportunity Inbox</span>
-            <span style={{
-              fontSize: 10, padding: "1px 6px", borderRadius: 4,
-              backgroundColor: "#2a2a1a", border: "1px solid #3f3a1f", color: "#f5a623",
-            }}>{opportunities.length} pending</span>
+      {/* Messages */}
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {dummyMessages.map((msg, i) => (
+          <div key={i} style={{
+            padding: "10px 16px", borderBottom: "1px solid #1e1e21", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 12,
+          }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#1e1e21")}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            {/* Avatar */}
+            <div style={{
+              width: 32, height: 32, borderRadius: "50%", backgroundColor: "#27272a",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontWeight: 600, color: "#a1a1aa", flexShrink: 0,
+            }}>
+              {msg.name.split(" ").map(n => n[0]).join("")}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "#fafafa" }}>{msg.name}</span>
+                <span style={{ fontSize: 10, color: "#52525b" }}>{msg.channel}</span>
+                {msg.badge === "urgent" && (
+                  <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, backgroundColor: "#7f1d1d", color: "#fca5a5", fontWeight: 600 }}>URGENT</span>
+                )}
+                {msg.badge === "needs_response" && (
+                  <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, backgroundColor: "#422006", color: "#fbbf24", fontWeight: 600 }}>NEEDS RESPONSE</span>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: "#71717a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msg.preview}</div>
+            </div>
+            <span style={{ fontSize: 10, color: "#52525b", flexShrink: 0 }}>{msg.time}</span>
           </div>
-          {opportunities.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", fontSize: 12, color: "#444", backgroundColor: "#111", borderRadius: 8, border: "1px solid #1f1f1f" }}>
-              No pending opportunities — all clear
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ minWidth: 900, width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Source</th>
-                  <th style={thStyle}>Type</th>
-                  <th style={thStyle}>Community</th>
-                  <th style={thStyle}>Phone</th>
-                  <th style={thStyle}>Last Activity</th>
-                  <th style={thStyle}>Created</th>
-                </tr></thead>
-                <tbody>
-                  {opportunities.map(o => (
-                    <tr key={o.id}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#161616")}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-                    >
-                      <td style={{ ...tdStyle, color: "#ededed", fontWeight: 500 }}>{o.first_name} {o.last_name}</td>
-                      <td style={tdStyle}>{o.source ?? "—"}</td>
-                      <td style={tdStyle}>{o.substage ?? "—"}</td>
-                      <td style={tdStyle}>{o.community_id ? (commMap[o.community_id] ?? "—") : "—"}</td>
-                      <td style={tdStyle}>{o.phone ?? "—"}</td>
-                      <td style={tdStyle}>{relativeTime(o.last_activity_at)}</td>
-                      <td style={tdStyle}>{new Date(o.created_at).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Lead Pipeline */}
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#ededed", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-            <span>Lead Pipeline</span>
-            <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, backgroundColor: "#1a1a1a", border: "1px solid #2a2a2a", color: "#555" }}>{leads.length}</span>
-          </div>
-          {leads.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", fontSize: 12, color: "#444", backgroundColor: "#111", borderRadius: 8, border: "1px solid #1f1f1f" }}>
-              No leads for this division
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ minWidth: 700, width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Stage</th>
-                  <th style={thStyle}>Source</th>
-                  <th style={thStyle}>Community</th>
-                  <th style={thStyle}>Last Activity</th>
-                  <th style={thStyle}>Created</th>
-                </tr></thead>
-                <tbody>
-                  {leads.slice(0, 25).map(l => (
-                    <tr key={l.id}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#161616")}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-                    >
-                      <td style={{ ...tdStyle, color: "#ededed", fontWeight: 500 }}>{l.first_name} {l.last_name}</td>
-                      <td style={tdStyle}>{l.stage}</td>
-                      <td style={tdStyle}>{l.source ?? "—"}</td>
-                      <td style={tdStyle}>{l.community_id ? (commMap[l.community_id] ?? "—") : "—"}</td>
-                      <td style={tdStyle}>{relativeTime(l.last_activity_at)}</td>
-                      <td style={tdStyle}>{new Date(l.created_at).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -233,90 +370,179 @@ function DivisionDashboard({
 
 export default function OscClient() {
   const { filter, labels } = useGlobalFilter();
-  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-  const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [communities, setCommunities] = useState<CommunityRef[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actionItem, setActionItem] = useState<QueueItem | null>(null);
+  const [actionType, setActionType] = useState<ActionType>(null);
+
+  const fetchQueue = useCallback(async () => {
+    if (!filter.divisionId) return;
+    setLoading(true);
+
+    // Get communities for this division
+    const { data: comms } = await supabase
+      .from("communities").select("id, name").eq("division_id", filter.divisionId).order("name");
+    setCommunities(comms ?? []);
+
+    // Get queue items (opportunities with crm_stage = 'queue') for this division
+    const { data: items } = await supabase
+      .from("opportunities")
+      .select("id, contact_id, crm_stage, community_id, division_id, source, opportunity_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
+      .eq("crm_stage", "queue")
+      .eq("division_id", filter.divisionId)
+      .order("last_activity_at", { ascending: false });
+
+    // Supabase returns arrays for single-FK joins — flatten to single objects
+    const flat = (items ?? []).map((item: any) => ({
+      ...item,
+      contacts: Array.isArray(item.contacts) ? item.contacts[0] ?? null : item.contacts,
+      communities: Array.isArray(item.communities) ? item.communities[0] ?? null : item.communities,
+    }));
+    setQueueItems(flat);
+    setLoading(false);
+  }, [filter.divisionId]);
 
   useEffect(() => {
     if (!filter.divisionId) {
-      setOpportunities([]);
-      setLeads([]);
+      setQueueItems([]);
       setCommunities([]);
       return;
     }
+    fetchQueue();
+  }, [filter.divisionId, fetchQueue]);
 
-    let cancelled = false;
-    setLoading(true);
+  // ── Execute promotion/demotion ──
+  async function handleAction(oppId: string, newStage: string, communityId: string | null, reason: string) {
+    const update: Record<string, unknown> = { crm_stage: newStage };
+    if (communityId) update.community_id = communityId;
+    if (newStage === "marketing") update.community_id = null;
 
-    async function fetchData() {
-      const divId = filter.divisionId!;
+    const { error } = await supabase
+      .from("opportunities")
+      .update(update)
+      .eq("id", oppId);
 
-      // First get communities for this division (to filter leads/opps)
-      const { data: comms } = await supabase
-        .from("communities")
-        .select("id, name")
-        .eq("division_id", divId);
-
-      const commIds = (comms ?? []).map(c => c.id);
-
-      if (commIds.length === 0) {
-        if (!cancelled) {
-          setCommunities(comms ?? []);
-          setOpportunities([]);
-          setLeads([]);
-          setLoading(false);
-        }
-        return;
-      }
-
-      const [oppRes, leadRes] = await Promise.all([
-        supabase.from("leads").select("*").eq("stage", "opportunity").in("community_id", commIds).order("last_activity_at", { ascending: false }),
-        supabase.from("leads").select("*").neq("stage", "opportunity").in("community_id", commIds).order("last_activity_at", { ascending: false }),
-      ]);
-
-      if (!cancelled) {
-        setCommunities(comms ?? []);
-        setOpportunities(oppRes.data ?? []);
-        setLeads(leadRes.data ?? []);
-        setLoading(false);
+    if (error) {
+      console.error("Stage transition failed:", error);
+      alert(`Error: ${error.message}`);
+    } else {
+      // Log the transition manually (trigger handles it too, but let's add the reason)
+      const item = queueItems.find(q => q.id === oppId);
+      if (item) {
+        await supabase.from("stage_transitions").insert({
+          org_id: "00000000-0000-0000-0000-000000000001",
+          opportunity_id: oppId,
+          contact_id: item.contact_id,
+          from_stage: "queue",
+          to_stage: newStage,
+          triggered_by: "manual",
+          reason: reason || null,
+        });
       }
     }
 
-    fetchData();
-    return () => { cancelled = true; };
-  }, [filter.divisionId]);
+    setActionItem(null);
+    setActionType(null);
+    fetchQueue(); // Refresh the queue
+  }
+
+  if (!filter.divisionId) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#09090b", color: "#fafafa" }}>
+        <div style={{ padding: "10px 24px", borderBottom: "1px solid #27272a", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>OSC Command Center</span>
+          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#18181b", border: "1px solid #27272a", color: "#71717a" }}>Online Sales Consultant</span>
+        </div>
+        <EmptyState />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#0a0a0a", color: "#ededed" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#09090b", color: "#fafafa" }}>
       {/* Top bar */}
       <div style={{
-        padding: "10px 24px", borderBottom: "1px solid #1a1a1a",
-        display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+        padding: "10px 24px", borderBottom: "1px solid #27272a",
+        display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
       }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#ededed" }}>OSC Command Center</span>
-        <span style={{
-          fontSize: 10, padding: "2px 8px", borderRadius: 4,
-          backgroundColor: "#1a1f2e", border: "1px solid #1a2a3f", color: "#0070f3",
-        }}>Online Sales Consultant</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>OSC Command Center</span>
+          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#18181b", border: "1px solid #27272a", color: "#71717a" }}>
+            {labels.division ?? "Division"}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: "#52525b" }}>Queue:</span>
+            <span style={{
+              fontSize: 16, fontWeight: 700,
+              color: queueItems.length === 0 ? "#4ade80" : queueItems.length > 10 ? "#f87171" : "#fbbf24",
+            }}>{queueItems.length}</span>
+          </div>
+          <span style={{ fontSize: 11, color: "#52525b" }}>
+            Goal: <strong style={{ color: queueItems.length === 0 ? "#4ade80" : "#fafafa" }}>0</strong>
+          </span>
+        </div>
       </div>
 
-      <div style={{ flex: 1, overflow: "auto" }}>
+      {/* Content */}
+      <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
         {loading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#555", fontSize: 13 }}>
-            Loading division data...
-          </div>
-        ) : !filter.divisionId ? (
-          <EmptyState />
+          <div style={{ textAlign: "center", color: "#52525b", padding: 48 }}>Loading queue...</div>
         ) : (
-          <DivisionDashboard
-            divisionName={labels.division ?? "Division"}
-            opportunities={opportunities}
-            leads={leads}
-            communities={communities}
-          />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, alignItems: "start" }}>
+            {/* LEFT: Queue */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Queue</span>
+                <span style={{
+                  fontSize: 10, padding: "1px 6px", borderRadius: 4,
+                  backgroundColor: queueItems.length === 0 ? "#052e16" : "#7f1d1d",
+                  color: queueItems.length === 0 ? "#4ade80" : "#fca5a5",
+                  fontWeight: 600,
+                }}>{queueItems.length === 0 ? "✓ Clear" : `${queueItems.length} pending`}</span>
+              </div>
+
+              {queueItems.length === 0 ? (
+                <div style={{
+                  padding: 48, textAlign: "center", backgroundColor: "#052e16", border: "1px solid #166534",
+                  borderRadius: 8, color: "#4ade80", fontSize: 14, fontWeight: 500,
+                }}>
+                  ✓ Queue is clear — all contacts routed
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {queueItems.map(item => (
+                    <QueueCard
+                      key={item.id}
+                      item={item}
+                      onPromote={() => { setActionItem(item); setActionType("promote"); }}
+                      onDemote={() => { setActionItem(item); setActionType("demote"); }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT: Comm Hub */}
+            <div>
+              <CommHub />
+            </div>
+          </div>
         )}
       </div>
+
+      {/* Action Modal */}
+      {actionItem && actionType && (
+        <ActionModal
+          item={actionItem}
+          action={actionType}
+          communities={communities}
+          onClose={() => { setActionItem(null); setActionType(null); }}
+          onExecute={handleAction}
+        />
+      )}
     </div>
   );
 }
