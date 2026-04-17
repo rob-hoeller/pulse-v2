@@ -447,14 +447,21 @@ export async function GET(request: Request) {
       .limit(1)
       .single();
 
-    const since = lastSync?.synced_at || DEFAULT_SINCE;
+    const sinceUtc = lastSync?.synced_at || DEFAULT_SINCE;
+
+    // HBv1 API expects EDT timestamps, not UTC
+    // Convert UTC sync time to EDT (UTC-4) for the API query
+    const sinceDate = new Date(sinceUtc);
+    const edtOffset = -4 * 60; // EDT = UTC-4
+    const edtDate = new Date(sinceDate.getTime() + edtOffset * 60 * 1000);
+    const sinceEdt = edtDate.toISOString().replace("Z", "");
 
     // ── Step 2: Fetch from Heartbeat API
     const url = new URL(HB_BASE);
     url.searchParams.set("engine", "data-warehouse");
     url.searchParams.set("opt", "pulse2-lead-forms");
     url.searchParams.set("token", HB_TOKEN);
-    url.searchParams.set("since", since);
+    url.searchParams.set("since", sinceEdt);
     url.searchParams.set("maxrows", "100");
 
     const hbRes = await fetch(url.toString(), {
@@ -529,7 +536,7 @@ export async function GET(request: Request) {
         skipped,
         errors,
         error_details: errorDetails.length > 0 ? errorDetails : undefined,
-        since,
+        sinceEdt,
         duration_ms: Date.now() - startTime,
       },
     });
@@ -542,7 +549,7 @@ export async function GET(request: Request) {
       skipped,
       errors,
       fetched: forms.length,
-      since,
+      sinceEdt,
       duration_ms: Date.now() - startTime,
     };
 
