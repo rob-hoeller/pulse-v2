@@ -213,70 +213,104 @@ function EmptyState() {
   );
 }
 
-// ─── Action Modal (Promote/Demote) ───────────────────────────────────────────
+// ─── Assign Modal ─────────────────────────────────────────────────────────────
 
-type ActionType = "promote" | "demote" | null;
+const ASSIGN_LANES = [
+  { value: "lead_div", label: "Lead (Division)", description: "Just interested in the division, no community", needsCommunity: false },
+  { value: "lead_com", label: "Lead (Community)", description: "Interested in a specific community", needsCommunity: true },
+  { value: "prospect_c", label: "Prospect C", description: "30-90 day horizon", needsCommunity: true },
+  { value: "prospect_b", label: "Prospect B", description: "Intent within 30 days", needsCommunity: true },
+  { value: "prospect_a", label: "Prospect A", description: "Contract this week", needsCommunity: true },
+  { value: "archived", label: "Archive", description: "On ice, opted out, not interested right now", needsCommunity: false },
+  { value: "deleted", label: "Delete", description: "Spam, junk, remove from system", needsCommunity: false },
+] as const;
 
-function ActionModal({
-  item, action, communities, onClose, onExecute,
+function getAiSuggestion(item: QueueItem, communities: CommunityRef[]): string {
+  const communityName = item.communities?.name;
+  const src = item.opportunity_source ?? item.source;
+  if (item.community_id && communityName) {
+    return `Submitted form for ${communityName}. Suggest: Lead (Community) at ${communityName}`;
+  }
+  if (src === "schedule_appt" || src === "schedule_visit") {
+    return `Requested a visit. Suggest: Prospect C${communityName ? ` at ${communityName}` : ""}`;
+  }
+  if (src === "subscribe_region") {
+    return "Subscribed to division updates. Suggest: Lead (Division)";
+  }
+  return "Review form details and assign to appropriate lane";
+}
+
+function AssignModal({
+  item, communities, onClose, onExecute,
 }: {
   item: QueueItem;
-  action: ActionType;
   communities: CommunityRef[];
   onClose: () => void;
   onExecute: (oppId: string, newStage: string, communityId: string | null, reason: string) => void;
 }) {
-  const [targetStage, setTargetStage] = useState(action === "promote" ? "prospect_c" : "lead_com");
+  const [targetStage, setTargetStage] = useState("lead_com");
   const [targetCommunity, setTargetCommunity] = useState(item.community_id ?? "");
   const [reason, setReason] = useState("");
 
-  const promoteOptions = [
-    { value: "prospect_c", label: "Prospect C — 30-90 day horizon" },
-    { value: "prospect_b", label: "Prospect B — Intent within 30 days" },
-    { value: "prospect_a", label: "Prospect A — Contract this week" },
-  ];
-  const demoteOptions = [
-    { value: "lead_com", label: "Lead (Community) — Keep nurturing in community" },
-    { value: "lead_div", label: "Lead (Division) — Division-level only" },
-  ];
-  const options = action === "promote" ? promoteOptions : demoteOptions;
+  const selectedLane = ASSIGN_LANES.find(l => l.value === targetStage);
+  const needsCommunity = selectedLane?.needsCommunity ?? false;
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
+  const suggestion = getAiSuggestion(item, communities);
+
+  const canSubmit = !needsCommunity || !!targetCommunity;
 
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", zIndex: 50, backdropFilter: "blur(2px)" }} />
       <div style={{
         position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-        width: 480, backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 12,
+        width: 520, backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 12,
         zIndex: 51, overflow: "hidden",
       }}>
+        {/* Header */}
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #27272a" }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: "#fafafa" }}>
-            {action === "promote" ? "Promote" : "Demote"}: {name}
+            Assign: {name}
           </div>
           <div style={{ fontSize: 12, color: "#71717a", marginTop: 4 }}>
             Currently in Queue{item.communities?.name ? ` — ${item.communities.name}` : ""}
           </div>
         </div>
+
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Target stage */}
+          {/* AI Suggestion */}
+          <div style={{
+            padding: "10px 14px", backgroundColor: "#052e16", border: "1px solid #166534",
+            borderRadius: 6,
+          }}>
+            <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+              🤖 AI Suggestion
+            </div>
+            <div style={{ fontSize: 12, color: "#86efac", lineHeight: 1.5 }}>
+              {suggestion}
+            </div>
+          </div>
+
+          {/* Target lane */}
           <div>
             <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
-              Move to
+              Assign to Lane
             </label>
             <select value={targetStage} onChange={e => setTargetStage(e.target.value)} style={{
               width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
               borderRadius: 6, color: "#fafafa", fontSize: 13, outline: "none",
             }}>
-              {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {ASSIGN_LANES.map(l => (
+                <option key={l.value} value={l.value}>{l.label} — {l.description}</option>
+              ))}
             </select>
           </div>
 
-          {/* Community (for promote) */}
-          {action === "promote" && (
+          {/* Community picker (conditional) */}
+          {needsCommunity && (
             <div>
               <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
-                Community
+                Community <span style={{ color: "#f87171" }}>*</span>
               </label>
               <select value={targetCommunity} onChange={e => setTargetCommunity(e.target.value)} style={{
                 width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
@@ -291,31 +325,38 @@ function ActionModal({
           {/* Reason */}
           <div>
             <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
-              Reason
+              Reason <span style={{ fontSize: 10, color: "#52525b" }}>(optional)</span>
             </label>
             <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2}
-              placeholder={action === "promote" ? "e.g., Toured model, very interested in Hadley plan" : "e.g., Not ready to build for 12+ months"}
+              placeholder="e.g., Toured model, very interested in Hadley plan"
               style={{
                 width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
                 borderRadius: 6, color: "#a1a1aa", fontSize: 12, outline: "none", resize: "none",
               }} />
           </div>
         </div>
+
+        {/* Footer */}
         <div style={{ padding: "16px 24px", borderTop: "1px solid #27272a", display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button onClick={onClose} style={{
             padding: "8px 16px", borderRadius: 6, border: "1px solid #27272a",
             backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 12, cursor: "pointer",
           }}>Cancel</button>
           <button
-            onClick={() => onExecute(item.id, targetStage, action === "promote" ? targetCommunity : item.community_id, reason)}
-            disabled={action === "promote" && !targetCommunity}
+            onClick={() => onExecute(
+              item.id,
+              targetStage,
+              needsCommunity ? targetCommunity : (targetStage === "lead_div" ? null : item.community_id),
+              reason,
+            )}
+            disabled={!canSubmit}
             style={{
-              padding: "8px 16px", borderRadius: 6, border: "none",
-              backgroundColor: action === "promote" ? "#166534" : "#991b1b",
-              color: "#fafafa", fontSize: 12, fontWeight: 600, cursor: "pointer",
-              opacity: (action === "promote" && !targetCommunity) ? 0.4 : 1,
+              padding: "8px 16px", borderRadius: 6, border: "1px solid #3f3f46",
+              backgroundColor: "#18181b", color: canSubmit ? "#fafafa" : "#52525b",
+              fontSize: 12, fontWeight: 600, cursor: canSubmit ? "pointer" : "default",
+              opacity: canSubmit ? 1 : 0.4,
             }}>
-            {action === "promote" ? "↑ Promote" : "↓ Demote"}
+            → Assign
           </button>
         </div>
       </div>
@@ -379,11 +420,10 @@ function SnoozePicker({ onSnooze, onClose }: { onSnooze: (until: string) => void
 // ─── Queue Card ───────────────────────────────────────────────────────────────
 
 function QueueCard({
-  item, onPromote, onDemote,
+  item, onAssign,
 }: {
   item: QueueItem;
-  onPromote: () => void;
-  onDemote: () => void;
+  onAssign: () => void;
 }) {
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
   const [expanded, setExpanded] = useState(false);
@@ -399,7 +439,7 @@ function QueueCard({
       {/* Main row */}
       <div onClick={() => setExpanded(!expanded)} style={{
         padding: "12px 16px", cursor: "pointer",
-        display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto",
+        display: "grid", gridTemplateColumns: "1fr auto auto auto auto",
         alignItems: "center", gap: 16,
       }}>
         <div>
@@ -411,14 +451,10 @@ function QueueCard({
         <div style={{ fontSize: 11, color: "#71717a" }}>{item.contacts?.phone ?? "—"}</div>
         <div style={{ fontSize: 11, color: "#71717a" }}>{formatBudget(item.budget_min, item.budget_max)}</div>
         <div style={{ fontSize: 11, color: "#52525b" }}>{relativeTime(item.last_activity_at)}</div>
-        <button onClick={e => { e.stopPropagation(); onPromote(); }} style={{
-          padding: "4px 10px", borderRadius: 4, border: "1px solid #166534",
-          backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
-        }}>↑ Promote</button>
-        <button onClick={e => { e.stopPropagation(); onDemote(); }} style={{
-          padding: "4px 10px", borderRadius: 4, border: "1px solid #991b1b",
-          backgroundColor: "#1c1917", color: "#f87171", fontSize: 11, fontWeight: 600, cursor: "pointer",
-        }}>↓ Demote</button>
+        <button onClick={e => { e.stopPropagation(); onAssign(); }} style={{
+          padding: "4px 10px", borderRadius: 4, border: "1px solid #3f3f46",
+          backgroundColor: "#18181b", color: "#a1a1aa", fontSize: 11, fontWeight: 600, cursor: "pointer",
+        }}>→ Assign</button>
       </div>
 
       {/* Expanded details */}
@@ -821,8 +857,7 @@ export default function OscClient() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [communities, setCommunities] = useState<CommunityRef[]>([]);
   const [loading, setLoading] = useState(false);
-  const [actionItem, setActionItem] = useState<QueueItem | null>(null);
-  const [actionType, setActionType] = useState<ActionType>(null);
+  const [assignItem, setAssignItem] = useState<QueueItem | null>(null);
   const [activeBucket, setActiveBucket] = useState<QueueBucket>("new_inbound");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [oscUsers, setOscUsers] = useState<TeamUser[]>([]);
@@ -1006,8 +1041,7 @@ export default function OscClient() {
       }
     }
 
-    setActionItem(null);
-    setActionType(null);
+    setAssignItem(null);
     fetchData();
   }
 
@@ -1175,8 +1209,7 @@ export default function OscClient() {
                     <QueueCard
                       key={item.id}
                       item={item}
-                      onPromote={() => { setActionItem(item); setActionType("promote"); }}
-                      onDemote={() => { setActionItem(item); setActionType("demote"); }}
+                      onAssign={() => { setAssignItem(item); }}
                     />
                   ))}
                 </div>
@@ -1303,13 +1336,12 @@ export default function OscClient() {
         )}
       </div>
 
-      {/* ── Action Modal ── */}
-      {actionItem && actionType && (
-        <ActionModal
-          item={actionItem}
-          action={actionType}
+      {/* ── Assign Modal ── */}
+      {assignItem && (
+        <AssignModal
+          item={assignItem}
           communities={communities}
-          onClose={() => { setActionItem(null); setActionType(null); }}
+          onClose={() => { setAssignItem(null); }}
           onExecute={handleAction}
         />
       )}
