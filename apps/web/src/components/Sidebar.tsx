@@ -30,6 +30,7 @@ export const NAV_ITEMS = [
   // ── TOOLS ──
   { icon: "⊡", label: "Agents",          href: "#",                   group: "tools" },
   { icon: "◷", label: "Calendar",        href: "/calendar",            group: "tools" },
+  { icon: "⟳", label: "Cron",            href: "/cron",               group: "tools" },
   { icon: "◉", label: "Notifications",   href: "#",                   group: "tools" },
   { icon: "⚙", label: "Settings",        href: "#",                   group: "tools" },
   { icon: "◈", label: "Status",          href: "/status",             group: "tools" },
