@@ -50,6 +50,47 @@ interface TaskItem {
 
 interface CommunityRef { id: string; name: string; }
 
+interface CommunityDetail {
+  id: string;
+  name: string;
+  city: string | null;
+  state: string | null;
+  status: string | null;
+  price_from: number | null;
+  hoa_fee: number | null;
+  hoa_period: string | null;
+  total_homesites: number | null;
+  school_district: string | null;
+  amenities: string[] | null;
+  website_url: string | null;
+  brochure_url: string | null;
+  site_map_url: string | null;
+}
+
+interface CommunityPlan {
+  id: string;
+  name: string;
+  base_price: number | null;
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+}
+
+interface CommunityLot {
+  id: string;
+  lot_number: string | null;
+  status: string | null;
+  premium: number | null;
+  address: string | null;
+}
+
+interface ModelHome {
+  id: string;
+  name: string | null;
+  address: string | null;
+  hours: string | null;
+}
+
 type QueueBucket = "new_inbound" | "re_engaged" | "demoted" | "ai_surfaced" | "customer";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -494,6 +535,242 @@ function ActionBtn({ label }: { label: string }) {
   );
 }
 
+// ─── Reference Module ──────────────────────────────────────────────────────────
+
+function ReferenceModule({ communities, divisionId }: { communities: CommunityRef[]; divisionId: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string>("");
+  const [detail, setDetail] = useState<CommunityDetail | null>(null);
+  const [plans, setPlans] = useState<CommunityPlan[]>([]);
+  const [lots, setLots] = useState<CommunityLot[]>([]);
+  const [modelHome, setModelHome] = useState<ModelHome | null>(null);
+  const [refLoading, setRefLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedCommunityId) {
+      setDetail(null);
+      setPlans([]);
+      setLots([]);
+      setModelHome(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setRefLoading(true);
+      const [detailRes, plansRes, lotsRes, modelRes] = await Promise.all([
+        supabase.from("communities").select("id, name, city, state, status, price_from, hoa_fee, hoa_period, total_homesites, school_district, amenities, website_url, brochure_url, site_map_url").eq("id", selectedCommunityId).single(),
+        supabase.from("community_plans").select("id, name, base_price, beds, baths, sqft").eq("community_id", selectedCommunityId).order("base_price", { ascending: true }),
+        supabase.from("lots").select("id, lot_number, status, premium, address").eq("community_id", selectedCommunityId).eq("is_available", true).order("lot_number", { ascending: true }),
+        supabase.from("model_homes").select("id, name, address, hours").eq("community_id", selectedCommunityId).limit(1).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setDetail((detailRes.data as CommunityDetail) ?? null);
+      setPlans((plansRes.data as CommunityPlan[]) ?? []);
+      setLots((lotsRes.data as CommunityLot[]) ?? []);
+      setModelHome((modelRes.data as ModelHome) ?? null);
+      setRefLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [selectedCommunityId]);
+
+  // Reset selection when division changes
+  useEffect(() => {
+    setSelectedCommunityId("");
+  }, [divisionId]);
+
+  const fmtPrice = (n: number | null) => n != null ? `$${n.toLocaleString()}` : "—";
+
+  return (
+    <div style={{ borderTop: "1px solid #27272a", marginTop: 20 }}>
+      {/* Toggle bar */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 0", background: "none", border: "none", cursor: "pointer", color: "#a1a1aa",
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+          📚 Community Reference
+        </span>
+        <span style={{ fontSize: 11, color: "#52525b" }}>{expanded ? "▲ Collapse" : "▼ Expand"}</span>
+      </button>
+
+      {expanded && (
+        <div style={{ paddingBottom: 16 }}>
+          {/* Community selector */}
+          <div style={{ marginBottom: 16 }}>
+            <select
+              value={selectedCommunityId}
+              onChange={e => setSelectedCommunityId(e.target.value)}
+              style={{
+                padding: "8px 12px", backgroundColor: "#18181b", border: "1px solid #27272a",
+                borderRadius: 6, color: "#fafafa", fontSize: 13, outline: "none", minWidth: 280,
+              }}
+            >
+              <option value="">Select a community...</option>
+              {communities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          {refLoading && (
+            <div style={{ textAlign: "center", color: "#52525b", padding: 24, fontSize: 12 }}>Loading community data...</div>
+          )}
+
+          {!refLoading && detail && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Row 1 — Key Facts */}
+              <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 600 }}>Key Facts</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                  <RefFact label="Community" value={detail.name} />
+                  <RefFact label="Location" value={[detail.city, detail.state].filter(Boolean).join(", ") || "—"} />
+                  <RefFact label="Status" value={detail.status ?? "—"} />
+                  <RefFact label="Price From" value={fmtPrice(detail.price_from)} highlight />
+                  <RefFact label="HOA Fee" value={detail.hoa_fee != null ? `$${detail.hoa_fee}${detail.hoa_period ? ` / ${detail.hoa_period}` : ""}` : "—"} />
+                  <RefFact label="Total Homesites" value={detail.total_homesites != null ? String(detail.total_homesites) : "—"} />
+                  <RefFact label="Available Lots" value={String(lots.length)} highlight />
+                  <RefFact label="School District" value={detail.school_district ?? "—"} />
+                </div>
+              </div>
+
+              {/* Row 2 — Floor Plans */}
+              <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 600 }}>
+                  Floor Plans {plans.length > 0 && <span style={{ color: "#52525b" }}>({plans.length})</span>}
+                </div>
+                {plans.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "#52525b" }}>No plans found</div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #27272a" }}>
+                        {["Plan", "Price", "Beds", "Baths", "Sq Ft"].map(h => (
+                          <th key={h} style={{ textAlign: "left", padding: "4px 8px", color: "#52525b", fontWeight: 500, fontSize: 10, textTransform: "uppercase" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plans.map(p => (
+                        <tr key={p.id} style={{ borderBottom: "1px solid #1a1a1e" }}>
+                          <td style={{ padding: "6px 8px", color: "#fafafa", fontWeight: 500 }}>{p.name}</td>
+                          <td style={{ padding: "6px 8px", color: "#a1a1aa" }}>{fmtPrice(p.base_price)}</td>
+                          <td style={{ padding: "6px 8px", color: "#a1a1aa" }}>{p.beds ?? "—"}</td>
+                          <td style={{ padding: "6px 8px", color: "#a1a1aa" }}>{p.baths ?? "—"}</td>
+                          <td style={{ padding: "6px 8px", color: "#a1a1aa" }}>{p.sqft != null ? p.sqft.toLocaleString() : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Row 3 — Available Lots */}
+              <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 600 }}>
+                  Available Lots {lots.length > 0 && <span style={{ color: "#52525b" }}>({lots.length})</span>}
+                </div>
+                {lots.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "#52525b" }}>No available lots</div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #27272a" }}>
+                        {["Lot #", "Status", "Premium", "Address"].map(h => (
+                          <th key={h} style={{ textAlign: "left", padding: "4px 8px", color: "#52525b", fontWeight: 500, fontSize: 10, textTransform: "uppercase" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lots.map(l => (
+                        <tr key={l.id} style={{ borderBottom: "1px solid #1a1a1e" }}>
+                          <td style={{ padding: "6px 8px", color: "#fafafa", fontWeight: 500 }}>{l.lot_number ?? "—"}</td>
+                          <td style={{ padding: "6px 8px", color: "#a1a1aa" }}>{l.status ?? "—"}</td>
+                          <td style={{ padding: "6px 8px", color: "#a1a1aa" }}>{l.premium != null ? fmtPrice(l.premium) : "—"}</td>
+                          <td style={{ padding: "6px 8px", color: "#a1a1aa" }}>{l.address ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Row 4 — Quick Reference */}
+              <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 600 }}>Quick Reference</div>
+
+                {/* Amenities */}
+                {detail.amenities && detail.amenities.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Amenities</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {detail.amenities.map((a, i) => (
+                        <span key={i} style={{
+                          fontSize: 11, padding: "3px 8px", borderRadius: 4,
+                          backgroundColor: "#27272a", color: "#a1a1aa",
+                        }}>{a}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Model Home */}
+                {modelHome && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Model Home</div>
+                    <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
+                      {modelHome.name && <div style={{ fontWeight: 500, color: "#fafafa" }}>{modelHome.name}</div>}
+                      {modelHome.address && <div>{modelHome.address}</div>}
+                      {modelHome.hours && <div style={{ color: "#71717a" }}>Hours: {modelHome.hours}</div>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Links */}
+                <div>
+                  <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Links</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {detail.website_url && <RefLink label="🌐 Website" href={detail.website_url} />}
+                    {detail.brochure_url && <RefLink label="📄 Brochure" href={detail.brochure_url} />}
+                    {detail.site_map_url && <RefLink label="🗺️ Site Map" href={detail.site_map_url} />}
+                    {!detail.website_url && !detail.brochure_url && !detail.site_map_url && (
+                      <span style={{ fontSize: 12, color: "#52525b" }}>No links available</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!refLoading && !detail && selectedCommunityId === "" && (
+            <div style={{ textAlign: "center", color: "#52525b", padding: 24, fontSize: 12 }}>
+              Select a community above to view reference data.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RefFact({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, color: highlight ? "#4ade80" : "#fafafa", fontWeight: highlight ? 600 : 400 }}>{value}</div>
+    </div>
+  );
+}
+
+function RefLink({ label, href }: { label: string; href: string }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{
+      fontSize: 11, padding: "4px 10px", borderRadius: 4, border: "1px solid #27272a",
+      backgroundColor: "#09090b", color: "#a1a1aa", textDecoration: "none", cursor: "pointer",
+    }}>{label}</a>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OscClient() {
@@ -775,6 +1052,11 @@ export default function OscClient() {
               )}
             </div>
           </div>
+        )}
+
+        {/* ── Reference Module ── */}
+        {!loading && (
+          <ReferenceModule communities={communities} divisionId={filter.divisionId!} />
         )}
       </div>
 
