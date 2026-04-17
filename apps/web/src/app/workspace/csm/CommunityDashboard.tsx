@@ -178,27 +178,28 @@ function priorityBadge(p: string | null): { color: string; bg: string; label: st
 // ─── MetricCard ───────────────────────────────────────────────────────────────
 
 function MetricCard({
-  label, value, subtitle, active, onClick,
+  label, value, subtitle, active, onClick, compact,
 }: {
   label: string;
   value: string | number;
   subtitle?: string;
   active?: boolean;
   onClick?: () => void;
+  compact?: boolean;
 }) {
   return (
     <div
       onClick={onClick}
       style={{
-        padding: "16px 20px",
+        padding: compact ? "6px 10px" : "16px 20px",
         backgroundColor: active ? "#18181b" : "#09090b",
         border: `1px solid ${active ? "#3f3f46" : "#27272a"}`,
-        borderRadius: 8,
+        borderRadius: compact ? 6 : 8,
         cursor: onClick ? "pointer" : "default",
         transition: "all 0.15s",
         display: "flex",
         flexDirection: "column",
-        gap: 4,
+        gap: compact ? 1 : 4,
         minWidth: 0,
       }}
       onMouseEnter={e => {
@@ -214,9 +215,9 @@ function MetricCard({
         }
       }}
     >
-      <span style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
-      <span style={{ fontSize: 24, fontWeight: 600, color: "#fafafa", lineHeight: 1.2 }}>{value}</span>
-      {subtitle && <span style={{ fontSize: 11, color: "#52525b" }}>{subtitle}</span>}
+      <span style={{ fontSize: compact ? 9 : 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
+      <span style={{ fontSize: compact ? 15 : 24, fontWeight: 600, color: "#fafafa", lineHeight: 1.2 }}>{value}</span>
+      {subtitle && <span style={{ fontSize: compact ? 8 : 11, color: "#52525b" }}>{subtitle}</span>}
     </div>
   );
 }
@@ -286,7 +287,7 @@ function SalesGoalStrip() {
     <div style={{ padding: "16px 24px" }}>
       <div style={{
         display: "flex", alignItems: "stretch", gap: 0,
-        border: "1px solid #27272a", borderRadius: 8, overflow: "hidden", backgroundColor: "#09090b",
+        border: "1px solid #27272a", borderRadius: 6, overflow: "hidden", backgroundColor: "#09090b",
       }}>
         <div style={{
           padding: "12px 20px", borderRight: "1px solid #27272a",
@@ -303,10 +304,10 @@ function SalesGoalStrip() {
             <div key={m.month} style={{
               flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               padding: "8px 4px", borderRight: "1px solid #18181b",
-              borderBottom: `2px solid ${met ? "#22c55e" : m.goal > 0 ? "#dc2626" : "#27272a"}`, minWidth: 0,
+              borderBottom: "1px solid #18181b", minWidth: 0,
             }}>
               <span style={{ fontSize: 9, color: "#52525b", fontWeight: 500, letterSpacing: "0.05em" }}>{m.month}</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: m.sales > 0 ? "#fafafa" : "#3f3f46", marginTop: 1 }}>{m.sales}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: m.goal === 0 ? "#3f3f46" : m.sales >= m.goal ? "#22c55e" : "#dc2626", marginTop: 1 }}>{m.sales}</span>
               <span style={{ fontSize: 9, color: m.goal > 0 ? "#52525b" : "#27272a" }}>/ {m.goal}</span>
             </div>
           );
@@ -448,7 +449,7 @@ function SnoozePicker({ onSnooze, onClose }: { onSnooze: (until: string) => void
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 50 }} />
       <div style={{
         position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 51,
-        backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8,
+        backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 6,
         padding: 4, minWidth: 160, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
       }}>
         {options.map(opt => (
@@ -498,7 +499,7 @@ function ProspectCard({
 
   return (
     <div style={{
-      backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8,
+      backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6,
       overflow: "hidden", transition: "border-color 0.15s",
     }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
@@ -586,7 +587,7 @@ function TaskCard({
 
   return (
     <div style={{
-      backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8,
+      backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6,
       padding: "12px 14px", transition: "border-color 0.15s", position: "relative",
     }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
@@ -674,7 +675,7 @@ function ReferenceModule({
         onClick={() => setOpen(!open)}
         style={{
           width: "100%", padding: "12px 16px", backgroundColor: "#18181b", border: "1px solid #27272a",
-          borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between",
+          borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between",
           color: "#fafafa", fontSize: 13, fontWeight: 600,
         }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
@@ -722,7 +723,7 @@ function ReferenceModule({
           {/* Community Info Grid */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             {/* Model Home */}
-            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
+            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 6, backgroundColor: "#09090b" }}>
               <div style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Model Home</div>
               {modelHome ? (
                 <>
@@ -741,7 +742,7 @@ function ReferenceModule({
             </div>
 
             {/* Schools */}
-            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
+            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 6, backgroundColor: "#09090b" }}>
               <div style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Schools</div>
               {[
                 ["District", community.school_district],
@@ -758,7 +759,7 @@ function ReferenceModule({
             </div>
 
             {/* Details + Links */}
-            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
+            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 6, backgroundColor: "#09090b" }}>
               <div style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Details</div>
               {[
                 ["Total Homesites", community.total_homesites],
@@ -809,6 +810,7 @@ function ReferenceModule({
 
 function CommunityView({ community, plans, lots, modelHome, specHomes, divisions, readOnly }: CommunityViewProps) {
   const [drill, setDrill] = useState<DrillPanel>(null);
+  const [leftPane, setLeftPane] = useState<"queue" | "comms">("queue");
   const [prospects, setProspects] = useState<ProspectItem[]>([]);
 
   const [customers, setCustomers] = useState<any[]>([]);
@@ -984,20 +986,18 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
       </div>
       <SalesGoalStrip />
 
-      {/* ── Metrics Grid ── */}
-      <div style={{ padding: "16px 24px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-          <MetricCard label="Plans" value={plans.length} onClick={() => toggleDrill("plans")} active={drill === "plans"} />
-          <MetricCard label="Available Lots" value={availableLots.length} subtitle={`${lots.length} total`} onClick={() => toggleDrill("lots")} active={drill === "lots"} />
-          <MetricCard label="Under Construction" value={underConstruction.length} />
-          <MetricCard label="QD / Spec Homes" value={specHomes.length + qdLots.length} onClick={(specHomes.length + qdLots.length) > 0 ? () => toggleDrill("qd") : undefined} active={drill === "qd"} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 12 }}>
-          <MetricCard label="Prospects (A/B/C)" value={prospects.length}
-            subtitle={prospects.length > 0 ? `A: ${prospects.filter(p => p.crm_stage === "prospect_a").length} · B: ${prospects.filter(p => p.crm_stage === "prospect_b").length} · C: ${prospects.filter(p => p.crm_stage === "prospect_c").length}` : undefined}
-            onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
-          <MetricCard label="Customers" value={customers.length} onClick={() => toggleDrill("customers")} active={drill === "customers"} />
-          <MetricCard label="Tasks" value={tasks.length} subtitle={tasks.length > 0 ? "pending" : "all clear"} />
+      {/* ── Metrics Strip (single compact row) ── */}
+      <div style={{ padding: "8px 24px" }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <MetricCard compact label="Plans" value={plans.length} onClick={() => toggleDrill("plans")} active={drill === "plans"} />
+          <MetricCard compact label="Avail Lots" value={availableLots.length} subtitle={`${lots.length} total`} onClick={() => toggleDrill("lots")} active={drill === "lots"} />
+          <MetricCard compact label="Under Const" value={underConstruction.length} />
+          <MetricCard compact label="QD/Spec" value={specHomes.length + qdLots.length} onClick={(specHomes.length + qdLots.length) > 0 ? () => toggleDrill("qd") : undefined} active={drill === "qd"} />
+          <MetricCard compact label="Prospect A" value={prospects.filter(p => p.crm_stage === "prospect_a").length} onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
+          <MetricCard compact label="Prospect B" value={prospects.filter(p => p.crm_stage === "prospect_b").length} onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
+          <MetricCard compact label="Prospect C" value={prospects.filter(p => p.crm_stage === "prospect_c").length} onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
+          <MetricCard compact label="Customers" value={customers.length} onClick={() => toggleDrill("customers")} active={drill === "customers"} />
+          <MetricCard compact label="Tasks" value={tasks.length} subtitle={tasks.length > 0 ? "pending" : ""} />
         </div>
       </div>
 
@@ -1088,7 +1088,17 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
         {/* LEFT: CSM Prospect Queue (~60%) */}
         <div style={{ flex: "0 0 60%", minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>CSM Queue</span>
+            <div style={{ display: "flex", gap: 0 }}>
+              {(["queue", "comms"] as const).map(t => (
+                <button key={t} onClick={() => setLeftPane(t)} style={{
+                  padding: "4px 12px", fontSize: 12, fontWeight: leftPane === t ? 600 : 400,
+                  color: leftPane === t ? "#fafafa" : "#52525b",
+                  borderBottom: leftPane === t ? "2px solid #fafafa" : "2px solid transparent",
+                  background: "none", border: "none", borderTop: "none", borderLeft: "none", borderRight: "none",
+                  cursor: "pointer",
+                }}>{t === "queue" ? "CSM Queue" : "Comm Hub"}</button>
+              ))}
+            </div>
             <span style={{
               fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600,
               backgroundColor: filteredProspects.length > 0 ? "#172554" : "#052e16",
@@ -1097,7 +1107,9 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
           </div>
 
           {/* Bucket tabs */}
-          <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12 }}>
+          {leftPane === "queue" ? (
+          <>
+<div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12 }}>
             {BUCKET_META.map(b => {
               const isActive = activeBucket === b.id;
               const count = bucketCounts[b.id];
@@ -1125,7 +1137,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
           {currentBucketItems.length === 0 ? (
             <div style={{
               padding: 32, textAlign: "center", backgroundColor: "#18181b", border: "1px solid #27272a",
-              borderRadius: 8, color: "#52525b", fontSize: 12,
+              borderRadius: 6, color: "#52525b", fontSize: 12,
             }}>
               No prospects in {BUCKET_META.find(b => b.id === activeBucket)?.label ?? "this bucket"}
             </div>
@@ -1142,6 +1154,30 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
               ))}
             </div>
           )}
+
+          </>
+        ) : (
+          /* Comm Hub */
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[{tab: "Urgent", count: 3}, {tab: "Needs Response", count: 5}, {tab: "Calls", count: 2}, {tab: "Texts", count: 4}, {tab: "Emails", count: 8}].map(t => (
+              <div key={t.tab} style={{ padding: "10px 14px", backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+              >
+                <span style={{ fontSize: 12, color: "#a1a1aa" }}>{t.tab}</span>
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 3, backgroundColor: t.tab === "Urgent" ? "#7f1d1d" : "#27272a", color: t.tab === "Urgent" ? "#fca5a5" : "#71717a", fontWeight: 600 }}>{t.count}</span>
+              </div>
+            ))}
+            <div style={{ marginTop: 8 }}>
+              {["Robert Clark called about pricing — 12m ago", "Sarah Martinez: Are there any lots near the pond? — 25m ago", "David Thompson RE: Tour reschedule — 1h ago", "Jennifer Wilson missed call — 2m ago", "Michael Brown: Hadley vs Stonefield? — 45m ago"].map((msg, i) => (
+                <div key={i} style={{ padding: "8px 14px", borderBottom: "1px solid #18181b", fontSize: 12, color: "#a1a1aa", cursor: "pointer" }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#18181b")}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                >{msg}</div>
+              ))}
+            </div>
+          </div>
+        )}
         </div>
 
         {/* RIGHT: Task List (~40%) */}
@@ -1158,7 +1194,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
           {filteredTasks.length === 0 ? (
             <div style={{
               padding: 32, textAlign: "center", backgroundColor: "#052e16", border: "1px solid #166534",
-              borderRadius: 8, color: "#4ade80", fontSize: 12, fontWeight: 500,
+              borderRadius: 6, color: "#4ade80", fontSize: 12, fontWeight: 500,
             }}>
               ✓ All tasks complete
             </div>
