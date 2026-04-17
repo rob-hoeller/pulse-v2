@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -25,18 +25,54 @@ interface MonthGoal {
   goal: number;
 }
 
-interface StubMessage {
+interface ProspectItem {
   id: string;
-  name: string;
-  initials: string;
-  channel: "call" | "text" | "email";
-  badges: ("urgent" | "needs-response")[];
-  preview: string;
-  aiSuggestion?: string;
-  time: string;
+  contact_id: string;
+  crm_stage: string;
+  community_id: string | null;
+  division_id: string | null;
+  source: string | null;
+  opportunity_source: string | null;
+  queue_source: string | null;
+  notes: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  engagement_score: number | null;
+  last_activity_at: string | null;
+  created_at: string;
+  contacts: {
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    phone: string | null;
+  } | null;
 }
 
-// ─── Stubbed Data ─────────────────────────────────────────────────────────────
+interface TaskItem {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: string | null;
+  channel: string | null;
+  status: string;
+  due_at: string | null;
+  snoozed_until: string | null;
+  completed_at: string | null;
+  ai_suggestion: string | null;
+  contact_id: string | null;
+  opportunity_id: string | null;
+  community_id: string | null;
+  created_at: string;
+  contacts: { first_name: string; last_name: string } | null;
+}
+
+type CsmBucket = "new_from_osc" | "stale" | "ai_hot" | "followup_due";
+
+type DrillPanel = null | "plans" | "lots" | "leads" | "prospects" | "customers" | "qd";
+
+type ActionType = "promote" | "demote" | null;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const MONTH_GOALS: MonthGoal[] = [
   { month: "JAN", sales: 3, goal: 4 },
@@ -53,63 +89,23 @@ const MONTH_GOALS: MonthGoal[] = [
   { month: "DEC", sales: 0, goal: 3 },
 ];
 
-const STUB_MESSAGES: StubMessage[] = [
-  {
-    id: "m1",
-    name: "Sarah Mitchell",
-    initials: "SM",
-    channel: "call",
-    badges: ["urgent"],
-    preview: "Called about lot 42 pricing — wants to schedule a walkthrough this weekend.",
-    aiSuggestion: "Confirm availability for Saturday 10am and send lot premium sheet.",
-    time: "12m ago",
-  },
-  {
-    id: "m2",
-    name: "James Rivera",
-    initials: "JR",
-    channel: "email",
-    badges: ["needs-response"],
-    preview: "Re: HOA fees and community amenities — requesting updated brochure.",
-    aiSuggestion: "Send latest community brochure PDF and HOA breakdown.",
-    time: "1h ago",
-  },
-  {
-    id: "m3",
-    name: "Karen & Tom Wells",
-    initials: "KW",
-    channel: "text",
-    badges: ["urgent", "needs-response"],
-    preview: "Can we move our appointment to next Tuesday? Also have questions about the Ashton plan.",
-    time: "2h ago",
-  },
-  {
-    id: "m4",
-    name: "David Chen",
-    initials: "DC",
-    channel: "call",
-    badges: [],
-    preview: "Follow-up call completed — confirmed interest in QD home on lot 18.",
-    time: "3h ago",
-  },
-  {
-    id: "m5",
-    name: "Lisa Patel",
-    initials: "LP",
-    channel: "email",
-    badges: ["needs-response"],
-    preview: "Asking about 55+ eligibility requirements and available floor plans.",
-    aiSuggestion: "Share eligibility guide and link to virtual tours for Captiva and Sanibel plans.",
-    time: "5h ago",
-  },
+const BUCKET_META: { id: CsmBucket; icon: string; label: string; description: string }[] = [
+  { id: "new_from_osc", icon: "🆕", label: "New from OSC", description: "Freshly promoted prospects" },
+  { id: "stale", icon: "⚠️", label: "Stale", description: "No communication in 30+ days" },
+  { id: "ai_hot", icon: "📈", label: "AI Hot", description: "Scoring spike / buying signals" },
+  { id: "followup_due", icon: "📋", label: "Follow-up Due", description: "Scheduled follow-ups due today" },
 ];
 
-type CommTab = "urgent" | "needs-response" | "call" | "text" | "email";
+const STAGE_COLORS: Record<string, { color: string; bg: string; label: string }> = {
+  prospect_a: { color: "#4ade80", bg: "#052e16", label: "A" },
+  prospect_b: { color: "#60a5fa", bg: "#172554", label: "B" },
+  prospect_c: { color: "#fbbf24", bg: "#422006", label: "C" },
+};
 
-const CHANNEL_ICONS: Record<string, string> = {
-  call: "📞",
-  text: "💬",
-  email: "✉️",
+const PROMOTE_MAP: Record<string, string> = {
+  prospect_c: "prospect_b",
+  prospect_b: "prospect_a",
+  prospect_a: "homeowner",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,9 +119,10 @@ function formatPrice(n: number | null): string {
 
 function formatBudget(min: number | null, max: number | null): string {
   if (min == null && max == null) return "—";
-  if (min != null && max != null) return `${formatPrice(min)} – ${formatPrice(max)}`;
-  if (min != null) return `${formatPrice(min)}+`;
-  return `up to ${formatPrice(max)}`;
+  const fmt = (n: number) => (n >= 1000000 ? `$${(n / 1000000).toFixed(2)}M` : `$${(n / 1000).toFixed(0)}K`);
+  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)}`;
+  if (min != null) return `${fmt(min)}+`;
+  return `up to ${fmt(max!)}`;
 }
 
 function relativeTime(iso: string | null): string {
@@ -140,7 +137,37 @@ function relativeTime(iso: string | null): string {
   return new Date(iso).toLocaleDateString();
 }
 
-// ─── Metric Card ──────────────────────────────────────────────────────────────
+function classifyBucket(item: ProspectItem, todayTaskOppIds: Set<string>): CsmBucket {
+  // New from OSC: created within last 7 days
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  if (new Date(item.created_at).getTime() > sevenDaysAgo) return "new_from_osc";
+
+  // Follow-up Due: has a task due today
+  if (todayTaskOppIds.has(item.id)) return "followup_due";
+
+  // AI Hot: engagement_score > 60
+  if (item.engagement_score != null && item.engagement_score > 60) return "ai_hot";
+
+  // Stale: last_activity_at > 30 days ago
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  if (!item.last_activity_at || new Date(item.last_activity_at).getTime() < thirtyDaysAgo) return "stale";
+
+  // Default: new from OSC (catch-all)
+  return "new_from_osc";
+}
+
+function channelIcon(ch: string | null): string {
+  const map: Record<string, string> = { call: "📞", phone: "📞", email: "📧", text: "💬", sms: "💬", chat: "💬" };
+  return map[ch ?? ""] ?? "📋";
+}
+
+function priorityBadge(p: string | null): { color: string; bg: string; label: string } {
+  if (p === "high") return { color: "#fca5a5", bg: "#7f1d1d", label: "🔴 High" };
+  if (p === "medium") return { color: "#fbbf24", bg: "#422006", label: "🟡 Medium" };
+  return { color: "#86efac", bg: "#052e16", label: "🟢 Low" };
+}
+
+// ─── MetricCard ───────────────────────────────────────────────────────────────
 
 function MetricCard({
   label, value, subtitle, active, onClick,
@@ -179,15 +206,9 @@ function MetricCard({
         }
       }}
     >
-      <span style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        {label}
-      </span>
-      <span style={{ fontSize: 24, fontWeight: 600, color: "#fafafa", lineHeight: 1.2 }}>
-        {value}
-      </span>
-      {subtitle && (
-        <span style={{ fontSize: 11, color: "#52525b" }}>{subtitle}</span>
-      )}
+      <span style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
+      <span style={{ fontSize: 24, fontWeight: 600, color: "#fafafa", lineHeight: 1.2 }}>{value}</span>
+      {subtitle && <span style={{ fontSize: 11, color: "#52525b" }}>{subtitle}</span>}
     </div>
   );
 }
@@ -208,7 +229,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   );
 }
 
-// ─── Data Table ───────────────────────────────────────────────────────────────
+// ─── MiniTable ────────────────────────────────────────────────────────────────
 
 function MiniTable({ headers, rows }: { headers: string[]; rows: React.ReactNode[][] }) {
   return (
@@ -247,10 +268,6 @@ function MiniTable({ headers, rows }: { headers: string[]; rows: React.ReactNode
   );
 }
 
-// ─── Drill-down panels ────────────────────────────────────────────────────────
-
-type DrillPanel = null | "plans" | "lots" | "leads" | "prospects" | "customers" | "appointments" | "qd";
-
 // ─── Sales Goal Strip ─────────────────────────────────────────────────────────
 
 function SalesGoalStrip() {
@@ -260,42 +277,24 @@ function SalesGoalStrip() {
   return (
     <div style={{ padding: "16px 24px" }}>
       <div style={{
-        display: "flex",
-        alignItems: "stretch",
-        gap: 0,
-        border: "1px solid #27272a",
-        borderRadius: 8,
-        overflow: "hidden",
-        backgroundColor: "#09090b",
+        display: "flex", alignItems: "stretch", gap: 0,
+        border: "1px solid #27272a", borderRadius: 8, overflow: "hidden", backgroundColor: "#09090b",
       }}>
-        {/* YTD Summary */}
         <div style={{
-          padding: "12px 20px",
-          borderRight: "1px solid #27272a",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          minWidth: 120,
-          gap: 2,
+          padding: "12px 20px", borderRight: "1px solid #27272a",
+          display: "flex", flexDirection: "column", justifyContent: "center", minWidth: 120, gap: 2,
         }}>
           <span style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>YTD</span>
           <span style={{ fontSize: 18, fontWeight: 600, color: "#fafafa" }}>Sales: {ytdSales}</span>
           <span style={{ fontSize: 11, color: "#52525b" }}>Goal: {ytdSales} / {ytdGoal}</span>
         </div>
-        {/* Monthly columns */}
         {MONTH_GOALS.map((m) => {
           const met = m.sales >= m.goal && m.goal > 0;
           return (
             <div key={m.month} style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "10px 4px",
-              borderRight: "1px solid #18181b",
-              borderBottom: `2px solid ${met ? "#22c55e" : "#27272a"}`,
-              minWidth: 0,
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              padding: "10px 4px", borderRight: "1px solid #18181b",
+              borderBottom: `2px solid ${met ? "#22c55e" : "#27272a"}`, minWidth: 0,
             }}>
               <span style={{ fontSize: 10, color: "#52525b", fontWeight: 500, letterSpacing: "0.05em" }}>{m.month}</span>
               <span style={{ fontSize: 16, fontWeight: 600, color: m.sales > 0 ? "#fafafa" : "#3f3f46", marginTop: 2 }}>{m.sales}</span>
@@ -307,228 +306,624 @@ function SalesGoalStrip() {
   );
 }
 
-// ─── Communication Hub ────────────────────────────────────────────────────────
+// ─── Action Modal (Promote/Demote) ───────────────────────────────────────────
 
-function CommunicationHub() {
-  const [activeTab, setActiveTab] = useState<CommTab>("urgent");
+function ActionModal({
+  item, action, onClose, onExecute,
+}: {
+  item: ProspectItem;
+  action: ActionType;
+  onClose: () => void;
+  onExecute: (oppId: string, newStage: string, reason: string) => void;
+}) {
+  const currentStage = item.crm_stage;
+  const promoteTarget = PROMOTE_MAP[currentStage] ?? "homeowner";
+  const [targetStage, setTargetStage] = useState(action === "promote" ? promoteTarget : "queue");
+  const [reason, setReason] = useState("");
 
-  const filteredMessages = STUB_MESSAGES.filter((msg) => {
-    switch (activeTab) {
-      case "urgent": return msg.badges.includes("urgent");
-      case "needs-response": return msg.badges.includes("needs-response");
-      case "call": return msg.channel === "call";
-      case "text": return msg.channel === "text";
-      case "email": return msg.channel === "email";
-      default: return true;
-    }
-  });
+  const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
+  const stageInfo = STAGE_COLORS[currentStage];
 
-  const tabs: { key: CommTab; label: string }[] = [
-    { key: "urgent", label: "Urgent" },
-    { key: "needs-response", label: "Needs Response" },
-    { key: "call", label: "Call" },
-    { key: "text", label: "Text" },
-    { key: "email", label: "Email" },
+  const promoteOptions = action === "promote"
+    ? [
+        ...(currentStage === "prospect_c" ? [{ value: "prospect_b", label: "Prospect B — Intent within 30 days" }] : []),
+        ...(currentStage === "prospect_c" || currentStage === "prospect_b" ? [{ value: "prospect_a", label: "Prospect A — Contract this week" }] : []),
+        { value: "homeowner", label: "Homeowner — Sale closed" },
+      ]
+    : [];
+
+  const demoteOptions = [
+    { value: "queue", label: "Queue — Return to OSC for re-routing" },
   ];
 
+  const options = action === "promote" ? promoteOptions : demoteOptions;
+
   return (
-    <div style={{ flex: "0 0 60%", minWidth: 0 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#fafafa", marginBottom: 12 }}>Communication Hub</div>
-      {/* Tab bar */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
-        {tabs.map((t) => (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", zIndex: 50, backdropFilter: "blur(2px)" }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        width: 480, backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 12,
+        zIndex: 51, overflow: "hidden",
+      }}>
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid #27272a" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16, fontWeight: 600, color: "#fafafa" }}>
+              {action === "promote" ? "↑ Promote" : "↓ Demote"}: {name}
+            </span>
+            {stageInfo && (
+              <span style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 4,
+                backgroundColor: stageInfo.bg, color: stageInfo.color, fontWeight: 600,
+              }}>{stageInfo.label}</span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: "#71717a", marginTop: 4 }}>
+            Currently: {currentStage.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase())}
+          </div>
+        </div>
+        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
+              Move to
+            </label>
+            <select value={targetStage} onChange={e => setTargetStage(e.target.value)} style={{
+              width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
+              borderRadius: 6, color: "#fafafa", fontSize: 13, outline: "none",
+            }}>
+              {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
+              Reason
+            </label>
+            <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2}
+              placeholder={action === "promote" ? "e.g., Very interested, toured model home, ready to move up" : "e.g., Not responding, needs more nurturing by OSC"}
+              style={{
+                width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
+                borderRadius: 6, color: "#a1a1aa", fontSize: 12, outline: "none", resize: "none",
+              }} />
+          </div>
+        </div>
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #27272a", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button onClick={onClose} style={{
+            padding: "8px 16px", borderRadius: 6, border: "1px solid #27272a",
+            backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 12, cursor: "pointer",
+          }}>Cancel</button>
           <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
+            onClick={() => onExecute(item.id, targetStage, reason)}
             style={{
-              padding: "6px 14px",
-              fontSize: 11,
-              fontWeight: 500,
-              borderRadius: 6,
-              border: `1px solid ${activeTab === t.key ? "#3f3f46" : "#27272a"}`,
-              backgroundColor: activeTab === t.key ? "#27272a" : "transparent",
-              color: activeTab === t.key ? "#fafafa" : "#71717a",
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
+              padding: "8px 16px", borderRadius: 6, border: "none",
+              backgroundColor: action === "promote" ? "#166534" : "#991b1b",
+              color: "#fafafa", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}>
+            {action === "promote" ? "↑ Promote" : "↓ Demote"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Snooze Picker ────────────────────────────────────────────────────────────
+
+function SnoozePicker({ onSnooze, onClose }: { onSnooze: (until: string) => void; onClose: () => void }) {
+  const options = [
+    { label: "1 hour", ms: 3600000 },
+    { label: "4 hours", ms: 14400000 },
+    { label: "Tomorrow 9am", ms: 0 },
+    { label: "Next Monday 9am", ms: 0 },
+  ];
+
+  function computeTime(opt: { label: string; ms: number }): string {
+    if (opt.ms > 0) return new Date(Date.now() + opt.ms).toISOString();
+    const now = new Date();
+    if (opt.label.startsWith("Tomorrow")) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + 1);
+      d.setHours(9, 0, 0, 0);
+      return d.toISOString();
+    }
+    const d = new Date(now);
+    const dayOfWeek = d.getDay();
+    const daysUntilMon = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+    d.setDate(d.getDate() + daysUntilMon);
+    d.setHours(9, 0, 0, 0);
+    return d.toISOString();
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 50 }} />
+      <div style={{
+        position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 51,
+        backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8,
+        padding: 4, minWidth: 160, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      }}>
+        {options.map(opt => (
+          <button key={opt.label} onClick={() => onSnooze(computeTime(opt))} style={{
+            display: "block", width: "100%", padding: "8px 12px", textAlign: "left",
+            background: "none", border: "none", color: "#a1a1aa", fontSize: 12,
+            cursor: "pointer", borderRadius: 4,
+          }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#27272a")}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
           >
-            {t.label}
+            ⏰ {opt.label}
           </button>
         ))}
       </div>
-      {/* Message list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {filteredMessages.length === 0 ? (
-          <div style={{ padding: 24, textAlign: "center", fontSize: 12, color: "#3f3f46", border: "1px solid #27272a", borderRadius: 8 }}>
-            No messages in this category
-          </div>
-        ) : (
-          filteredMessages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
-                padding: "12px 16px",
-                backgroundColor: "#18181b",
-                borderRadius: 8,
-                border: "1px solid #27272a",
-                cursor: "pointer",
-                transition: "border-color 0.15s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#3f3f46")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#27272a")}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                {/* Avatar */}
-                <div style={{
-                  width: 32, height: 32, borderRadius: "50%",
-                  backgroundColor: "#27272a", display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 600, color: "#a1a1aa", flexShrink: 0,
-                }}>
-                  {msg.initials}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: "#fafafa" }}>{msg.name}</span>
-                    {msg.badges.includes("urgent") && (
-                      <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, backgroundColor: "#450a0a", color: "#fca5a5", fontWeight: 500 }}>Urgent</span>
-                    )}
-                    {msg.badges.includes("needs-response") && (
-                      <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, backgroundColor: "#172554", color: "#93c5fd", fontWeight: 500 }}>Needs Response</span>
-                    )}
-                    <span style={{ fontSize: 11, marginLeft: "auto", flexShrink: 0 }}>{CHANNEL_ICONS[msg.channel] ?? ""}</span>
-                  </div>
-                </div>
-                <span style={{ fontSize: 10, color: "#52525b", flexShrink: 0 }}>{msg.time}</span>
-              </div>
-              <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{msg.preview}</div>
-              {msg.aiSuggestion && (
-                <div style={{
-                  marginTop: 8, padding: "8px 12px", borderRadius: 6,
-                  backgroundColor: "#052e16", border: "1px solid #14532d",
-                  fontSize: 11, color: "#86efac", lineHeight: 1.4,
-                }}>
-                  <span style={{ fontWeight: 600, marginRight: 4 }}>AI:</span>{msg.aiSuggestion}
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+    </>
   );
 }
 
-// ─── AI Scoring Panel ─────────────────────────────────────────────────────────
+// ─── Action Button ────────────────────────────────────────────────────────────
 
-function AIScoringPanel({ prospects }: { prospects: any[] }) {
-  const high = prospects.filter((p: any) => p.stage === "prospect_a");
-  const medium = prospects.filter((p: any) => p.stage === "prospect_b");
-  const low = prospects.filter((p: any) => p.stage === "prospect_c");
-  const total = prospects.length || 1;
+function ActionBtn({ label }: { label: string }) {
+  return (
+    <button style={{
+      padding: "4px 10px", borderRadius: 4, border: "1px solid #27272a",
+      backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer",
+    }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+    >{label}</button>
+  );
+}
 
-  const tiers = [
-    { label: "High Priority", count: high.length, color: "#ef4444", bg: "#450a0a", items: high },
-    { label: "Medium", count: medium.length, color: "#eab308", bg: "#422006", items: medium },
-    { label: "Low", count: low.length, color: "#22c55e", bg: "#052e16", items: low },
-  ];
+// ─── Prospect Queue Card ──────────────────────────────────────────────────────
+
+function ProspectCard({
+  item, onPromote, onDemote,
+}: {
+  item: ProspectItem;
+  onPromote: () => void;
+  onDemote: () => void;
+}) {
+  const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
+  const stageInfo = STAGE_COLORS[item.crm_stage];
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div style={{ flex: "0 0 40%", minWidth: 0 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#fafafa", marginBottom: 12 }}>AI Prospect Scoring</div>
-      <div style={{
-        padding: 16, backgroundColor: "#18181b", borderRadius: 8, border: "1px solid #27272a",
-        display: "flex", flexDirection: "column", gap: 12,
+    <div style={{
+      backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8,
+      overflow: "hidden", transition: "border-color 0.15s",
+    }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+    >
+      <div onClick={() => setExpanded(!expanded)} style={{
+        padding: "12px 16px", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 12,
       }}>
-        {/* Tier bars */}
-        {tiers.map((tier) => (
-          <div key={tier.label}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: "#a1a1aa", fontWeight: 500 }}>{tier.label}</span>
-              <span style={{ fontSize: 11, color: "#71717a" }}>{tier.count}</span>
-            </div>
-            <div style={{ height: 6, borderRadius: 3, backgroundColor: "#27272a", overflow: "hidden" }}>
-              <div style={{
-                height: "100%",
-                width: `${Math.round((tier.count / total) * 100)}%`,
-                backgroundColor: tier.color,
-                borderRadius: 3,
-                transition: "width 0.3s",
-              }} />
-            </div>
-          </div>
-        ))}
-
-        {/* Divider */}
-        <div style={{ borderTop: "1px solid #27272a", margin: "4px 0" }} />
-
-        {/* Prospect list */}
-        {high.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 10, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>High Priority Prospects</span>
-            {high.map((p: any, i: number) => (
-              <div key={p.id ?? i} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px 10px", borderRadius: 6, backgroundColor: "#09090b", border: "1px solid #27272a",
-              }}>
-                <span style={{ fontSize: 12, color: "#fafafa", fontWeight: 500 }}>{p.first_name} {p.last_name}</span>
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#450a0a", color: "#fca5a5", fontWeight: 500 }}>A</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ padding: 16, textAlign: "center", fontSize: 12, color: "#3f3f46" }}>No high priority prospects</div>
-        )}
-
-        {medium.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 10, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Medium Priority</span>
-            {medium.slice(0, 3).map((p: any, i: number) => (
-              <div key={p.id ?? i} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px 10px", borderRadius: 6, backgroundColor: "#09090b", border: "1px solid #27272a",
-              }}>
-                <span style={{ fontSize: 12, color: "#fafafa", fontWeight: 500 }}>{p.first_name} {p.last_name}</span>
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#422006", color: "#fde047", fontWeight: 500 }}>B</span>
-              </div>
-            ))}
-            {medium.length > 3 && (
-              <span style={{ fontSize: 11, color: "#52525b", textAlign: "center" }}>+{medium.length - 3} more</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#fafafa" }}>{name}</span>
+            {stageInfo && (
+              <span style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 4,
+                backgroundColor: stageInfo.bg, color: stageInfo.color, fontWeight: 600,
+              }}>{stageInfo.label}</span>
             )}
           </div>
+          <div style={{ fontSize: 11, color: "#52525b", marginTop: 2 }}>
+            {formatBudget(item.budget_min, item.budget_max)} · {relativeTime(item.last_activity_at)}
+          </div>
+        </div>
+        <span style={{ fontSize: 11, color: "#71717a", flexShrink: 0 }}>{item.contacts?.phone ?? "—"}</span>
+        <button onClick={e => { e.stopPropagation(); onPromote(); }} style={{
+          padding: "4px 10px", borderRadius: 4, border: "1px solid #166534",
+          backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer", flexShrink: 0,
+        }}>↑ Promote</button>
+        <button onClick={e => { e.stopPropagation(); onDemote(); }} style={{
+          padding: "4px 10px", borderRadius: 4, border: "1px solid #991b1b",
+          backgroundColor: "#1c1917", color: "#f87171", fontSize: 11, fontWeight: 600, cursor: "pointer", flexShrink: 0,
+        }}>↓ Demote</button>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "0 16px 12px", borderTop: "1px solid #27272a", paddingTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <div>
+              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Email</span>
+              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.contacts?.email ?? "—"}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Source</span>
+              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.opportunity_source ?? item.source ?? "—"}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Created</span>
+              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{new Date(item.created_at).toLocaleDateString()}</div>
+            </div>
+          </div>
+          {item.notes && (
+            <div style={{ marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Notes</span>
+              <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{item.notes}</div>
+            </div>
+          )}
+          {/* Quick Actions */}
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <ActionBtn label="📞 Call" />
+            <ActionBtn label="📧 Email" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Task Card ────────────────────────────────────────────────────────────────
+
+function TaskCard({
+  task, onComplete, onSnooze,
+}: {
+  task: TaskItem;
+  onComplete: () => void;
+  onSnooze: (until: string) => void;
+}) {
+  const [showSnooze, setShowSnooze] = useState(false);
+  const pb = priorityBadge(task.priority);
+  const contactName = task.contacts ? `${task.contacts.first_name} ${task.contacts.last_name}` : null;
+
+  return (
+    <div style={{
+      backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8,
+      padding: "12px 14px", transition: "border-color 0.15s", position: "relative",
+    }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", flex: 1 }}>
+          {channelIcon(task.channel)} {task.title}
+        </span>
+        <span style={{
+          fontSize: 9, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
+          backgroundColor: pb.bg, color: pb.color,
+        }}>{pb.label}</span>
+      </div>
+
+      {contactName && (
+        <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 4 }}>{contactName}</div>
+      )}
+
+      {task.ai_suggestion && (
+        <div style={{
+          fontSize: 11, color: "#86efac", backgroundColor: "#052e16", border: "1px solid #166534",
+          borderRadius: 4, padding: "6px 10px", marginBottom: 8, lineHeight: 1.5,
+        }}>
+          🤖 {task.ai_suggestion}
+        </div>
+      )}
+
+      {task.description && !task.ai_suggestion && (
+        <div style={{ fontSize: 11, color: "#71717a", marginBottom: 8, lineHeight: 1.4 }}>{task.description}</div>
+      )}
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", position: "relative" }}>
+        {(task.channel === "call" || task.channel === "phone") && <ActionBtn label="📞 Call" />}
+        {task.channel === "email" && <ActionBtn label="📧 Email" />}
+        {(task.channel === "text" || task.channel === "sms") && <ActionBtn label="💬 Text" />}
+        {!task.channel && (
+          <>
+            <ActionBtn label="📞 Call" />
+            <ActionBtn label="📧 Email" />
+            <ActionBtn label="💬 Text" />
+          </>
         )}
+        <button onClick={onComplete} style={{
+          padding: "4px 10px", borderRadius: 4, border: "1px solid #166534",
+          backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
+        }}>✓ Complete</button>
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setShowSnooze(!showSnooze)} style={{
+            padding: "4px 10px", borderRadius: 4, border: "1px solid #27272a",
+            backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer",
+          }}>⏰ Snooze</button>
+          {showSnooze && (
+            <SnoozePicker
+              onSnooze={(until) => { setShowSnooze(false); onSnooze(until); }}
+              onClose={() => setShowSnooze(false)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Reference Module ─────────────────────────────────────────────────────────
+
+function ReferenceModule({
+  community, plans, lots, modelHome,
+}: {
+  community: Record<string, any>;
+  plans: any[];
+  lots: any[];
+  modelHome: any | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const availableLots = lots.filter((l: any) => l.is_available);
+
+  return (
+    <div style={{ padding: "0 24px 24px" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: "100%", padding: "12px 16px", backgroundColor: "#18181b", border: "1px solid #27272a",
+          borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between",
+          color: "#fafafa", fontSize: 13, fontWeight: 600,
+        }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+      >
+        <span>📚 Community Reference</span>
+        <span style={{ fontSize: 11, color: "#71717a" }}>{open ? "▲ Collapse" : "▼ Expand"}</span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Plans Table */}
+          {plans.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#a1a1aa", marginBottom: 8 }}>Floor Plans ({plans.length})</div>
+              <MiniTable
+                headers={["Plan", "Price", "Beds", "Baths", "Sq Ft"]}
+                rows={plans.map((p: any) => [
+                  p.marketing_name ?? p.plan_name ?? "—",
+                  formatPrice(p.net_price ?? p.base_price),
+                  p.beds ?? "—",
+                  p.baths ?? "—",
+                  p.sqft ? p.sqft.toLocaleString() : "—",
+                ])}
+              />
+            </div>
+          )}
+
+          {/* Available Lots */}
+          {availableLots.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#a1a1aa", marginBottom: 8 }}>Available Lots ({availableLots.length})</div>
+              <MiniTable
+                headers={["Lot #", "Premium", "Address", "Phase"]}
+                rows={availableLots.map((l: any) => [
+                  l.lot_number ?? "—",
+                  l.lot_premium ? formatPrice(l.lot_premium) : "—",
+                  l.address ?? "—",
+                  l.phase ?? "—",
+                ])}
+              />
+            </div>
+          )}
+
+          {/* Community Info Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            {/* Model Home */}
+            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
+              <div style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Model Home</div>
+              {modelHome ? (
+                <>
+                  <div style={{ fontSize: 12, color: "#fafafa", fontWeight: 500 }}>{modelHome.name ?? modelHome.model_marketing_name ?? "Model"}</div>
+                  {modelHome.address && <div style={{ fontSize: 11, color: "#71717a", marginTop: 4 }}>{modelHome.address}</div>}
+                  {modelHome.open_hours && <div style={{ fontSize: 11, color: "#52525b", marginTop: 2 }}>Hours: {modelHome.open_hours}</div>}
+                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    {modelHome.virtual_tour_url && (
+                      <a href={modelHome.virtual_tour_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "#a1a1aa", textDecoration: "underline" }}>Virtual Tour ↗</a>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <span style={{ fontSize: 12, color: "#3f3f46" }}>No model home</span>
+              )}
+            </div>
+
+            {/* Schools */}
+            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
+              <div style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Schools</div>
+              {[
+                ["District", community.school_district],
+                ["Elementary", community.school_elementary],
+                ["Middle", community.school_middle],
+                ["High", community.school_high],
+              ].map(([label, val]) => val ? (
+                <div key={label as string} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+                  <span style={{ fontSize: 11, color: "#52525b" }}>{label}</span>
+                  <span style={{ fontSize: 11, color: "#a1a1aa" }}>{val as string}</span>
+                </div>
+              ) : null)}
+              {!community.school_district && <span style={{ fontSize: 12, color: "#3f3f46" }}>No school data</span>}
+            </div>
+
+            {/* Details + Links */}
+            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
+              <div style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Details</div>
+              {[
+                ["Total Homesites", community.total_homesites],
+                ["Status", community.status],
+                ["55+", community.is_55_plus ? "Yes" : "No"],
+                ["HOA", community.hoa_fee ? `${formatPrice(community.hoa_fee)}/${community.hoa_period ?? "mo"}` : "—"],
+              ].map(([label, val]) => (
+                <div key={label as string} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+                  <span style={{ fontSize: 11, color: "#52525b" }}>{label}</span>
+                  <span style={{ fontSize: 11, color: "#a1a1aa" }}>{String(val ?? "—")}</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                {community.page_url && (
+                  <a href={`https://schellbrothers.com${community.page_url}`} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "#a1a1aa", textDecoration: "underline" }}>Website ↗</a>
+                )}
+                {community.brochure_url && (
+                  <a href={community.brochure_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "#a1a1aa", textDecoration: "underline" }}>Brochure ↗</a>
+                )}
+                {community.lot_map_url && (
+                  <a href={community.lot_map_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "#a1a1aa", textDecoration: "underline" }}>Site Map ↗</a>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Amenities */}
+          {community.amenities && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#a1a1aa", marginBottom: 8 }}>Amenities</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {community.amenities.split(",").map((a: string) => a.trim()).filter(Boolean).map((a: string) => (
+                  <span key={a} style={{
+                    fontSize: 11, padding: "4px 10px", borderRadius: 4,
+                    backgroundColor: "#18181b", border: "1px solid #27272a", color: "#a1a1aa",
+                  }}>{a}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 function CommunityView({ community, plans, lots, modelHome, specHomes, divisions }: CommunityViewProps) {
   const [drill, setDrill] = useState<DrillPanel>(null);
-  const [prospects, setProspects] = useState<any[]>([]);
+  const [prospects, setProspects] = useState<ProspectItem[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [activeBucket, setActiveBucket] = useState<CsmBucket>("new_from_osc");
+  const [actionItem, setActionItem] = useState<ProspectItem | null>(null);
+  const [actionType, setActionType] = useState<ActionType>(null);
 
   const availableLots = lots.filter((l: any) => l.is_available);
   const underConstruction = lots.filter((l: any) => l.construction_status === "under-construction" || l.lot_status === "under-construction");
   const qdLots = lots.filter((l: any) => l.lot_status === "quick-delivery");
   const division = divisions.find(d => d.id === community.division_id);
 
-  // Fetch CRM data for this community
-  useEffect(() => {
+  // Fetch CRM data
+  const fetchData = useCallback(async () => {
     if (!community?.id) return;
     const cid = community.id;
+    const now = new Date().toISOString();
 
-    Promise.all([
-      supabase.from("prospects").select("*").eq("community_id", cid),
+    const [oppRes, leadRes, custRes, taskRes] = await Promise.all([
+      supabase
+        .from("opportunities")
+        .select("id, contact_id, crm_stage, community_id, division_id, source, opportunity_source, queue_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone)")
+        .eq("community_id", cid)
+        .in("crm_stage", ["prospect_c", "prospect_b", "prospect_a"])
+        .order("last_activity_at", { ascending: false }),
       supabase.from("leads").select("*").eq("community_id", cid).neq("stage", "opportunity"),
       supabase.from("home_owners").select("*, contacts(first_name, last_name, email, phone)").eq("community_id", cid),
-    ]).then(([pRes, lRes, hRes]) => {
-      setProspects(pRes.data ?? []);
-      setLeads(lRes.data ?? []);
-      setCustomers(hRes.data ?? []);
-    });
+      supabase
+        .from("tasks")
+        .select("id, title, description, priority, channel, status, due_at, snoozed_until, completed_at, ai_suggestion, contact_id, opportunity_id, community_id, created_at, contacts(first_name, last_name)")
+        .eq("community_id", cid)
+        .eq("status", "pending")
+        .or(`snoozed_until.is.null,snoozed_until.lte.${now}`)
+        .order("priority", { ascending: true })
+        .order("created_at", { ascending: false }),
+    ]);
+
+    const flatProspects = (oppRes.data ?? []).map((item: Record<string, unknown>) => ({
+      ...item,
+      contacts: Array.isArray(item.contacts) ? (item.contacts as Record<string, unknown>[])[0] ?? null : item.contacts,
+    })) as ProspectItem[];
+
+    const flatTasks = (taskRes.data ?? []).map((t: Record<string, unknown>) => ({
+      ...t,
+      contacts: Array.isArray(t.contacts) ? (t.contacts as Record<string, unknown>[])[0] ?? null : t.contacts,
+    })) as TaskItem[];
+
+    setProspects(flatProspects);
+    setLeads(leadRes.data ?? []);
+    setCustomers(custRes.data ?? []);
+    setTasks(flatTasks);
   }, [community?.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Build task opp IDs for today's due tasks
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  const todayTaskOppIds = new Set(
+    tasks
+      .filter(t => t.due_at && new Date(t.due_at) >= todayStart && new Date(t.due_at) <= todayEnd && t.opportunity_id)
+      .map(t => t.opportunity_id!)
+  );
+
+  // Bucket prospects
+  const bucketCounts: Record<CsmBucket, number> = { new_from_osc: 0, stale: 0, ai_hot: 0, followup_due: 0 };
+  const bucketedItems: Record<CsmBucket, ProspectItem[]> = { new_from_osc: [], stale: [], ai_hot: [], followup_due: [] };
+  for (const item of prospects) {
+    const bucket = classifyBucket(item, todayTaskOppIds);
+    bucketCounts[bucket]++;
+    bucketedItems[bucket].push(item);
+  }
+  const currentBucketItems = bucketedItems[activeBucket];
+
+  // Execute promote/demote
+  async function handleAction(oppId: string, newStage: string, reason: string) {
+    const item = prospects.find(p => p.id === oppId);
+    if (!item) return;
+
+    const { error } = await supabase
+      .from("opportunities")
+      .update({
+        crm_stage: newStage,
+        ...(newStage === "queue" ? { community_id: null } : {}),
+      })
+      .eq("id", oppId);
+
+    if (error) {
+      console.error("Stage transition failed:", error);
+      alert(`Error: ${error.message}`);
+    } else {
+      await supabase.from("stage_transitions").insert({
+        org_id: "00000000-0000-0000-0000-000000000001",
+        opportunity_id: oppId,
+        contact_id: item.contact_id,
+        from_stage: item.crm_stage,
+        to_stage: newStage,
+        triggered_by: "manual",
+        reason: reason || null,
+      });
+    }
+
+    setActionItem(null);
+    setActionType(null);
+    fetchData();
+  }
+
+  async function handleCompleteTask(taskId: string) {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("id", taskId);
+    if (error) {
+      console.error("Task completion failed:", error);
+      alert(`Error: ${error.message}`);
+    }
+    fetchData();
+  }
+
+  async function handleSnoozeTask(taskId: string, until: string) {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ snoozed_until: until })
+      .eq("id", taskId);
+    if (error) {
+      console.error("Task snooze failed:", error);
+      alert(`Error: ${error.message}`);
+    }
+    fetchData();
+  }
 
   function toggleDrill(panel: DrillPanel) {
     setDrill(prev => prev === panel ? null : panel);
@@ -536,18 +931,26 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #27272a" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-          {division && (
-            <span style={{ fontSize: 12, color: "#52525b" }}>{division.name} /</span>
-          )}
+          {division && <span style={{ fontSize: 12, color: "#52525b" }}>{division.name} /</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <h1 style={{ fontSize: 20, fontWeight: 600, color: "#fafafa", margin: 0 }}>{community.name}</h1>
           <span style={{ fontSize: 12, color: "#52525b" }}>
             {[community.city, community.state].filter(Boolean).join(", ")}
           </span>
+          {community.status && (
+            <span style={{
+              fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 500,
+              backgroundColor: community.status === "active" ? "#052e16" : "#422006",
+              color: community.status === "active" ? "#4ade80" : "#fbbf24",
+              border: `1px solid ${community.status === "active" ? "#166534" : "#854d0e"}`,
+            }}>
+              {community.status.charAt(0).toUpperCase() + community.status.slice(1)}
+            </span>
+          )}
         </div>
         {community.price_from && (
           <span style={{ fontSize: 12, color: "#71717a", marginTop: 4, display: "block" }}>
@@ -557,10 +960,10 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
         )}
       </div>
 
-      {/* Sales Goal Strip */}
+      {/* ── Sales Goal Strip ── */}
       <SalesGoalStrip />
 
-      {/* Metric grid */}
+      {/* ── Metrics Grid ── */}
       <div style={{ padding: "16px 24px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
           <MetricCard label="Plans" value={plans.length} onClick={() => toggleDrill("plans")} active={drill === "plans"} />
@@ -570,23 +973,17 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 12 }}>
           <MetricCard label="Leads" value={leads.length} onClick={() => toggleDrill("leads")} active={drill === "leads"} />
-          <MetricCard label="Prospects" value={prospects.length}
-            subtitle={prospects.length > 0 ? `A: ${prospects.filter((p: any) => p.stage === "prospect_a").length} · B: ${prospects.filter((p: any) => p.stage === "prospect_b").length} · C: ${prospects.filter((p: any) => p.stage === "prospect_c").length}` : undefined}
+          <MetricCard label="Prospects (A/B/C)" value={prospects.length}
+            subtitle={prospects.length > 0 ? `A: ${prospects.filter(p => p.crm_stage === "prospect_a").length} · B: ${prospects.filter(p => p.crm_stage === "prospect_b").length} · C: ${prospects.filter(p => p.crm_stage === "prospect_c").length}` : undefined}
             onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
           <MetricCard label="Customers" value={customers.length} onClick={() => toggleDrill("customers")} active={drill === "customers"} />
-          <MetricCard label="Appointments" value="—" subtitle="Coming soon" />
+          <MetricCard label="Tasks" value={tasks.length} subtitle={tasks.length > 0 ? "pending" : "all clear"} />
         </div>
       </div>
 
-      {/* Communication Hub + AI Scoring */}
-      <div style={{ padding: "0 24px 24px", display: "flex", gap: 16 }}>
-        <CommunicationHub />
-        <AIScoringPanel prospects={prospects} />
-      </div>
-
-      {/* Drill-down panel */}
+      {/* ── Drill-down panel ── */}
       {drill && (
-        <div style={{ padding: "0 24px 24px" }}>
+        <div style={{ padding: "0 24px 16px" }}>
           {drill === "plans" && (
             <Section title="Floor Plans" count={plans.length}>
               <MiniTable
@@ -601,7 +998,6 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
               />
             </Section>
           )}
-
           {drill === "lots" && (
             <Section title="Lots" count={lots.length}>
               <MiniTable
@@ -616,7 +1012,6 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
               />
             </Section>
           )}
-
           {drill === "leads" && (
             <Section title="Leads" count={leads.length}>
               <MiniTable
@@ -631,23 +1026,25 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
               />
             </Section>
           )}
-
           {drill === "prospects" && (
             <Section title="Prospects" count={prospects.length}>
               <MiniTable
-                headers={["Name", "Stage", "Budget", "Phone", "Last Contact", "Created"]}
-                rows={prospects.map((p: any) => [
-                  `${p.first_name} ${p.last_name}`,
-                  ({ prospect_a: "A", prospect_b: "B", prospect_c: "C" } as Record<string, string>)[p.stage] ?? p.stage,
+                headers={["Name", "Stage", "Budget", "Phone", "Last Activity", "Created"]}
+                rows={prospects.map(p => [
+                  `${p.contacts?.first_name ?? "—"} ${p.contacts?.last_name ?? ""}`,
+                  <span key="stage" style={{
+                    fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 600,
+                    backgroundColor: STAGE_COLORS[p.crm_stage]?.bg ?? "#27272a",
+                    color: STAGE_COLORS[p.crm_stage]?.color ?? "#a1a1aa",
+                  }}>{STAGE_COLORS[p.crm_stage]?.label ?? p.crm_stage}</span>,
                   formatBudget(p.budget_min, p.budget_max),
-                  p.phone ?? "—",
-                  relativeTime(p.last_contacted_at),
+                  p.contacts?.phone ?? "—",
+                  relativeTime(p.last_activity_at),
                   new Date(p.created_at).toLocaleDateString(),
                 ])}
               />
             </Section>
           )}
-
           {drill === "customers" && (
             <Section title="Customers" count={customers.length}>
               <MiniTable
@@ -662,7 +1059,6 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
               />
             </Section>
           )}
-
           {drill === "qd" && (
             <Section title="Quick Delivery / Spec Homes" count={specHomes.length + qdLots.length}>
               <MiniTable
@@ -681,100 +1077,111 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
         </div>
       )}
 
-      {/* Community details */}
-      <div style={{ padding: "0 24px 24px" }}>
-        {/* Model Home */}
-        {modelHome && (
-          <Section title="Model Home">
-            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
-              <div style={{ fontSize: 13, color: "#fafafa", fontWeight: 500 }}>{modelHome.name ?? modelHome.model_marketing_name ?? "Model Home"}</div>
-              {modelHome.address && <div style={{ fontSize: 12, color: "#71717a", marginTop: 4 }}>{modelHome.address}, {modelHome.city}, {modelHome.state}</div>}
-              {modelHome.open_hours && <div style={{ fontSize: 12, color: "#52525b", marginTop: 4 }}>Hours: {modelHome.open_hours}</div>}
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                {modelHome.virtual_tour_url && (
-                  <a href={modelHome.virtual_tour_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#a1a1aa", textDecoration: "underline" }}>Virtual Tour ↗</a>
-                )}
-                {modelHome.page_url && (
-                  <a href={modelHome.page_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#a1a1aa", textDecoration: "underline" }}>Details ↗</a>
-                )}
-              </div>
-            </div>
-          </Section>
-        )}
-
-        {/* Community Info */}
-        <Section title="Community Info">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
-              <div style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Schools</div>
-              {[
-                ["District", community.school_district],
-                ["Elementary", community.school_elementary],
-                ["Middle", community.school_middle],
-                ["High", community.school_high],
-              ].map(([label, val]) => val && (
-                <div key={label as string} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                  <span style={{ fontSize: 12, color: "#52525b" }}>{label}</span>
-                  <span style={{ fontSize: 12, color: "#a1a1aa" }}>{val as string}</span>
-                </div>
-              ))}
-              {!community.school_district && <span style={{ fontSize: 12, color: "#3f3f46" }}>No school data</span>}
-            </div>
-            <div style={{ padding: 16, border: "1px solid #27272a", borderRadius: 8, backgroundColor: "#09090b" }}>
-              <div style={{ fontSize: 11, color: "#71717a", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Details</div>
-              {[
-                ["Total Homesites", community.total_homesites],
-                ["Status", community.status],
-                ["Has Model", community.has_model ? "Yes" : "No"],
-                ["55+", community.is_55_plus ? "Yes" : "No"],
-              ].map(([label, val]) => (
-                <div key={label as string} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                  <span style={{ fontSize: 12, color: "#52525b" }}>{label}</span>
-                  <span style={{ fontSize: 12, color: "#a1a1aa" }}>{String(val ?? "—")}</span>
-                </div>
-              ))}
-            </div>
+      {/* ── CSM Queue + Task List ── */}
+      <div style={{ padding: "0 24px 24px", display: "flex", gap: 20, alignItems: "flex-start" }}>
+        {/* LEFT: CSM Prospect Queue (~60%) */}
+        <div style={{ flex: "0 0 60%", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>CSM Queue</span>
+            <span style={{
+              fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600,
+              backgroundColor: prospects.length > 0 ? "#172554" : "#052e16",
+              color: prospects.length > 0 ? "#60a5fa" : "#4ade80",
+            }}>{prospects.length} prospects</span>
           </div>
-        </Section>
 
-        {/* Amenities */}
-        {community.amenities && (
-          <Section title="Amenities">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {community.amenities.split(",").map((a: string) => a.trim()).filter(Boolean).map((a: string) => (
-                <span key={a} style={{
-                  fontSize: 11, padding: "4px 10px", borderRadius: 4,
-                  backgroundColor: "#18181b", border: "1px solid #27272a", color: "#a1a1aa",
-                }}>{a}</span>
+          {/* Bucket tabs */}
+          <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12 }}>
+            {BUCKET_META.map(b => {
+              const isActive = activeBucket === b.id;
+              const count = bucketCounts[b.id];
+              return (
+                <button key={b.id} onClick={() => setActiveBucket(b.id)} style={{
+                  padding: "8px 12px", fontSize: 11, fontWeight: isActive ? 600 : 400,
+                  color: isActive ? "#fafafa" : "#52525b",
+                  borderBottom: isActive ? "2px solid #fafafa" : "2px solid transparent",
+                  background: "none", border: "none", borderBottomStyle: "solid",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+                }}>
+                  <span>{b.icon}</span>
+                  <span>{b.label}</span>
+                  <span style={{
+                    fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600,
+                    backgroundColor: count > 0 ? "#172554" : "#27272a",
+                    color: count > 0 ? "#60a5fa" : "#71717a",
+                  }}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Queue items */}
+          {currentBucketItems.length === 0 ? (
+            <div style={{
+              padding: 32, textAlign: "center", backgroundColor: "#18181b", border: "1px solid #27272a",
+              borderRadius: 8, color: "#52525b", fontSize: 12,
+            }}>
+              No prospects in {BUCKET_META.find(b => b.id === activeBucket)?.label ?? "this bucket"}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {currentBucketItems.map(item => (
+                <ProspectCard
+                  key={item.id}
+                  item={item}
+                  onPromote={() => { setActionItem(item); setActionType("promote"); }}
+                  onDemote={() => { setActionItem(item); setActionType("demote"); }}
+                />
               ))}
             </div>
-          </Section>
-        )}
+          )}
+        </div>
 
-        {/* Links */}
-        <Section title="Links">
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {community.page_url && (
-              <a href={`https://schellbrothers.com${community.page_url}`} target="_blank" rel="noreferrer" style={{
-                fontSize: 12, padding: "6px 14px", borderRadius: 6, backgroundColor: "#18181b",
-                border: "1px solid #27272a", color: "#a1a1aa", textDecoration: "none",
-              }}>SchellBrothers.com ↗</a>
-            )}
-            {community.brochure_url && (
-              <a href={community.brochure_url} target="_blank" rel="noreferrer" style={{
-                fontSize: 12, padding: "6px 14px", borderRadius: 6, backgroundColor: "#18181b",
-                border: "1px solid #27272a", color: "#a1a1aa", textDecoration: "none",
-              }}>Brochure ↗</a>
-            )}
-            {community.lot_map_url && (
-              <a href={community.lot_map_url} target="_blank" rel="noreferrer" style={{
-                fontSize: 12, padding: "6px 14px", borderRadius: 6, backgroundColor: "#18181b",
-                border: "1px solid #27272a", color: "#a1a1aa", textDecoration: "none",
-              }}>Site Map ↗</a>
-            )}
+        {/* RIGHT: Task List (~40%) */}
+        <div style={{ flex: "0 0 38%", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Action Items</span>
+            <span style={{
+              fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600,
+              backgroundColor: tasks.length > 0 ? "#422006" : "#052e16",
+              color: tasks.length > 0 ? "#fbbf24" : "#4ade80",
+            }}>{tasks.length} pending</span>
           </div>
-        </Section>
+
+          {tasks.length === 0 ? (
+            <div style={{
+              padding: 32, textAlign: "center", backgroundColor: "#052e16", border: "1px solid #166534",
+              borderRadius: 8, color: "#4ade80", fontSize: 12, fontWeight: 500,
+            }}>
+              ✓ All tasks complete
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {tasks.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onComplete={() => handleCompleteTask(task.id)}
+                  onSnooze={(until) => handleSnoozeTask(task.id, until)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* ── Reference Module (collapsible) ── */}
+      <ReferenceModule community={community} plans={plans} lots={lots} modelHome={modelHome} />
+
+      {/* ── Action Modal ── */}
+      {actionItem && actionType && (
+        <ActionModal
+          item={actionItem}
+          action={actionType}
+          onClose={() => { setActionItem(null); setActionType(null); }}
+          onExecute={handleAction}
+        />
+      )}
     </div>
   );
 }
