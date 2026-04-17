@@ -224,7 +224,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OpportunityPanel({ open, onClose, opportunity }: OpportunityPanelProps) {
-  const [activeTab, setActiveTab] = useState<"history" | "activity">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "activity" | "notes">("history");
   const [history, setHistory] = useState<StageTransition[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -321,7 +321,6 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
   // Fetch activities (lazy — only when tab is active)
   useEffect(() => {
     if (activeTab !== "activity" || !opportunity) return;
-    if (activities.length > 0) return; // already fetched
     setActivityLoading(true);
 
     const fetchActivities = async () => {
@@ -658,70 +657,11 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
               {opportunity.floor_plan_name && <Row label="Floor Plan" value={opportunity.floor_plan_name} />}
             </Section>
 
-            {/* ── Notes (append-only with timestamps) ──────────────────── */}
-            <Section title="Notes">
-              {/* Existing note entries — scrollable list */}
-              <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: noteEntries.length > 0 ? 8 : 0 }}>
-                {noteEntries.length > 0 ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {noteEntries.map((entry, i) => (
-                      <div key={i}>
-                        {entry.timestamp && (
-                          <div style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>
-                            [{entry.timestamp}]
-                          </div>
-                        )}
-                        <div style={{ fontSize: 13, color: "#888", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                          {entry.text}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : !editingNotes ? (
-                  <p
-                    onClick={() => setEditingNotes(true)}
-                    style={{ fontSize: 12, color: "#333", fontStyle: "italic", margin: 0, cursor: "pointer" }}
-                  >
-                    Click to add notes…
-                  </p>
-                ) : null}
-              </div>
-
-              {/* Add new note */}
-              {editingNotes ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <textarea
-                    value={newNoteText}
-                    onChange={e => setNewNoteText(e.target.value)}
-                    rows={3}
-                    style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
-                    placeholder="Type a new note…"
-                    autoFocus
-                  />
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      onClick={saveNotes}
-                      disabled={savingNotes || !newNoteText.trim()}
-                      style={{ ...smallBtnStyle, background: "#22c55e", color: "#000", border: "none", fontWeight: 600, opacity: savingNotes || !newNoteText.trim() ? 0.5 : 1 }}
-                    >
-                      {savingNotes ? "Saving…" : "Save"}
-                    </button>
-                    <button onClick={() => { setEditingNotes(false); setNewNoteText(""); }} style={smallBtnStyle}>Cancel</button>
-                  </div>
-                </div>
-              ) : noteEntries.length > 0 ? (
-                <button
-                  onClick={() => setEditingNotes(true)}
-                  style={{ ...smallBtnStyle, fontSize: 10, padding: "3px 10px", alignSelf: "flex-start" }}
-                >
-                  + Add Note
-                </button>
-              ) : null}
-            </Section>
+            {/* Notes moved to sub-tab */}
 
             {/* ── Sub-tabs ─────────────────────────────────────────────── */}
             <div style={{ display: "flex", gap: 0, marginBottom: 12, borderBottom: "1px solid #1a1a1a" }}>
-              {(["history", "activity"] as const).map(tab => (
+              {(["history", "activity", "notes"] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -854,6 +794,37 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                       );
                     })}
                   </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "notes" && (
+              <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                {noteEntries.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+                    {noteEntries.map((entry, i) => (
+                      <div key={i}>
+                        {entry.timestamp && <div style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>[{entry.timestamp}]</div>}
+                        <div style={{ fontSize: 13, color: "#888", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{entry.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {editingNotes ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <textarea value={newNoteText} onChange={e => setNewNoteText(e.target.value)} rows={3}
+                      style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }} placeholder="Type a new note\u2026" autoFocus />
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={saveNotes} disabled={savingNotes || !newNoteText.trim()}
+                        style={{ ...smallBtnStyle, background: "#22c55e", color: "#000", border: "none", fontWeight: 600, opacity: savingNotes || !newNoteText.trim() ? 0.5 : 1 }}>
+                        {savingNotes ? "Saving\u2026" : "Save"}</button>
+                      <button onClick={() => { setEditingNotes(false); setNewNoteText(""); }} style={smallBtnStyle}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditingNotes(true)}
+                    style={{ ...smallBtnStyle, fontSize: 10, padding: "3px 10px" }}>
+                    {noteEntries.length > 0 ? "+ Add Note" : "Click to add notes\u2026"}</button>
                 )}
               </div>
             )}
