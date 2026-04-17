@@ -320,7 +320,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
 
   // Fetch activities (lazy — only when tab is active)
   useEffect(() => {
-    if (activeTab !== "activity" || !opportunity) return;
+    if (activeTab !== "activity" || !opportunity) { setActivities([]); return; }
     setActivityLoading(true);
 
     const fetchActivities = async () => {
@@ -701,7 +701,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                           <span style={{ color: "#555", fontSize: 12 }}>→</span>
                           {t.to_stage ? <StageBadge stage={t.to_stage} /> : <span style={{ fontSize: 10, color: "#555" }}>—</span>}
                         </div>
-                        <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 0, display: "inline" }}>
                           {formatDateTime(t.created_at)}
                           {t.triggered_by && <span> · by {t.triggered_by}</span>}
                           {t.reason && <span> ({t.reason})</span>}
@@ -732,7 +732,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                         <span style={{ color: "#555", fontSize: 12 }}>→</span>
                         <StageBadge stage={opportunity.stage} />
                       </div>
-                      <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 0, display: "inline" }}>
                         {formatDateTime(opportunity.created_at)} · Created via web form
                       </div>
                     </div>
@@ -780,7 +780,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                             <div style={{ fontSize: 12, color: "#ededed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {subjectDisplay}
                             </div>
-                            <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
+                            <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 0, display: "inline" }}>
                               {formatDateTime(a.occurred_at)}
                               {a.duration_sec != null && a.duration_sec > 0 && (
                                 <span> · {Math.round(a.duration_sec / 60)}min</span>
@@ -804,7 +804,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
                     {noteEntries.map((entry, i) => (
                       <div key={i}>
-                        {entry.timestamp && <div style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>[{entry.timestamp}]</div>}
+                        {entry.timestamp && <span style={{ fontSize: 10, color: "#7aafdf", marginRight: 6 }}>{entry.timestamp}</span>}
                         <div style={{ fontSize: 13, color: "#888", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{entry.text}</div>
                       </div>
                     ))}
