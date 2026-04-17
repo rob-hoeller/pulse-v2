@@ -8,38 +8,40 @@ import { useGlobalFilter } from "@/context/GlobalFilterContext";
 // To add a new page: add one entry here. All client pages inherit it automatically.
 export const NAV_ITEMS = [
   // ── WORKSPACE: role-based command centers ──
-  { icon: "◎", label: "OSC",             href: "/workspace/osc",   group: "core" },
-  { icon: "◉", label: "CSM",             href: "/workspace/csm",   group: "core" },
-  { icon: "◈", label: "DSM",             href: "/workspace/dsm",   group: "core" },
+  { icon: "◎", label: "OSC",             href: "/workspace/osc",       group: "core" },
+  { icon: "◉", label: "CSM",             href: "/workspace/csm",       group: "core" },
+  { icon: "◈", label: "DSM",             href: "/workspace/dsm",       group: "core" },
   { icon: "◎", label: "Marketing",       href: "/workspace/marketing", group: "core" },
-  // ── DATA: CRM pipeline + reference tables ──
-  { icon: "✓", label: "Tasks",           href: "/tasks",           group: "data" },
-  { icon: "⊕", label: "Leads",           href: "/leads",           group: "data" },
-  { icon: "⊙", label: "Queue",            href: "/queue",            group: "data" },
-  { icon: "◧", label: "Prospects",       href: "/prospects",       group: "data" },
-  { icon: "⊞", label: "Customers",       href: "/customers",       group: "data" },
-  { icon: "◎", label: "Marketing",        href: "/marketing",       group: "data" },
-  { icon: "◉", label: "Contacts",         href: "/contacts",        group: "data" },
-  { icon: "⊞", label: "Divisions",       href: "/divisions",       group: "data" },
-  { icon: "⌂", label: "Communities",     href: "/communities",     group: "data" },
-  { icon: "◱", label: "Division Plans",  href: "/division-plans",  group: "data" },
-  { icon: "◫", label: "Community Plans", href: "/community-plans", group: "data" },
-  { icon: "⌂", label: "Model Homes",     href: "/model-homes",     group: "data" },
-  { icon: "◈", label: "Quick Delivery",  href: "/quick-delivery",  group: "data" },
-  { icon: "◫", label: "Lots",            href: "/lots",            group: "data" },
+  // ── PIPELINE: the sales funnel in order ──
+  { icon: "⊕", label: "Leads",           href: "/leads",              group: "pipeline" },
+  { icon: "⊙", label: "Queue",           href: "/queue",              group: "pipeline" },
+  { icon: "◧", label: "Prospects",       href: "/prospects",          group: "pipeline" },
+  { icon: "⊞", label: "Homeowners",      href: "/customers",          group: "pipeline" },
+  // ── CRM: supporting data ──
+  { icon: "◉", label: "Contacts",        href: "/contacts",           group: "crm" },
+  { icon: "✓", label: "Tasks",           href: "/tasks",              group: "crm" },
+  // ── REFERENCE: inventory + property data ──
+  { icon: "⊞", label: "Divisions",       href: "/divisions",          group: "reference" },
+  { icon: "⌂", label: "Communities",     href: "/communities",        group: "reference" },
+  { icon: "◱", label: "Plans",           href: "/community-plans",    group: "reference" },
+  { icon: "⌂", label: "Model Homes",     href: "/model-homes",        group: "reference" },
+  { icon: "◈", label: "Quick Delivery",  href: "/quick-delivery",     group: "reference" },
+  { icon: "◫", label: "Lots",            href: "/lots",               group: "reference" },
   // ── TOOLS ──
-  { icon: "⊡", label: "Agents",          href: "#",               group: "tools" },
-  { icon: "◷", label: "Calendar",        href: "#",               group: "tools" },
-  { icon: "◉", label: "Notifications",   href: "#",               group: "tools" },
-  { icon: "⚙", label: "Settings",        href: "#",               group: "tools" },
-  { icon: "◈", label: "Status",          href: "/status",         group: "tools" },
-  { icon: "◧", label: "Docs",            href: "/docs",           group: "tools" },
-  { icon: "⬡", label: "MCP Tools",       href: "/tools/mcp",      group: "tools" },
+  { icon: "⊡", label: "Agents",          href: "#",                   group: "tools" },
+  { icon: "◷", label: "Calendar",        href: "#",                   group: "tools" },
+  { icon: "◉", label: "Notifications",   href: "#",                   group: "tools" },
+  { icon: "⚙", label: "Settings",        href: "#",                   group: "tools" },
+  { icon: "◈", label: "Status",          href: "/status",             group: "tools" },
+  { icon: "◧", label: "Docs",            href: "/docs",               group: "tools" },
+  { icon: "⬡", label: "MCP Tools",       href: "/tools/mcp",          group: "tools" },
 ] as const;
 
 const GROUP_LABELS: Record<string, string> = {
   core: "WORKSPACE",
-  data: "DATA",
+  pipeline: "PIPELINE",
+  crm: "CRM",
+  reference: "REFERENCE",
   tools: "TOOLS",
 };
 

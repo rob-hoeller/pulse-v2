@@ -146,7 +146,7 @@ function CustomersInner({ customers, communities, divisions }: Props) {
     <PageShell
       topBar={
         <TableSubHeader
-          title="Customers"
+          title="Homeowners"
           rows={tableRows}
           totalRows={tableRows.length}
           stats={STATS}
@@ -156,7 +156,7 @@ function CustomersInner({ customers, communities, divisions }: Props) {
           onPageSizeChange={s => { setPageSize(s); setPage(0); }}
           search={search}
           onSearch={q => { setSearch(q); setPage(0); }}
-          searchPlaceholder="Search customers…"
+          searchPlaceholder="Search homeowners…"
           onExport={() => exportToCSV(tableRows as unknown as Record<string, unknown>[], "customers")}
           onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "customers-all")}
         />
@@ -169,7 +169,7 @@ function CustomersInner({ customers, communities, divisions }: Props) {
         controlledPageSize={pageSize}
         defaultPageSize={pageSize}
         onRowClick={row => setSelected(row)}
-        emptyMessage="No customers match the current filter"
+        emptyMessage="No homeowners match the current filter"
         minWidth={1200}
       />
 

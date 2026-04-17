@@ -98,9 +98,9 @@ function isActiveStage(stage: string): boolean {
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 const STATS: StatConfig<LeadRow>[] = [
-  { label: "Active", getValue: (r) => r.filter(x => x.is_active).length },
-  { label: "New", getValue: (r) => r.filter(x => x.stage === "new" || x.stage === "lead_div").length },
-  { label: "Contacted", getValue: (r) => r.filter(x => x.stage === "contacted" || x.stage === "lead_com").length },
+  { label: "Total", getValue: (r) => r.length },
+  { label: "Division", getValue: (r) => r.filter(x => x.stage === "lead_div").length },
+  { label: "Community", getValue: (r) => r.filter(x => x.stage === "lead_com").length },
   {
     label: "Avg Budget",
     getValue: (r) => {
@@ -119,11 +119,13 @@ function LeadsInner({ leads, communities, divisions }: Props) {
   const [selected, setSelected] = useState<Lead | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [leadType, setLeadType] = useState<"all" | "lead_div" | "lead_com">("all");
 
-  useEffect(() => { setPage(0); }, [search, filter.divisionId, filter.communityId]);
+  useEffect(() => { setPage(0); }, [search, filter.divisionId, filter.communityId, leadType]);
 
   // Filter
   const filtered = leads.filter(l => {
+    if (leadType !== "all" && l.stage !== leadType) return false;
     if (filter.communityId && l.community_id !== filter.communityId) return false;
     if (filter.divisionId && l.division_id !== filter.divisionId) return false;
     if (search) {
@@ -214,6 +216,24 @@ function LeadsInner({ leads, communities, divisions }: Props) {
           onExport={() => exportToCSV(tableRows as unknown as Record<string, unknown>[], "leads")}
           onExportAll={() => exportToCSV(allRows as unknown as Record<string, unknown>[], "leads-all")}
         />
+      }
+      filtersBar={
+        <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "6px 16px", backgroundColor: "#0d0e10", borderBottom: "1px solid #1a1a1e" }}>
+          {(["all", "lead_div", "lead_com"] as const).map(t => (
+            <button key={t} onClick={() => setLeadType(t)} style={{
+              padding: "4px 12px", fontSize: 11, fontWeight: leadType === t ? 600 : 400, borderRadius: 4,
+              border: leadType === t ? "1px solid #3f3f46" : "1px solid transparent",
+              backgroundColor: leadType === t ? "#18181b" : "transparent",
+              color: leadType === t ? "#fafafa" : "#71717a",
+              cursor: "pointer", transition: "all 0.15s",
+            }}>
+              {t === "all" ? "All Leads" : t === "lead_div" ? "Division Leads" : "Community Leads"}
+            </button>
+          ))}
+          <span style={{ fontSize: 11, color: "#3f3f46", marginLeft: 8 }}>
+            {leadType === "all" ? "" : leadType === "lead_div" ? "Division-level interest — no community assigned" : "Community-level interest — assigned to specific community"}
+          </span>
+        </div>
       }
     >
       <DataTable<LeadRow>
