@@ -35,19 +35,11 @@ const HB_DIVISION_MAP: Record<number, string> = {
 };
 
 // Form type → initial CRM stage
-function stageForFormType(formTypeCode: string): string {
-  switch (formTypeCode) {
-    case "subscribe_region":
-      return "lead_div"; // division-level interest, no community
-    case "prelaunch_community":
-      return "lead_com"; // interested in specific community
-    case "schedule_visit":
-    case "contact_us":
-    case "branchout":
-      return "queue"; // high intent — OSC should act
-    default:
-      return "queue"; // default to queue so OSC sees it
-  }
+// ALL web forms go to OSC Queue — no auto-routing.
+// OSC decides where to assign them with AI suggesting the best lane.
+// form_type_code is stored for context in the activity/task.
+function stageForFormType(_formTypeCode: string): string {
+  return "queue";
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -352,14 +344,9 @@ async function processForm(form: HBForm): Promise<ProcessResult> {
           .eq("id", opportunityId);
       }
     } else {
-      const stage = initialStage === "lead_com" ? "lead_div" : initialStage;
-      // For lead_div stage, community_id is null which is valid per constraint
-      // For queue stage with no community, we need to set community_id to satisfy constraint
-      // Actually constraint says: crm_stage = 'lead_div' OR community_id IS NOT NULL
-      // So only marketing can have null community. If stage is queue but no community,
-      // use marketing instead (division-level interest with no specific community).
-      const finalStage =
-        stage !== "lead_div" && !communityId ? "lead_div" : stage;
+      // ALL web forms go to queue — OSC assigns the lane
+      // Queue can have null community_id (division-only forms like subscribe_region)
+      const finalStage = "queue";
       const { data: newOpp } = await supabase
         .from("opportunities")
         .insert({
