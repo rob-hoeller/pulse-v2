@@ -29,7 +29,7 @@ export const NAV_ITEMS = [
   { icon: "◫", label: "Lots",            href: "/lots",               group: "reference" },
   // ── TOOLS ──
   { icon: "⊡", label: "Agents",          href: "#",                   group: "tools" },
-  { icon: "◷", label: "Calendar",        href: "#",                   group: "tools" },
+  { icon: "◷", label: "Calendar",        href: "/calendar",            group: "tools" },
   { icon: "◉", label: "Notifications",   href: "#",                   group: "tools" },
   { icon: "⚙", label: "Settings",        href: "#",                   group: "tools" },
   { icon: "◈", label: "Status",          href: "/status",             group: "tools" },
