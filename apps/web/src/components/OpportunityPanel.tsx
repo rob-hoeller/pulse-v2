@@ -733,7 +733,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                         <StageBadge stage={opportunity.stage} />
                       </div>
                       <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 0, display: "inline" }}>
-                        {formatDateTime(opportunity.created_at)} · Created via web form
+                        {formatDateTime(opportunity.last_activity_at ?? opportunity.created_at)} · Created via web form
                       </div>
                     </div>
                   </div>
@@ -754,10 +754,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                       const channelKey = a.channel ?? "";
                       const icon = CHANNEL_ICONS[channelKey] ?? "📋";
                       const channelLabel = CHANNEL_LABELS[channelKey] ?? channelKey.replace(/_/g, " ");
-                      const isWebform = channelKey === "webform" || channelKey === "form" || channelKey === "web";
-                      const subjectDisplay = isWebform && a.subject
-                        ? `Web Form: ${a.subject}`
-                        : a.subject || "(no subject)";
+                      const subjectDisplay = a.subject || "(no subject)";
 
                       return (
                         <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 0", borderBottom: "1px solid #1a1a1a" }}>
