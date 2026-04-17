@@ -99,8 +99,8 @@ function isActiveStage(stage: string): boolean {
 
 const STATS: StatConfig<LeadRow>[] = [
   { label: "Active", getValue: (r) => r.filter(x => x.is_active).length },
-  { label: "New", getValue: (r) => r.filter(x => x.stage === "new" || x.stage === "marketing").length },
-  { label: "Contacted", getValue: (r) => r.filter(x => x.stage === "contacted" || x.stage === "lead").length },
+  { label: "New", getValue: (r) => r.filter(x => x.stage === "new" || x.stage === "lead_div").length },
+  { label: "Contacted", getValue: (r) => r.filter(x => x.stage === "contacted" || x.stage === "lead_com").length },
   {
     label: "Avg Budget",
     getValue: (r) => {

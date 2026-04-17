@@ -213,7 +213,7 @@ export async function matchOrCreateContact(
       email: email,
       phone: phone,
       source: inbound.source ?? "website",
-      lifecycle: "lead" as const,
+      lifecycle: "lead_com" as const,
     })
     .select()
     .single();
@@ -298,7 +298,7 @@ export async function processWebForm(
       opportunityId = existingOpp[0].id;
       
       // If they're in marketing/lead, auto-promote to queue (new inbound = OSC should look)
-      if (["marketing", "lead"].includes(existingOpp[0].crm_stage)) {
+      if (["lead_div", "lead_com"].includes(existingOpp[0].crm_stage)) {
         await supabase
           .from("opportunities")
           .update({ 
@@ -345,7 +345,7 @@ export async function processWebForm(
       .from("opportunities")
       .select("id")
       .eq("contact_id", contactId)
-      .eq("crm_stage", "marketing")
+      .eq("crm_stage", "lead_div")
       .eq("division_id", form.division_id ?? "")
       .limit(1);
 
@@ -361,7 +361,7 @@ export async function processWebForm(
         })
         .eq("id", opportunityId);
       
-      flags.push("Marketing contact auto-promoted to queue (submitted web form)");
+      flags.push("Division lead auto-promoted to queue (submitted web form)");
     } else {
       const { data: newOpp } = await supabase
         .from("opportunities")

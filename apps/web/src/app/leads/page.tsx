@@ -30,7 +30,7 @@ export default async function LeadsPage() {
     last_name: l.last_name ?? "",
     email: l.email ?? null,
     phone: l.phone ?? null,
-    stage: l.stage ?? "lead",
+    stage: l.stage ?? "lead_com",
     substage: l.substage ?? null,
     source: l.source ?? null,
     community_id: l.community_id ?? null,

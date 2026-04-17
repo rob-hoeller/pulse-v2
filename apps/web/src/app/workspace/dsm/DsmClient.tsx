@@ -23,8 +23,8 @@ interface Community {
 interface CommunityBreakdown {
   communityId: string;
   communityName: string;
-  marketing: number;
-  lead: number;
+  lead_div: number;
+  lead_com: number;
   queue: number;
   prospect_a: number;
   prospect_b: number;
@@ -36,8 +36,8 @@ interface CommunityBreakdown {
 }
 
 interface PipelineCounts {
-  marketing: number;
-  lead: number;
+  lead_div: number;
+  lead_com: number;
   queue: number;
   prospect_a: number;
   prospect_b: number;
@@ -46,8 +46,8 @@ interface PipelineCounts {
 }
 
 interface FunnelRates {
-  marketingToLead: number;
-  leadToQueue: number;
+  leadDivToLeadCom: number;
+  leadComToQueue: number;
   queueToProspect: number;
   prospectToHomeowner: number;
 }
@@ -76,7 +76,7 @@ interface MonthSales {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STAGE_ORDER = ["marketing", "lead", "queue", "prospect_c", "prospect_b", "prospect_a", "homeowner"] as const;
+const STAGE_ORDER = ["lead_div", "lead_com", "queue", "prospect_c", "prospect_b", "prospect_a", "homeowner"] as const;
 
 const STUBBED_MONTHLY_GOALS: MonthSales[] = [
   { month: "JAN", sales: 0, goal: 8 },
@@ -109,8 +109,8 @@ function relativeTime(iso: string | null): string {
 
 function stageLabel(stage: string): string {
   const map: Record<string, string> = {
-    marketing: "Marketing",
-    lead: "Lead",
+    lead_div: "Lead (Division)",
+    lead_com: "Lead (Community)",
     queue: "Queue",
     prospect_c: "Prospect C",
     prospect_b: "Prospect B",
@@ -219,8 +219,8 @@ function SalesPerformanceStrip({ monthData }: { monthData: MonthSales[] }) {
 
 function ConversionFunnel({ rates }: { rates: FunnelRates }) {
   const steps = [
-    { from: "Marketing", to: "Lead", rate: rates.marketingToLead },
-    { from: "Lead", to: "Queue", rate: rates.leadToQueue },
+    { from: "Lead (Div)", to: "Lead (Com)", rate: rates.leadDivToLeadCom },
+    { from: "Lead (Com)", to: "Queue", rate: rates.leadComToQueue },
     { from: "Queue", to: "Prospect", rate: rates.queueToProspect },
     { from: "Prospect", to: "Homeowner", rate: rates.prospectToHomeowner },
   ];
@@ -390,11 +390,11 @@ export default function DsmClient() {
   // Division overview data
   const [communities, setCommunities] = useState<Community[]>([]);
   const [pipeline, setPipeline] = useState<PipelineCounts>({
-    marketing: 0, lead: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
+    lead_div: 0, lead_com: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
   });
   const [communityBreakdown, setCommunityBreakdown] = useState<CommunityBreakdown[]>([]);
   const [funnelRates, setFunnelRates] = useState<FunnelRates>({
-    marketingToLead: 0, leadToQueue: 0, queueToProspect: 0, prospectToHomeowner: 0,
+    leadDivToLeadCom: 0, leadComToQueue: 0, queueToProspect: 0, prospectToHomeowner: 0,
   });
   const [monthData, setMonthData] = useState<MonthSales[]>(STUBBED_MONTHLY_GOALS);
   const [oscTeam, setOscTeam] = useState<TeamMember[]>([]);
@@ -431,7 +431,7 @@ export default function DsmClient() {
 
       // Pipeline counts
       const counts: PipelineCounts = {
-        marketing: 0, lead: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
+        lead_div: 0, lead_com: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
       };
       for (const o of oppList) {
         const stage = o.crm_stage as keyof PipelineCounts;
@@ -455,7 +455,7 @@ export default function DsmClient() {
       const breakdown: CommunityBreakdown[] = commList.map(comm => {
         const commOpps = oppList.filter(o => o.community_id === comm.id);
         const stages: Record<string, number> = {
-          marketing: 0, lead: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
+          lead_div: 0, lead_com: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
         };
         let totalDays = 0;
         let countWithActivity = 0;
@@ -476,8 +476,8 @@ export default function DsmClient() {
         return {
           communityId: comm.id,
           communityName: comm.name,
-          marketing: stages.marketing,
-          lead: stages.lead,
+          lead_div: stages.lead_div,
+          lead_com: stages.lead_com,
           queue: stages.queue,
           prospect_a: stages.prospect_a,
           prospect_b: stages.prospect_b,
@@ -491,13 +491,13 @@ export default function DsmClient() {
       setCommunityBreakdown(breakdown);
 
       // Funnel rates (approximate from current counts)
-      const totalMarketing = counts.marketing || 1;
-      const totalLead = counts.lead || 1;
+      const totalLeadDiv = counts.lead_div || 1;
+      const totalLeadCom = counts.lead_com || 1;
       const totalQueue = counts.queue || 1;
       const totalProspects = counts.prospect_a + counts.prospect_b + counts.prospect_c || 1;
       setFunnelRates({
-        marketingToLead: (counts.lead / totalMarketing) * 100,
-        leadToQueue: (counts.queue / totalLead) * 100,
+        leadDivToLeadCom: (counts.lead_com / totalLeadDiv) * 100,
+        leadComToQueue: (counts.queue / totalLeadCom) * 100,
         queueToProspect: (totalProspects / totalQueue) * 100,
         prospectToHomeowner: (counts.homeowner / totalProspects) * 100,
       });
@@ -630,8 +630,8 @@ export default function DsmClient() {
             {/* ── PIPELINE SUMMARY ── */}
             <Section title="Pipeline Summary">
               <div style={{ display: "flex", gap: 12 }}>
-                <MetricCard label="Marketing" value={pipeline.marketing} />
-                <MetricCard label="Leads" value={pipeline.lead} />
+                <MetricCard label="Lead (Div)" value={pipeline.lead_div} />
+                <MetricCard label="Lead (Com)" value={pipeline.lead_com} />
                 <MetricCard
                   label="Queue"
                   value={pipeline.queue}
@@ -658,7 +658,7 @@ export default function DsmClient() {
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
                   <thead>
                     <tr>
-                      {["Community", "Mktg", "Lead", "Queue", "Pr-C", "Pr-B", "Pr-A", "HO", "Pipeline", "Avg Days", "Last Activity"].map(h => (
+                      {["Community", "L-Div", "L-Com", "Queue", "Pr-C", "Pr-B", "Pr-A", "HO", "Pipeline", "Avg Days", "Last Activity"].map(h => (
                         <th key={h} style={{
                           padding: "8px 12px", textAlign: "left", fontSize: 11, color: "#71717a",
                           fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em",
@@ -690,8 +690,8 @@ export default function DsmClient() {
                           {row.communityName}
                           <span style={{ fontSize: 10, color: "#52525b", marginLeft: 6 }}>→</span>
                         </td>
-                        <td style={{ padding: "8px 12px", fontSize: 12, color: "#a1a1aa", borderBottom: "1px solid #18181b" }}>{row.marketing}</td>
-                        <td style={{ padding: "8px 12px", fontSize: 12, color: "#a1a1aa", borderBottom: "1px solid #18181b" }}>{row.lead}</td>
+                        <td style={{ padding: "8px 12px", fontSize: 12, color: "#a1a1aa", borderBottom: "1px solid #18181b" }}>{row.lead_div}</td>
+                        <td style={{ padding: "8px 12px", fontSize: 12, color: "#a1a1aa", borderBottom: "1px solid #18181b" }}>{row.lead_com}</td>
                         <td style={{
                           padding: "8px 12px", fontSize: 12, borderBottom: "1px solid #18181b",
                           color: row.queue > 0 ? "#f87171" : "#a1a1aa",

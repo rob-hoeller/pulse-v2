@@ -11,6 +11,7 @@ export const NAV_ITEMS = [
   { icon: "◎", label: "OSC",             href: "/workspace/osc",   group: "core" },
   { icon: "◉", label: "CSM",             href: "/workspace/csm",   group: "core" },
   { icon: "◈", label: "DSM",             href: "/workspace/dsm",   group: "core" },
+  { icon: "◎", label: "Marketing",       href: "/workspace/marketing", group: "core" },
   // ── DATA: CRM pipeline + reference tables ──
   { icon: "✓", label: "Tasks",           href: "/tasks",           group: "data" },
   { icon: "⊕", label: "Leads",           href: "/leads",           group: "data" },

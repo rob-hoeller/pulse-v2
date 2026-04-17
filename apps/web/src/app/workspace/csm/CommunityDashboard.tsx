@@ -76,7 +76,7 @@ interface TeamUser {
 
 type CsmBucket = "new_from_osc" | "stale" | "ai_hot" | "followup_due";
 
-type DrillPanel = null | "plans" | "lots" | "leads" | "prospects" | "customers" | "qd";
+type DrillPanel = null | "plans" | "lots" | "prospects" | "customers" | "qd";
 
 type ActionType = "promote" | "demote" | null;
 
@@ -808,7 +808,7 @@ function ReferenceModule({
 function CommunityView({ community, plans, lots, modelHome, specHomes, divisions, readOnly }: CommunityViewProps) {
   const [drill, setDrill] = useState<DrillPanel>(null);
   const [prospects, setProspects] = useState<ProspectItem[]>([]);
-  const [leads, setLeads] = useState<any[]>([]);
+
   const [customers, setCustomers] = useState<any[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [activeBucket, setActiveBucket] = useState<CsmBucket>("new_from_osc");
@@ -836,14 +836,14 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
       .eq("is_active", true);
     setCsmUsers((users as TeamUser[]) ?? []);
 
-    const [oppRes, leadRes, custRes, taskRes] = await Promise.all([
+    const [oppRes, , custRes, taskRes] = await Promise.all([
       supabase
         .from("opportunities")
         .select("id, contact_id, crm_stage, community_id, division_id, csm_id, source, opportunity_source, queue_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone)")
         .eq("community_id", cid)
         .in("crm_stage", ["prospect_c", "prospect_b", "prospect_a"])
         .order("last_activity_at", { ascending: false }),
-      supabase.from("leads").select("*").eq("community_id", cid).neq("stage", "opportunity"),
+      Promise.resolve({ data: [] }), // leads removed — CSM manages prospects only
       supabase.from("home_owners").select("*, contacts(first_name, last_name, email, phone)").eq("community_id", cid),
       supabase
         .from("tasks")
@@ -866,7 +866,6 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
     })) as TaskItem[];
 
     setProspects(flatProspects);
-    setLeads(leadRes.data ?? []);
     setCustomers(custRes.data ?? []);
     setTasks(flatTasks);
   }, [community?.id]);
@@ -1018,8 +1017,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
           <MetricCard label="Under Construction" value={underConstruction.length} />
           <MetricCard label="QD / Spec Homes" value={specHomes.length + qdLots.length} onClick={(specHomes.length + qdLots.length) > 0 ? () => toggleDrill("qd") : undefined} active={drill === "qd"} />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 12 }}>
-          <MetricCard label="Leads" value={leads.length} onClick={() => toggleDrill("leads")} active={drill === "leads"} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 12 }}>
           <MetricCard label="Prospects (A/B/C)" value={prospects.length}
             subtitle={prospects.length > 0 ? `A: ${prospects.filter(p => p.crm_stage === "prospect_a").length} · B: ${prospects.filter(p => p.crm_stage === "prospect_b").length} · C: ${prospects.filter(p => p.crm_stage === "prospect_c").length}` : undefined}
             onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
@@ -1055,20 +1053,6 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
                   l.is_available ? "✓" : "—",
                   l.lot_premium ? formatPrice(l.lot_premium) : "—",
                   l.address ?? "—",
-                ])}
-              />
-            </Section>
-          )}
-          {drill === "leads" && (
-            <Section title="Leads" count={leads.length}>
-              <MiniTable
-                headers={["Name", "Stage", "Source", "Last Activity", "Created"]}
-                rows={leads.map((l: any) => [
-                  `${l.first_name} ${l.last_name}`,
-                  l.stage ?? "—",
-                  l.source ?? "—",
-                  relativeTime(l.last_activity_at),
-                  new Date(l.created_at).toLocaleDateString(),
                 ])}
               />
             </Section>

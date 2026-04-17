@@ -191,7 +191,7 @@ function ActionModal({
   onClose: () => void;
   onExecute: (oppId: string, newStage: string, communityId: string | null, reason: string) => void;
 }) {
-  const [targetStage, setTargetStage] = useState(action === "promote" ? "prospect_c" : "lead");
+  const [targetStage, setTargetStage] = useState(action === "promote" ? "prospect_c" : "lead_com");
   const [targetCommunity, setTargetCommunity] = useState(item.community_id ?? "");
   const [reason, setReason] = useState("");
 
@@ -201,8 +201,8 @@ function ActionModal({
     { value: "prospect_a", label: "Prospect A — Contract this week" },
   ];
   const demoteOptions = [
-    { value: "lead", label: "Lead — Keep nurturing in community" },
-    { value: "marketing", label: "Marketing — Division-level only" },
+    { value: "lead_com", label: "Lead (Community) — Keep nurturing in community" },
+    { value: "lead_div", label: "Lead (Division) — Division-level only" },
   ];
   const options = action === "promote" ? promoteOptions : demoteOptions;
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
@@ -881,7 +881,7 @@ export default function OscClient() {
   async function handleAction(oppId: string, newStage: string, communityId: string | null, reason: string) {
     const update: Record<string, unknown> = { crm_stage: newStage };
     if (communityId) update.community_id = communityId;
-    if (newStage === "marketing") update.community_id = null;
+    if (newStage === "lead_div") update.community_id = null;
 
     const { error } = await supabase
       .from("opportunities")

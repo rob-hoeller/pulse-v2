@@ -140,8 +140,9 @@ function formatDuration(seconds: number): string {
 function getLifecycleLabel(stage: string | null): string {
   if (!stage) return "—";
   const map: Record<string, string> = {
-    lead: "Lead", prospect: "Prospect", customer: "Customer", homeowner: "Homeowner",
-    marketing: "Marketing", opportunity: "Opportunity",
+    lead: "Lead", lead_com: "Lead (Community)", lead_div: "Lead (Division)",
+    prospect: "Prospect", customer: "Customer", homeowner: "Homeowner",
+    opportunity: "Opportunity",
   };
   return map[stage] ?? stage;
 }
@@ -150,7 +151,7 @@ function getLifecycleLabel(stage: string | null): string {
 
 const STATS: StatConfig<ContactRow>[] = [
   { label: "Total", getValue: (r) => r.length },
-  { label: "Active Leads", getValue: (r) => r.filter(x => x.lifecycle_stage === "lead").length },
+  { label: "Active Leads", getValue: (r) => r.filter(x => x.lifecycle_stage === "lead" || x.lifecycle_stage === "lead_com" || x.lifecycle_stage === "lead_div").length },
   { label: "Prospects", getValue: (r) => r.filter(x => x.lifecycle_stage === "prospect").length },
   { label: "Homeowners", getValue: (r) => r.filter(x => x.lifecycle_stage === "homeowner").length },
 ];
@@ -398,7 +399,7 @@ function ContactsInner({ contacts, communities, divisions }: Props) {
                     const fromLabel = t.from_stage ? getStageLabel(t.from_stage) : "(none)";
                     const toLabel = t.to_stage ? getStageLabel(t.to_stage) : "(none)";
                     // Determine direction indicator
-                    const stageOrder = ["marketing", "lead", "new", "contacted", "touring", "opportunity", "prospect", "under-contract", "customer", "closed-won", "homeowner"];
+                    const stageOrder = ["lead_div", "lead_com", "new", "contacted", "touring", "opportunity", "prospect", "under-contract", "customer", "closed-won", "homeowner"];
                     const fromIdx = stageOrder.indexOf(t.from_stage ?? "");
                     const toIdx = stageOrder.indexOf(t.to_stage ?? "");
                     let arrow = "→";
