@@ -208,7 +208,7 @@ function EmptyState() {
       <div style={{ fontSize: 48, opacity: 0.3 }}>◎</div>
       <div style={{ fontSize: 16, fontWeight: 600, color: "#a1a1aa" }}>OSC Command Center</div>
       <div style={{ fontSize: 13, color: "#71717a", textAlign: "center", maxWidth: 400, lineHeight: 1.6 }}>
-        Select a <strong style={{ color: "#80B602" }}>Division</strong> to load your Queue and Action Items.
+        Select a <strong style={{ color: "#80B602" }}>Division</strong> to load your Queue and Communication Hub.
       </div>
     </div>
   );
@@ -911,7 +911,7 @@ export default function OscClient() {
   const [activeBucket, setActiveBucket] = useState<QueueBucket>("new_inbound");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [oscUsers, setOscUsers] = useState<TeamUser[]>([]);
-  const [leftPane, setLeftPane] = useState<"queue" | "comms">("queue");
+  // Queue and Comm Hub are now side by side, no toggle needed
   const [commActivities, setCommActivities] = useState<CommActivity[]>([]);
   const [drillBucket, setDrillBucket] = useState<QueueBucket | null>(null);
   const [activeCommTab, setActiveCommTab] = useState<CommHubTab>("needs_response");
@@ -1206,31 +1206,14 @@ export default function OscClient() {
           <div style={{ textAlign: "center", color: "#52525b", padding: 48 }}>Loading...</div>
         ) : (
           <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-            {/* ── LEFT: Queue + Comm Hub (~60%) ── */}
-            <div style={{ flex: "0 0 60%", minWidth: 0 }}>
-              {/* Tier 1 tabs */}
-              <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 12, borderBottom: "1px solid #27272a" }}>
-                <button onClick={() => setLeftPane("queue")} style={{
-                  padding: "6px 14px", fontSize: 13, fontWeight: leftPane === "queue" ? 600 : 400,
-                  color: leftPane === "queue" ? "#fafafa" : "#52525b",
-                  borderBottom: leftPane === "queue" ? "2px solid #fafafa" : "2px solid transparent",
-                  background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                }}>
-                  OSC Queue
-                  <span style={{ fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600, backgroundColor: filteredQueueItems.length > 0 ? "#7f1d1d" : "#052e16", color: filteredQueueItems.length > 0 ? "#fca5a5" : "#4ade80" }}>{filteredQueueItems.length}</span>
-                </button>
-                <button onClick={() => setLeftPane("comms")} style={{
-                  padding: "6px 14px", fontSize: 13, fontWeight: leftPane === "comms" ? 600 : 400,
-                  color: leftPane === "comms" ? "#fafafa" : "#52525b",
-                  borderBottom: leftPane === "comms" ? "2px solid #fafafa" : "2px solid transparent",
-                  background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                }}>
-                  Comm Hub
-                  <span style={{ fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600, backgroundColor: unreadCommCount > 0 ? "#7f1d1d" : "#27272a", color: unreadCommCount > 0 ? "#fca5a5" : "#71717a" }}>{unreadCommCount}</span>
-                </button>
+            {/* ── LEFT: Queue (50%) ── */}
+            <div style={{ flex: "0 0 50%", minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Queue</span>
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600, backgroundColor: filteredQueueItems.length > 0 ? "#7f1d1d" : "#052e16", color: filteredQueueItems.length > 0 ? "#fca5a5" : "#4ade80" }}>{filteredQueueItems.length}</span>
               </div>
 
-              {leftPane === "queue" ? (
+              {true ? (
               drillBucket ? (
                 <PipelineDetailView
                   items={drillItems}
@@ -1384,36 +1367,51 @@ export default function OscClient() {
             )}
             </div>
 
-            {/* ── RIGHT: Action Items (Tasks) (~38%) ── */}
-            <div style={{ flex: "0 0 38%", minWidth: 0 }}>
+            {/* ── RIGHT: Comm Hub (50%) ── */}
+            <div style={{ flex: "0 0 48%", minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Action Items</span>
-                <span style={{
-                  fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600,
-                  backgroundColor: filteredTasks.length > 0 ? "#422006" : "#052e16",
-                  color: filteredTasks.length > 0 ? "#fbbf24" : "#4ade80",
-                }}>{filteredTasks.length} pending</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Comm Hub</span>
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600, backgroundColor: "#172554", color: "#60a5fa" }}>{commActivities.filter(a => !a.is_read).length} unread</span>
               </div>
-
-              {filteredTasks.length === 0 ? (
-                <div style={{
-                  padding: 32, textAlign: "center", backgroundColor: "#052e16", border: "1px solid #166534",
-                  borderRadius: 8, color: "#4ade80", fontSize: 12, fontWeight: 500,
-                }}>
-                  ✓ All tasks complete
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {filteredTasks.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onComplete={() => handleCompleteTask(task.id)}
-                      onSnooze={(until) => handleSnoozeTask(task.id, until)}
-                    />
-                  ))}
-                </div>
-              )}
+              <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12 }}>
+                {COMM_HUB_TABS.map(t => (
+                  <button key={t.id} onClick={() => setActiveCommTab(t.id)} style={{
+                    padding: "6px 10px", fontSize: 10, fontWeight: activeCommTab === t.id ? 600 : 400,
+                    color: activeCommTab === t.id ? "#fafafa" : "#52525b",
+                    borderBottom: activeCommTab === t.id ? "2px solid #fafafa" : "2px solid transparent",
+                    background: "none", border: "none", cursor: "pointer", display: "flex", gap: 3, alignItems: "center",
+                  }}>
+                    <span>{t.icon}</span><span>{t.label}</span>
+                    <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, backgroundColor: commCounts[t.id] > 0 ? "#172554" : "#27272a", color: commCounts[t.id] > 0 ? "#60a5fa" : "#52525b" }}>{commCounts[t.id]}</span>
+                  </button>
+                ))}
+              </div>
+              <div style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+                {filteredCommActivities.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: "center", fontSize: 12, color: "#52525b" }}>No items</div>
+                ) : filteredCommActivities.map(a => (
+                  <div key={a.id} style={{
+                    padding: "8px 12px", backgroundColor: a.is_read ? "transparent" : "#18181b",
+                    border: "1px solid #27272a", borderRadius: 6, opacity: a.is_read ? 0.5 : 1,
+                    display: "flex", gap: 10, alignItems: "flex-start",
+                  }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 12 }}>{({"email":"📧","phone":"📞","text":"💬","zoom_meeting":"🎥","rilla":"🎙","webform":"🌐","chat":"💭","web_session":"🖥","walk_in":"🚶","mailchimp":"📬"} as Record<string, string>)[a.channel ?? ""] ?? "📋"}</span>
+                        <span style={{ fontSize: 11, fontWeight: 500, color: "#fafafa" }}>{a.contacts?.first_name} {a.contacts?.last_name}</span>
+                        {a.is_urgent && <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, backgroundColor: "#7f1d1d", color: "#fca5a5", fontWeight: 600 }}>URGENT</span>}
+                        {a.needs_response && !a.responded_at && <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, backgroundColor: "#422006", color: "#fbbf24", fontWeight: 600 }}>NEEDS RESPONSE</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#a1a1aa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.subject}</div>
+                      <div style={{ fontSize: 10, color: "#52525b", marginTop: 2 }}>{new Date(a.occurred_at).toLocaleDateString("en-US", {month:"short",day:"numeric"})} {new Date(a.occurred_at).toLocaleTimeString("en-US", {hour:"numeric",minute:"2-digit"})}</div>
+                    </div>
+                    {!a.is_read && <button onClick={() => handleMarkRead(a.id)} style={{ padding: "2px 6px", borderRadius: 3, border: "1px solid #27272a", backgroundColor: "transparent", color: "#52525b", fontSize: 10, cursor: "pointer", flexShrink: 0 }}>✓</button>}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
