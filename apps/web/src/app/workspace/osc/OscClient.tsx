@@ -264,6 +264,12 @@ function AssignModal({
   const selectedLane = ASSIGN_LANES.find(l => l.value === targetStage);
   const needsCommunity = selectedLane?.needsCommunity ?? false;
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
+  const src = item.opportunity_source ?? item.source ?? "";
+  const suggestedLane = src === "subscribe_region" ? "Lead (Division)"
+    : (src === "schedule_visit" || src === "schedule_appt") ? `Prospect C${item.communities?.name ? " → " + item.communities.name : ""}`
+    : (src === "prelaunch_community" || src === "subscribe_community") ? `Lead (Community)${item.communities?.name ? " → " + item.communities.name : ""}`
+    : item.community_id ? `Lead (Community)${item.communities?.name ? " → " + item.communities.name : ""}`
+    : "Lead (Division)";
   const suggestion = getAiSuggestion(item, communities);
 
   const canSubmit = !needsCommunity || !!targetCommunity;
@@ -438,6 +444,12 @@ function QueueCard({
   divisionName: string;
 }) {
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
+  const src = item.opportunity_source ?? item.source ?? "";
+  const suggestedLane = src === "subscribe_region" ? "Lead (Division)"
+    : (src === "schedule_visit" || src === "schedule_appt") ? `Prospect C${item.communities?.name ? " → " + item.communities.name : ""}`
+    : (src === "prelaunch_community" || src === "subscribe_community") ? `Lead (Community)${item.communities?.name ? " → " + item.communities.name : ""}`
+    : item.community_id ? `Lead (Community)${item.communities?.name ? " → " + item.communities.name : ""}`
+    : "Lead (Division)";
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -484,7 +496,7 @@ function QueueCard({
           <div>{item.last_activity_at ? new Date(item.last_activity_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + new Date(item.last_activity_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "—"}</div>
           <div style={{ fontSize: 10, color: "#3f3f46" }}>{relativeTime(item.last_activity_at)}</div>
         </div>
-        <button onClick={e => { e.stopPropagation(); onQuickAssign(); }} title="Quick assign with AI suggestion" style={{
+        <button onClick={e => { e.stopPropagation(); onQuickAssign(); }} title={`Assign → ${suggestedLane}`} style={{
           padding: "4px 10px", borderRadius: 4, border: "1px solid #166534",
           backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
         }}>→ Assign</button>
