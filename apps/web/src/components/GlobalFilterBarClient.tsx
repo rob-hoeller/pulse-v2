@@ -38,9 +38,12 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
       {/* Pill button */}
       <div
         onClick={() => !disabled && setOpen(!open)}
+        onTouchEnd={(e) => { if (!disabled) { e.preventDefault(); setOpen(!open); } }}
         style={{
           width: compact ? 130 : 170,
           height: compact ? 38 : 44,
+          touchAction: "manipulation",
+          WebkitTapHighlightColor: "transparent",
           background: "#2a2b2e",
           border: `1px solid ${isActive ? "#80B602" : "#444"}`,
           borderRadius: 3,
@@ -163,8 +166,7 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
       background: "#0d0d0d",
       borderBottom: "1px solid #222",
       flexShrink: 0,
-      overflowX: isMobile ? "auto" : undefined,
-      WebkitOverflowScrolling: "touch" as unknown as undefined,
+      overflowX: undefined,  // removed: was clipping dropdown menus on mobile
     }}>
       <CompoundFilter
         label="Division"
