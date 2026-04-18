@@ -80,8 +80,7 @@ async function resolveDivision(
   const { data } = await supabase
     .from("divisions")
     .select("id")
-    .eq("org_id", ORG_ID)
-    .eq("code", code)
+    .eq("heartbeat_division_id", hbDivId)
     .limit(1)
     .single();
   return data?.id ?? null;
@@ -97,8 +96,7 @@ async function resolveCommunity(
   const { data } = await supabase
     .from("communities")
     .select("id")
-    .eq("org_id", ORG_ID)
-    .eq("pv1_community_id", numId)
+    .eq("heartbeat_community_id", numId)
     .limit(1)
     .single();
   return data?.id ?? null;
