@@ -1,8 +1,8 @@
+import { useIsMobile } from "@/hooks/useIsMobile";
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { useIsMobile } from "@/hooks/useIsMobile";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
@@ -164,7 +164,7 @@ function ActivityCard({
           if (!isRead) onMarkRead();
         }}
         style={{
-          padding: "10px 14px",
+          padding: "12px 16px",
           backgroundColor: isRead && !needsResponse ? "transparent" : "#18181b",
           cursor: "pointer",
           display: "flex",
@@ -201,7 +201,7 @@ function ActivityCard({
           )}
 
           {/* Contact name */}
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "#fafafa", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {contactName}
           </span>
 
@@ -237,7 +237,7 @@ function ActivityCard({
 
         {/* Message preview */}
         <div style={{
-          fontSize: 12, color: "#a1a1aa", lineHeight: 1.5,
+          fontSize: 13, color: "#a1a1aa", lineHeight: 1.5,
           padding: "6px 10px", backgroundColor: "#0f0f12", borderRadius: 4,
           overflow: "hidden", textOverflow: "ellipsis",
           display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
@@ -304,7 +304,7 @@ function ActivityCard({
                 {activity.subject}
               </div>
             )}
-            <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+            <div style={{ fontSize: 13, color: "#a1a1aa", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
               {activity.body ?? "No content"}
             </div>
           </div>
@@ -575,7 +575,7 @@ export default function CommHub({ communityId, divisionId, teamFilter }: CommHub
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder={isMobile ? "Search..." : "Search by name, keyword, or content..."}
+          placeholder="Search..."
           style={{
             width: "100%", padding: isMobile ? "6px 10px" : "8px 12px", backgroundColor: "#18181b",
             border: "1px solid #27272a", borderRadius: 6, color: "#d4d4d8",

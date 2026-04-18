@@ -1218,10 +1218,10 @@ export default function OscClient() {
           <div style={isMobile ? {} : { display: "flex", gap: 20, alignItems: "flex-start" }}>
             {/* ── LEFT: Queue (50%) ── */}
             <div style={isMobile ? { display: mobileTab === "queue" ? "block" : "none" } : { flex: "0 0 50%", minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              {!isMobile && <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Queue</span>
                 <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600, backgroundColor: filteredQueueItems.length > 0 ? "#7f1d1d" : "#052e16", color: filteredQueueItems.length > 0 ? "#fca5a5" : "#4ade80" }}>{filteredQueueItems.length}</span>
-              </div>
+              </div>}
 
               {true ? (
               drillBucket ? (
