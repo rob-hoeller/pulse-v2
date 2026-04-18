@@ -845,7 +845,6 @@ function ReferenceModule({
 
 function CommunityView({ community, plans, lots, modelHome, specHomes, divisions, readOnly }: CommunityViewProps) {
   const [drill, setDrill] = useState<DrillPanel>(null);
-  const [leftPane, setLeftPane] = useState<"queue" | "comms">("queue");
   const [prospects, setProspects] = useState<ProspectItem[]>([]);
   const [commActivities, setCommActivities] = useState<CommActivity[]>([]);
   const [activeCommTab, setActiveCommTab] = useState<CommHubTab>("needs_response");
@@ -973,10 +972,6 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
   const filteredProspects = teamFilter === "all"
     ? prospects
     : prospects.filter(p => p.csm_id === teamFilter);
-  const filteredTasks = teamFilter === "all"
-    ? tasks
-    : tasks.filter(t => t.assigned_to_id === teamFilter);
-
   // Bucket prospects
   const bucketCounts: Record<CsmBucket, number> = { new_from_osc: 0, stale: 0, ai_hot: 0, followup_due: 0 };
   const bucketedItems: Record<CsmBucket, ProspectItem[]> = { new_from_osc: [], stale: [], ai_hot: [], followup_due: [] };
@@ -1208,34 +1203,17 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
         </div>
       )}
 
-      {/* ── CSM Queue + Task List ── */}
+      {/* ── CSM Queue + Comm Hub (50/50) ── */}
       <div style={{ padding: "0 24px 24px", display: "flex", gap: 20, alignItems: "flex-start" }}>
-        {/* LEFT: CSM Prospect Queue (~60%) */}
-        <div style={{ flex: "0 0 60%", minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 12, borderBottom: "1px solid #27272a" }}>
-            <button onClick={() => setLeftPane("queue")} style={{
-              padding: "6px 14px", fontSize: 13, fontWeight: leftPane === "queue" ? 600 : 400,
-              color: leftPane === "queue" ? "#fafafa" : "#52525b",
-              borderBottom: leftPane === "queue" ? "2px solid #fafafa" : "2px solid transparent",
-              background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-            }}>
-              CSM Queue
-              <span style={{ fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600, backgroundColor: "#172554", color: "#60a5fa" }}>{filteredProspects.length}</span>
-            </button>
-            <button onClick={() => setLeftPane("comms")} style={{
-              padding: "6px 14px", fontSize: 13, fontWeight: leftPane === "comms" ? 600 : 400,
-              color: leftPane === "comms" ? "#fafafa" : "#52525b",
-              borderBottom: leftPane === "comms" ? "2px solid #fafafa" : "2px solid transparent",
-              background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-            }}>
-              Comm Hub
-              <span style={{ fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600, backgroundColor: unreadCommCount > 0 ? "#7f1d1d" : "#27272a", color: unreadCommCount > 0 ? "#fca5a5" : "#71717a" }}>{unreadCommCount}</span>
-            </button>
+        {/* LEFT: CSM Prospect Queue (50%) */}
+        <div style={{ flex: "0 0 50%", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>CSM Queue</span>
+            <span style={{ fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600, backgroundColor: "#172554", color: "#60a5fa" }}>{filteredProspects.length}</span>
           </div>
 
-          {/* Bucket tabs */}
-          {leftPane === "queue" ? (
-          drillBucket ? (
+          {/* Bucket tabs / Queue content */}
+          {drillBucket ? (
             <PipelineDetailView
               items={drillItems}
               communityId={community.id}
@@ -1296,10 +1274,21 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
           )}
 
           </>
-          )
-        ) : (
-          /* Comm Hub */
-          <>
+          )}
+        </div>
+
+        {/* RIGHT: Comm Hub (48%) */}
+        <div style={{ flex: "0 0 48%", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Comm Hub</span>
+            <span style={{
+              fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600,
+              backgroundColor: unreadCommCount > 0 ? "#7f1d1d" : "#27272a",
+              color: unreadCommCount > 0 ? "#fca5a5" : "#71717a",
+            }}>{unreadCommCount} unread</span>
+          </div>
+
+          {/* Comm Hub sub-tabs */}
           <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12, flexWrap: "wrap" }}>
             {COMM_HUB_TABS.map(t => {
               const isActive = activeCommTab === t.id;
@@ -1324,6 +1313,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
             })}
           </div>
 
+          {/* Activity list */}
           {filteredCommActivities.length === 0 ? (
             <div style={{
               padding: 32, textAlign: "center", backgroundColor: "#18181b", border: "1px solid #27272a",
@@ -1337,11 +1327,12 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
                 return (
                   <div key={a.id} style={{
                     padding: "8px 12px", display: "flex", alignItems: "center", gap: 10,
-                    borderRadius: 6, cursor: "pointer", opacity: isRead ? 0.5 : 1,
-                    transition: "background-color 0.1s",
+                    borderBottom: "1px solid #27272a", cursor: "pointer",
+                    backgroundColor: !isRead ? "#18181b" : "transparent",
+                    opacity: isRead ? 0.5 : 1, transition: "background-color 0.1s",
                   }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#18181b")}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                    onMouseEnter={e => { if (isRead) e.currentTarget.style.backgroundColor = "#18181b"; }}
+                    onMouseLeave={e => { if (isRead) e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
                     <span style={{ fontSize: 14, flexShrink: 0 }}>{activityChannelIcon(a.channel)}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1371,41 +1362,6 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
                   </div>
                 );
               })}
-            </div>
-          )}
-          </>
-        )}
-        </div>
-
-        {/* RIGHT: Task List (~40%) */}
-        <div style={{ flex: "0 0 38%", minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Action Items</span>
-            <span style={{
-              fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600,
-              backgroundColor: filteredTasks.length > 0 ? "#422006" : "#052e16",
-              color: filteredTasks.length > 0 ? "#fbbf24" : "#4ade80",
-            }}>{filteredTasks.length} pending</span>
-          </div>
-
-          {filteredTasks.length === 0 ? (
-            <div style={{
-              padding: 32, textAlign: "center", backgroundColor: "#052e16", border: "1px solid #166534",
-              borderRadius: 6, color: "#4ade80", fontSize: 12, fontWeight: 500,
-            }}>
-              ✓ All tasks complete
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {filteredTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  readOnly={readOnly}
-                  onComplete={() => handleCompleteTask(task.id)}
-                  onSnooze={(until) => handleSnoozeTask(task.id, until)}
-                />
-              ))}
             </div>
           )}
         </div>
