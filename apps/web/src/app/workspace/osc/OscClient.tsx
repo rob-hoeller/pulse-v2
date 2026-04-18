@@ -458,8 +458,8 @@ function QueueCard({
             {item.contacts?.phone ? (
               <>
                 <span style={{ fontSize: 11, color: "#71717a" }}>{item.contacts.phone}</span>
-                <a href={`tel:${item.contacts.phone}`} onClick={e => e.stopPropagation()} title="Call" style={{ fontSize: 14, textDecoration: "none", cursor: "pointer" }}>📞</a>
-                <a href={`sms:${item.contacts.phone}`} onClick={e => e.stopPropagation()} title="SMS" style={{ fontSize: 12, textDecoration: "none", cursor: "pointer" }}>💬</a>
+                <a href={`tel:${item.contacts.phone}`} onClick={e => e.stopPropagation()} title="Call" style={{ fontSize: 15, textDecoration: "none", cursor: "pointer", opacity: 0.7 }}>📞</a>
+                <a href={`sms:${item.contacts.phone}`} onClick={e => e.stopPropagation()} title="SMS" style={{ fontSize: 15, textDecoration: "none", cursor: "pointer", opacity: 0.7 }}>💬</a>
               </>
             ) : <span style={{ color: "#3f3f46", fontSize: 11 }}>—</span>}
           </div>
@@ -486,9 +486,9 @@ function QueueCard({
             <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
             <span style={{ fontSize: 10, color: "#52525b", flexShrink: 0 }}>{relativeTime(item.last_activity_at)}</span>
             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-              {item.contacts?.phone && <a href={`tel:${item.contacts.phone}`} style={{ fontSize: 16, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6, backgroundColor: "#18181b", border: "1px solid #27272a" }}>📞</a>}
-              {item.contacts?.phone && <a href={`sms:${item.contacts.phone}`} style={{ fontSize: 16, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6, backgroundColor: "#18181b", border: "1px solid #27272a" }}>💬</a>}
-              {item.contacts?.email && <a href={`mailto:${item.contacts.email}`} style={{ fontSize: 16, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6, backgroundColor: "#18181b", border: "1px solid #27272a" }}>📧</a>}
+              {item.contacts?.phone && <a href={`tel:${item.contacts.phone}`} style={{ fontSize: 16, textDecoration: "none", opacity: 0.7 }}>📞</a>}
+              {item.contacts?.phone && <a href={`sms:${item.contacts.phone}`} style={{ fontSize: 16, textDecoration: "none", opacity: 0.7 }}>💬</a>}
+              {item.contacts?.email && <a href={`mailto:${item.contacts.email}`} style={{ fontSize: 16, textDecoration: "none", opacity: 0.7 }}>📧</a>}
             </div>
           </div>
           {/* Row 2: Community + source + timestamp */}

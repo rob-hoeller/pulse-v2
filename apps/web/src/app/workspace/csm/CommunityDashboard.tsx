@@ -569,10 +569,10 @@ function ProspectCard({
           {/* Action icons */}
           <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             {item.contacts?.phone && (
-              <a href={`tel:${item.contacts.phone}`} style={{ fontSize: 20, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: 8, backgroundColor: "#09090b", border: "1px solid #27272a" }}>📞</a>
+              <a href={`tel:${item.contacts.phone}`} style={{ fontSize: 18, textDecoration: "none", opacity: 0.7, padding: "4px" }}>📞</a>
             )}
             {item.contacts?.email && (
-              <a href={`mailto:${item.contacts.email}`} style={{ fontSize: 20, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: 8, backgroundColor: "#09090b", border: "1px solid #27272a" }}>📧</a>
+              <a href={`mailto:${item.contacts.email}`} style={{ fontSize: 18, textDecoration: "none", opacity: 0.7, padding: "4px" }}>📧</a>
             )}
           </div>
 
