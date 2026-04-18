@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { DivisionOption, CommunityOption } from "./GlobalFilterBar";
 
 interface CommunityPlanOption {
@@ -25,9 +26,10 @@ interface CompoundFilterProps {
   options: { id: string; name: string }[];
   onChange: (id: string | null) => void;
   disabled?: boolean;
+  compact?: boolean;
 }
 
-function CompoundFilter({ label, value, displayValue, count, options, onChange, disabled }: CompoundFilterProps) {
+function CompoundFilter({ label, value, displayValue, count, options, onChange, disabled, compact }: CompoundFilterProps) {
   const [open, setOpen] = useState(false);
   const isActive = !!value;
 
@@ -37,8 +39,8 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
       <div
         onClick={() => !disabled && setOpen(!open)}
         style={{
-          width: 170,
-          height: 44,
+          width: compact ? 130 : 170,
+          height: compact ? 38 : 44,
           background: "#2a2b2e",
           border: `1px solid ${isActive ? "#80B602" : "#444"}`,
           borderRadius: 3,
@@ -119,6 +121,7 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
 // ─── GlobalFilterBarClient ────────────────────────────────────────────────────
 
 export default function GlobalFilterBarClient({ divisions, communities }: Props) {
+  const isMobile = useIsMobile();
   const { filter, setDivision, setCommunity, setPlan, setLabels } =
     useGlobalFilter();
 
@@ -154,12 +157,14 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
     <div style={{
       display: "flex",
       alignItems: "center",
-      gap: 8,
-      padding: "0 16px",
-      height: 56,
+      gap: isMobile ? 4 : 8,
+      padding: isMobile ? "0 8px" : "0 16px",
+      height: isMobile ? 48 : 56,
       background: "#0d0d0d",
       borderBottom: "1px solid #222",
       flexShrink: 0,
+      overflowX: isMobile ? "auto" : undefined,
+      WebkitOverflowScrolling: "touch" as unknown as undefined,
     }}>
       <CompoundFilter
         label="Division"
@@ -168,6 +173,7 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
         count={divisions.length}
         options={divisions.map(d => ({ id: d.id, name: d.name }))}
         onChange={id => setDivision(id)}
+        compact={isMobile}
       />
       <CompoundFilter
         label="Community"
@@ -176,25 +182,30 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
         count={filteredCommunities.length}
         options={filteredCommunities.map(c => ({ id: c.id, name: c.name }))}
         onChange={id => setCommunity(id)}
+        compact={isMobile}
       />
-      <CompoundFilter
-        label="Floor Plan"
-        value={filter.planModelId}
-        displayValue={plans.find(p => p.id === filter.planModelId)?.plan_name ?? ""}
-        count={plans.length}
-        options={plans.map(p => ({ id: p.id, name: p.plan_name }))}
-        onChange={id => setPlan(id)}
-        disabled={!filter.communityId}
-      />
+      {!isMobile && (
+        <CompoundFilter
+          label="Floor Plan"
+          value={filter.planModelId}
+          displayValue={plans.find(p => p.id === filter.planModelId)?.plan_name ?? ""}
+          count={plans.length}
+          options={plans.map(p => ({ id: p.id, name: p.plan_name }))}
+          onChange={id => setPlan(id)}
+          disabled={!filter.communityId}
+        />
+      )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
       {/* Right: bell + account */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#80B602", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" }}>L</div>
-        <span style={{ fontSize: 12, color: "#888" }}>Hello, Lance!</span>
-      </div>
+      {!isMobile && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#80B602", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" }}>L</div>
+          <span style={{ fontSize: 12, color: "#888" }}>Hello, Lance!</span>
+        </div>
+      )}
     </div>
   );
 }

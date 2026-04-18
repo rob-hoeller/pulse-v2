@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
@@ -182,7 +183,7 @@ function ActivityCard({
             backgroundColor: meta.bg, color: meta.color, fontWeight: 600,
             display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap", flexShrink: 0,
           }}>
-            {meta.icon} {meta.label} {dirArrow}
+            {meta.icon}{" "}{meta.label} {dirArrow}
           </span>
 
           {/* Priority badges — ALWAYS visible when applicable */}
@@ -190,7 +191,7 @@ function ActivityCard({
             <span style={{
               fontSize: 9, padding: "2px 7px", borderRadius: 3, fontWeight: 600,
               backgroundColor: "#7f1d1d", color: "#fca5a5", flexShrink: 0,
-            }}>⚠ Urgent</span>
+            }}>⚠{" "}{"Urgent"}</span>
           )}
           {needsResponse && (
             <span style={{
@@ -241,7 +242,7 @@ function ActivityCard({
           overflow: "hidden", textOverflow: "ellipsis",
           display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
         }}>
-          {activity.subject && <span style={{ fontWeight: 500, color: "#d4d4d8" }}>{activity.subject} — </span>}
+          {activity.subject && <span style={{ fontWeight: 500, color: "#d4d4d8", overflow: "hidden", textOverflow: "ellipsis" }}>{activity.subject} — </span>}
           {activity.body ?? "No content"}
         </div>
 
@@ -396,6 +397,7 @@ function ActivityCard({
 // ─── CommHub Component ────────────────────────────────────────────────────────
 
 export default function CommHub({ communityId, divisionId, teamFilter }: CommHubProps) {
+  const isMobile = useIsMobile();
   const [activities, setActivities] = useState<CommActivity[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<CommHubTab>("needs_response");
@@ -573,11 +575,11 @@ export default function CommHub({ communityId, divisionId, teamFilter }: CommHub
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search by name, keyword, or content..."
+          placeholder={isMobile ? "Search..." : "Search by name, keyword, or content..."}
           style={{
-            width: "100%", padding: "8px 12px", backgroundColor: "#18181b",
+            width: "100%", padding: isMobile ? "6px 10px" : "8px 12px", backgroundColor: "#18181b",
             border: "1px solid #27272a", borderRadius: 6, color: "#d4d4d8",
-            fontSize: 12, outline: "none",
+            fontSize: isMobile ? 11 : 12, outline: "none",
           }}
           onFocus={e => (e.currentTarget.style.borderColor = "#3f3f46")}
           onBlur={e => (e.currentTarget.style.borderColor = "#27272a")}
@@ -585,22 +587,23 @@ export default function CommHub({ communityId, divisionId, teamFilter }: CommHub
       </div>
 
       {/* ── Sub-tabs ── */}
-      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : "wrap" }}>
         {COMM_HUB_TABS.map(t => {
           const isActive = activeTab === t.id;
           const count = counts[t.id];
           return (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-              padding: "6px 10px", fontSize: 11, fontWeight: isActive ? 600 : 400,
+              padding: isMobile ? "5px 6px" : "6px 10px", fontSize: isMobile ? 10 : 11, fontWeight: isActive ? 600 : 400,
               color: isActive ? "#fafafa" : "#52525b",
               borderBottom: isActive ? "2px solid #fafafa" : "2px solid transparent",
               background: "none", border: "none", borderBottomStyle: "solid",
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap",
+              flexShrink: 0,
             }}>
               {t.icon && <span>{t.icon}</span>}
-              <span>{t.label}</span>
+              {!isMobile && <span>{t.label}</span>}
               <span style={{
-                fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600,
+                fontSize: isMobile ? 9 : 10, padding: "0 4px", borderRadius: 3, fontWeight: 600,
                 backgroundColor: t.id === "urgent" && count > 0 ? "#7f1d1d" : count > 0 ? "#172554" : "#27272a",
                 color: t.id === "urgent" && count > 0 ? "#fca5a5" : count > 0 ? "#60a5fa" : "#71717a",
               }}>{count}</span>

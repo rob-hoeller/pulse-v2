@@ -480,48 +480,36 @@ function QueueCard({
 
       {/* Main row — mobile */}
       {isMobile && (
-        <div style={{ padding: "16px" }}>
-          {/* Name + meta */}
-          <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 15, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px", marginBottom: 4 }}>{name}</div>
-          <div style={{ fontSize: 12, color: "#71717a", marginBottom: 8 }}>
-            {divisionName}{item.communities?.name ? ` · ${item.communities.name}` : ""} · {item.opportunity_source ?? item.source ?? "webform"}
+        <div style={{ padding: "10px 12px" }}>
+          {/* Row 1: Name + timestamp + action icons */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+            <span style={{ fontSize: 10, color: "#52525b", flexShrink: 0 }}>{relativeTime(item.last_activity_at)}</span>
+            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+              {item.contacts?.phone && <a href={`tel:${item.contacts.phone}`} style={{ fontSize: 16, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6, backgroundColor: "#18181b", border: "1px solid #27272a" }}>📞</a>}
+              {item.contacts?.phone && <a href={`sms:${item.contacts.phone}`} style={{ fontSize: 16, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6, backgroundColor: "#18181b", border: "1px solid #27272a" }}>💬</a>}
+              {item.contacts?.email && <a href={`mailto:${item.contacts.email}`} style={{ fontSize: 16, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6, backgroundColor: "#18181b", border: "1px solid #27272a" }}>📧</a>}
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: "#52525b", marginBottom: 12 }}>
-            {relativeTime(item.last_activity_at)}
+          {/* Row 2: Community + source + timestamp */}
+          <div style={{ fontSize: 10, color: "#71717a", marginBottom: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {item.communities?.name ?? divisionName} · {item.opportunity_source ?? item.source ?? "webform"}
           </div>
-
-          {/* Action icons row */}
-          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-            {item.contacts?.phone && (
-              <a href={`tel:${item.contacts.phone}`} style={{ fontSize: 20, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: 8, backgroundColor: "#18181b", border: "1px solid #27272a" }}>📞</a>
-            )}
-            {item.contacts?.phone && (
-              <a href={`sms:${item.contacts.phone}`} style={{ fontSize: 20, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: 8, backgroundColor: "#18181b", border: "1px solid #27272a" }}>💬</a>
-            )}
-            {item.contacts?.email && (
-              <a href={`mailto:${item.contacts.email}`} style={{ fontSize: 20, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: 8, backgroundColor: "#18181b", border: "1px solid #27272a" }}>📧</a>
-            )}
-          </div>
-
-          {/* AI suggestion — always visible on mobile */}
-          <div style={{
-            padding: "10px 14px", backgroundColor: "#052e16", border: "1px solid #166534",
-            borderRadius: 6, marginBottom: 12, fontSize: 12, color: "#86efac", lineHeight: 1.5,
-          }}>
-            🤖 {suggestedLane}
-          </div>
-
-          {/* Assign buttons */}
-          <div style={{ display: "flex", gap: 8 }}>
+          {/* Row 3: AI suggestion inline with assign */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{
+              fontSize: 10, padding: "3px 8px", backgroundColor: "#052e16", border: "1px solid #166534",
+              borderRadius: 4, color: "#86efac", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, minWidth: 0,
+            }}>🤖 {suggestedLane}</span>
             <button onClick={onQuickAssign} style={{
-              flex: 1, padding: "12px 10px", borderRadius: 6, border: "1px solid #166534",
-              backgroundColor: "#052e16", color: "#4ade80", fontSize: 14, fontWeight: 600, cursor: "pointer",
-              minHeight: 44,
+              padding: "6px 12px", borderRadius: 4, border: "1px solid #166534",
+              backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
+              minHeight: 32, flexShrink: 0,
             }}>→ Assign</button>
             <button onClick={onAssign} style={{
-              padding: "12px 16px", borderRadius: 6, border: "1px solid #3f3f46",
-              backgroundColor: "#18181b", color: "#71717a", fontSize: 14, cursor: "pointer",
-              minHeight: 44,
+              padding: "6px 8px", borderRadius: 4, border: "1px solid #3f3f46",
+              backgroundColor: "#18181b", color: "#71717a", fontSize: 11, cursor: "pointer",
+              minHeight: 32, flexShrink: 0,
             }}>⋯</button>
           </div>
         </div>
@@ -1140,40 +1128,69 @@ export default function OscClient() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#09090b", color: "#fafafa" }}>
       {/* ── Top Bar ── */}
-      <div style={{
-        padding: "10px 24px", borderBottom: "1px solid #27272a",
-        display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 600 }}>OSC Command Center</span>
-          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#18181b", border: "1px solid #27272a", color: "#71717a" }}>
-            {labels.division ?? "Division"}
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      {isMobile ? (
+        <div style={{
+          padding: "8px 12px", borderBottom: "1px solid #27272a",
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#fafafa" }}>OSC</span>
+            <span style={{ fontSize: 9, color: "#71717a" }}>·</span>
+            <span style={{ fontSize: 10, color: "#71717a" }}>{labels.division ?? "Div"}</span>
+            <span style={{ fontSize: 9, color: "#71717a" }}>·</span>
+            <span style={{
+              fontSize: 11, fontWeight: 700,
+              color: filteredQueueItems.length === 0 ? "#4ade80" : filteredQueueItems.length > 10 ? "#f87171" : "#fbbf24",
+            }}>Q:{filteredQueueItems.length}</span>
+          </div>
           <select
             value={teamFilter}
             onChange={e => setTeamFilter(e.target.value)}
             style={{
-              backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6,
-              color: "#a1a1aa", fontSize: 12, padding: "6px 12px", outline: "none",
+              backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 4,
+              color: "#a1a1aa", fontSize: 10, padding: "4px 6px", outline: "none", maxWidth: 100,
             }}
           >
-            <option value="all">All Team Members</option>
+            <option value="all">All</option>
             {oscUsers.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
           </select>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11, color: "#52525b" }}>Queue:</span>
-            <span style={{
-              fontSize: 16, fontWeight: 700,
-              color: filteredQueueItems.length === 0 ? "#4ade80" : filteredQueueItems.length > 10 ? "#f87171" : "#fbbf24",
-            }}>{filteredQueueItems.length}</span>
-          </div>
-          <span style={{ fontSize: 11, color: "#52525b" }}>
-            Goal: <strong style={{ color: filteredQueueItems.length === 0 ? "#4ade80" : "#fafafa" }}>0</strong>
-          </span>
         </div>
-      </div>
+      ) : (
+        <div style={{
+          padding: "10px 24px", borderBottom: "1px solid #27272a",
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>OSC Command Center</span>
+            <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#18181b", border: "1px solid #27272a", color: "#71717a" }}>
+              {labels.division ?? "Division"}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <select
+              value={teamFilter}
+              onChange={e => setTeamFilter(e.target.value)}
+              style={{
+                backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6,
+                color: "#a1a1aa", fontSize: 12, padding: "6px 12px", outline: "none",
+              }}
+            >
+              <option value="all">All Team Members</option>
+              {oscUsers.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+            </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, color: "#52525b" }}>Queue:</span>
+              <span style={{
+                fontSize: 16, fontWeight: 700,
+                color: filteredQueueItems.length === 0 ? "#4ade80" : filteredQueueItems.length > 10 ? "#f87171" : "#fbbf24",
+              }}>{filteredQueueItems.length}</span>
+            </div>
+            <span style={{ fontSize: 11, color: "#52525b" }}>
+              Goal: <strong style={{ color: filteredQueueItems.length === 0 ? "#4ade80" : "#fafafa" }}>0</strong>
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Content ── */}
       <div style={{ flex: 1, overflow: "auto", padding: isMobile ? 12 : 24, paddingBottom: isMobile ? 72 : 24 }}>
