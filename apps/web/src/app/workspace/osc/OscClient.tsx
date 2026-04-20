@@ -457,7 +457,7 @@ function QueueCard({
               <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{name}</div>
               {item.prior_stage && (
                 <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#1e1b4b", color: "#818cf8", whiteSpace: "nowrap" }}>
-                  {stageLabel(item.prior_stage)}{item.prior_community ? ` · ${item.prior_community}` : ""}
+                  {stageLabel(item.prior_stage)} · {item.prior_community ?? divisionName}
                 </span>
               )}
               {item.is_new_contact && (
@@ -510,7 +510,7 @@ function QueueCard({
               <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 15, fontWeight: 600, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "3px" }}>{name}</div>
               {item.prior_stage && (
                 <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, fontWeight: 600, backgroundColor: "#1e1b4b", color: "#818cf8", whiteSpace: "nowrap" }}>
-                  {stageLabel(item.prior_stage)}{item.prior_community ? ` · ${item.prior_community}` : ""}
+                  {stageLabel(item.prior_stage)} · {item.prior_community ?? divisionName}
                 </span>
               )}
               {item.is_new_contact && (
