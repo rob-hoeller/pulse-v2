@@ -190,8 +190,8 @@ function EmptyState() {
 // ─── Assign Modal ─────────────────────────────────────────────────────────────
 
 const ASSIGN_LANES = [
-  { value: "lead_div", label: "Lead (Division)", description: "Just interested in the division, no community", needsCommunity: false },
-  { value: "lead_com", label: "Lead (Community)", description: "Interested in a specific community", needsCommunity: true },
+  { value: "lead_div", label: "Lead", description: "Division-level lead interest", needsCommunity: false },
+  { value: "lead_com", label: "Lead", description: "Community-level lead interest", needsCommunity: true },
   { value: "prospect_c", label: "Prospect C", description: "30-90 day horizon", needsCommunity: true },
   { value: "prospect_b", label: "Prospect B", description: "Intent within 30 days", needsCommunity: true },
   { value: "prospect_a", label: "Prospect A", description: "Contract this week", needsCommunity: true },
@@ -203,24 +203,25 @@ function getAiSuggestion(item: QueueItem, communities: CommunityRef[]): string {
   const communityName = item.communities?.name;
   const src = item.opportunity_source ?? item.source;
   if (item.community_id && communityName) {
-    return `Submitted form for ${communityName}. Suggest: Lead (Community) at ${communityName}`;
+    return `Submitted form for ${communityName}. Suggest: Lead at ${communityName}`;
   }
   if (src === "schedule_appt" || src === "schedule_visit") {
     return `Requested a visit. Suggest: Prospect C${communityName ? ` at ${communityName}` : ""}`;
   }
   if (src === "subscribe_region") {
-    return "Subscribed to division updates. Suggest: Lead (Division)";
+    return "Subscribed to division updates. Suggest: Lead";
   }
   return "Review form details and assign to appropriate lane";
 }
 
 function AssignModal({
-  item, communities, onClose, onExecute,
+  item, communities, onClose, onExecute, divisionName,
 }: {
   item: QueueItem;
   communities: CommunityRef[];
   onClose: () => void;
   onExecute: (oppId: string, newStage: string, communityId: string | null, reason: string) => void;
+  divisionName: string;
 }) {
   // Default lane based on form type — match the AI suggestion
   const defaultStage = (() => {
@@ -238,11 +239,11 @@ function AssignModal({
   const needsCommunity = selectedLane?.needsCommunity ?? false;
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
   const src = item.opportunity_source ?? item.source ?? "";
-  const suggestedLane = src === "subscribe_region" ? "Lead (Division)"
-    : (src === "schedule_visit" || src === "schedule_appt") ? `Prospect C${item.communities?.name ? " → " + item.communities.name : ""}`
-    : (src === "prelaunch_community" || src === "subscribe_community") ? `Lead (Community)${item.communities?.name ? " → " + item.communities.name : ""}`
-    : item.community_id ? `Lead (Community)${item.communities?.name ? " → " + item.communities.name : ""}`
-    : "Lead (Division)";
+  const suggestedLane = src === "subscribe_region" ? `Lead · ${divisionName}`
+    : (src === "schedule_visit" || src === "schedule_appt") ? `Prospect C${item.communities?.name ? " · " + item.communities.name : ""}`
+    : (src === "prelaunch_community" || src === "subscribe_community") ? `Lead${item.communities?.name ? " · " + item.communities.name : ""}`
+    : item.community_id ? `Lead${item.communities?.name ? " · " + item.communities.name : ""}`
+    : `Lead · ${divisionName}`;
   const suggestion = getAiSuggestion(item, communities);
 
   const canSubmit = !needsCommunity || !!targetCommunity;
@@ -430,11 +431,11 @@ function QueueCard({
 }) {
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
   const src = item.opportunity_source ?? item.source ?? "";
-  const suggestedLane = src === "subscribe_region" ? "Lead (Division)"
-    : (src === "schedule_visit" || src === "schedule_appt") ? `Prospect C${item.communities?.name ? " → " + item.communities.name : ""}`
-    : (src === "prelaunch_community" || src === "subscribe_community") ? `Lead (Community)${item.communities?.name ? " → " + item.communities.name : ""}`
-    : item.community_id ? `Lead (Community)${item.communities?.name ? " → " + item.communities.name : ""}`
-    : "Lead (Division)";
+  const suggestedLane = src === "subscribe_region" ? `Lead · ${divisionName}`
+    : (src === "schedule_visit" || src === "schedule_appt") ? `Prospect C${item.communities?.name ? " · " + item.communities.name : ""}`
+    : (src === "prelaunch_community" || src === "subscribe_community") ? `Lead${item.communities?.name ? " · " + item.communities.name : ""}`
+    : item.community_id ? `Lead${item.communities?.name ? " · " + item.communities.name : ""}`
+    : `Lead · ${divisionName}`;
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -1416,6 +1417,7 @@ export default function OscClient() {
         <AssignModal
           item={assignItem}
           communities={communities}
+          divisionName={labels.division ?? ""}
           onClose={() => { setAssignItem(null); }}
           onExecute={handleAction}
         />
