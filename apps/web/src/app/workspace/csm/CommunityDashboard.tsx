@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
+import OpportunityPanel, { type OpportunityPanelData } from "@/components/OpportunityPanel";
 import PipelineDetailView, { type PipelineItem } from "@/components/PipelineDetailView";
 import CommHub from "@/components/CommHub";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -494,13 +495,14 @@ function ActionBtn({ label }: { label: string }) {
 // ─── Prospect Queue Card ──────────────────────────────────────────────────────
 
 function ProspectCard({
-  item, onPromote, onDemote, readOnly, isMobile,
+  item, onPromote, onDemote, readOnly, isMobile, onNameClick,
 }: {
   item: ProspectItem;
   onPromote: () => void;
   onDemote: () => void;
   readOnly?: boolean;
   isMobile?: boolean;
+  onNameClick?: () => void;
 }) {
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
   const stageInfo = STAGE_COLORS[item.crm_stage];
@@ -522,7 +524,7 @@ function ProspectCard({
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#fafafa" }}>{name}</span>
+              <span onClick={e => { e.stopPropagation(); if (onNameClick) onNameClick(); }} style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{name}</span>
               {stageInfo && (
                 <span style={{
                   fontSize: 10, padding: "2px 8px", borderRadius: 4,
@@ -863,9 +865,32 @@ function ReferenceModule({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+
+function prospectToPanelData(p: ProspectItem, communityName: string | null, divisionName: string | null): OpportunityPanelData {
+  return {
+    id: p.id,
+    contact_id: p.contact_id,
+    first_name: p.contacts?.first_name ?? "—",
+    last_name: p.contacts?.last_name ?? "",
+    email: p.contacts?.email ?? null,
+    phone: p.contacts?.phone ?? null,
+    stage: p.crm_stage,
+    source: p.source ?? null,
+    community_name: communityName,
+    division_name: divisionName,
+    budget_min: p.budget_min,
+    budget_max: p.budget_max,
+    floor_plan_name: null,
+    notes: p.notes ?? null,
+    last_activity_at: p.last_activity_at,
+    created_at: p.created_at,
+  };
+}
+
 function CommunityView({ community, plans, lots, modelHome, specHomes, divisions, readOnly }: CommunityViewProps) {
   const isMobile = useIsMobile();
   const [drill, setDrill] = useState<DrillPanel>(null);
+  const [panelItem, setPanelItem] = useState<OpportunityPanelData | null>(null);
   const [prospects, setProspects] = useState<ProspectItem[]>([]);
   const [mobileTab, setMobileTab] = useState<"queue" | "comm">("queue");
 
@@ -1138,7 +1163,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
               <MiniTable
                 headers={["Name", "Stage", "Budget", "Phone", "Last Activity", "Created"]}
                 rows={prospects.map(p => [
-                  `${p.contacts?.first_name ?? "—"} ${p.contacts?.last_name ?? ""}`,
+                  <span key="name" onClick={() => setPanelItem(prospectToPanelData(p, community.name, division?.name ?? null))} style={{ color: "#fafafa", fontWeight: 500, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{p.contacts?.first_name ?? "—"} {p.contacts?.last_name ?? ""}</span>,
                   <span key="stage" style={{
                     fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 600,
                     backgroundColor: STAGE_COLORS[p.crm_stage]?.bg ?? "#27272a",
@@ -1285,6 +1310,15 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
         </div>
       </div>
       </div>
+
+      {/* ── Opportunity Detail Panel ── */}
+      {panelItem && (
+        <OpportunityPanel
+          open={!!panelItem}
+          onClose={() => setPanelItem(null)}
+          opportunity={panelItem}
+        />
+      )}
 
       {/* ── Reference Module (collapsible) ── */}
       <ReferenceModule community={community} plans={plans} lots={lots} modelHome={modelHome} />
