@@ -12,7 +12,7 @@ export default async function TemplatesPage() {
   const { data: templates } = await supabase
     .from("response_templates")
     .select("*")
-    .eq("is_default", true)
+    .eq("is_active", true)
     .order("form_type_code")
     .order("channel");
 

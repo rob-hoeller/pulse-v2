@@ -305,14 +305,27 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
 
           const { data, error } = await sb
             .from("response_templates")
-            .insert(insertPayload)
+            .upsert(insertPayload, { onConflict: "form_type_code,channel,division_id,community_id" })
             .select()
             .single();
 
-          if (error) throw error;
-
-          if (data) {
-            setTemplates((prev) => [...prev, data as Template]);
+          if (error) {
+            // Fallback: if upsert fails (no unique constraint), try insert
+            const { data: insertData, error: insertError } = await sb
+              .from("response_templates")
+              .insert(insertPayload)
+              .select()
+              .single();
+            if (insertError) throw insertError;
+            if (insertData) {
+              setTemplates((prev) => [...prev, insertData as Template]);
+            }
+          } else if (data) {
+            setTemplates((prev) => {
+              const exists = prev.some((t) => t.id === (data as Template).id);
+              if (exists) return prev.map((t) => t.id === (data as Template).id ? data as Template : t);
+              return [...prev, data as Template];
+            });
           }
         }
 
