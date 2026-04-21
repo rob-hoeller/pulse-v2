@@ -453,6 +453,7 @@ function QueueCard({
   // Email state
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
+  const [emailHtml, setEmailHtml] = useState("");
   const [emailEditing, setEmailEditing] = useState(false);
   const [emailAttachments, setEmailAttachments] = useState<{type: string; label: string; url: string}[]>([]);
   const [smsAttachments, setSmsAttachments] = useState<{type: string; label: string; url: string}[]>([]);
@@ -828,13 +829,20 @@ function QueueCard({
                       />
                     </div>
                   ) : (
-                    <div style={{
-                      padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #27272a",
-                      borderRadius: 4, fontSize: 12, color: "#a1a1aa", lineHeight: 1.6,
-                      whiteSpace: "pre-wrap", marginBottom: 8, maxHeight: 200, overflow: "auto",
-                    }}>
-                      {emailBody || "No email content generated"}
-                    </div>
+                    emailHtml ? (
+                      <div style={{
+                        marginBottom: 8, maxHeight: 400, overflow: "auto", borderRadius: 4,
+                        border: "1px solid #27272a",
+                      }} dangerouslySetInnerHTML={{ __html: emailHtml }} />
+                    ) : (
+                      <div style={{
+                        padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #27272a",
+                        borderRadius: 4, fontSize: 12, color: "#a1a1aa", lineHeight: 1.6,
+                        whiteSpace: "pre-wrap", marginBottom: 8, maxHeight: 200, overflow: "auto",
+                      }}>
+                        {emailBody || "No email content generated"}
+                      </div>
+                    )
                   )}
 
                   {/* File Attachments */}

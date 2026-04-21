@@ -272,7 +272,30 @@ async function generateResponse(opportunity_id: string, ctx: ActionContext) {
   let emailBody = ep ? render(ep.body ?? "") : `Hi ${firstName}!\n\nThank you for reaching out. A member of our team will be in touch shortly.`;
   let smsBody = sm ? render(sm.body ?? "") : `Hi ${firstName}! Thanks for reaching out to Schell Brothers!`;
   
-  return { success: true, data: { email: { subject: emailSubject, body: emailBody }, sms: { body: smsBody }, form_type: formType } };
+  // Build branded HTML email (matches SendGrid auto-confirmation style)
+  const emailHtml = `
+    <div style="font-family: Georgia, serif; max-width: 640px; margin: 0 auto; background: #ffffff; border: 4px solid #C41230;">
+      <div style="background: #1B2A4A; padding: 28px 32px; text-align: center;">
+        <img src="https://heartbeat-page-designer-production.s3.amazonaws.com/site-8/schell-logo-color-horizontal__76b84a3c12300dd95411702f2f9e9dd6-ebf486218337267c1b432845a3df25be.png" alt="Schell Brothers" style="height: 44px; max-width: 240px;" />
+      </div>
+      <div style="height: 4px; background: #C41230;"></div>
+      <div style="padding: 40px 32px;">
+        <h2 style="color: #1B2A4A; font-size: 26px; font-weight: 400; margin: 0 0 20px;">
+          ${emailSubject}
+        </h2>
+        <div style="color: #444; font-size: 15px; line-height: 1.8; white-space: pre-wrap;">
+          ${emailBody}
+        </div>
+      </div>
+      <div style="height: 4px; background: #C41230;"></div>
+      <div style="background: #1B2A4A; padding: 24px 32px; text-align: center;">
+        <p style="color: #ffffff; font-size: 13px; font-weight: 600; margin: 0 0 8px;">Our Mission of Happiness</p>
+        <p style="color: rgba(255,255,255,0.6); font-size: 11px; margin: 0 0 8px;">Delaware Beaches · Richmond · Nashville · Boise</p>
+        <a href="https://schellbrothers.com" style="color: #ffffff; text-decoration: none; font-size: 12px; font-weight: 600;">schellbrothers.com</a>
+      </div>
+    </div>`;
+
+  return { success: true, data: { email: { subject: emailSubject, body: emailBody, html: emailHtml }, sms: { body: smsBody }, form_type: formType } };
 }
 
 async function updateContact(contact_id: string, updates: Record<string, unknown>, ctx: ActionContext) {
