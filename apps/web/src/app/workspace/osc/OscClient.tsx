@@ -445,6 +445,8 @@ function QueueCard({
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [emailEditing, setEmailEditing] = useState(false);
+  const [emailAttachments, setEmailAttachments] = useState<{type: string; label: string; url: string}[]>([]);
+  const [smsAttachments, setSmsAttachments] = useState<{type: string; label: string; url: string}[]>([]);
   const [emailSent, setEmailSent] = useState(false);
   const [emailSkipped, setEmailSkipped] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
@@ -794,6 +796,44 @@ function QueueCard({
                       {emailBody || "No email content generated"}
                     </div>
                   )}
+
+                  {/* Attachments */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                    {emailAttachments.map((att, i) => (
+                      <span key={i} style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        padding: "3px 8px", borderRadius: 4, backgroundColor: "#18181b",
+                        border: "1px solid #27272a", fontSize: 10, color: "#a1a1aa",
+                      }}>
+                        {att.type === "link" ? "🔗" : att.type === "photo" ? "🖼" : "📎"} {att.label}
+                        <span onClick={() => setEmailAttachments(prev => prev.filter((_, j) => j !== i))}
+                          style={{ cursor: "pointer", color: "#71717a", marginLeft: 2 }}>✕</span>
+                      </span>
+                    ))}
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={() => {
+                        const url = prompt("Enter link URL:");
+                        if (url) setEmailAttachments(prev => [...prev, { type: "link", label: url.replace(/https?:\/\//, "").substring(0, 30), url }]);
+                      }} style={{
+                        padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a",
+                        backgroundColor: "#09090b", color: "#71717a", fontSize: 10, cursor: "pointer",
+                      }}>🔗 Link</button>
+                      <button onClick={() => {
+                        const url = prompt("Enter photo URL:");
+                        if (url) setEmailAttachments(prev => [...prev, { type: "photo", label: "Photo", url }]);
+                      }} style={{
+                        padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a",
+                        backgroundColor: "#09090b", color: "#71717a", fontSize: 10, cursor: "pointer",
+                      }}>🖼 Photo</button>
+                      <button onClick={() => {
+                        const url = prompt("Enter document URL:");
+                        if (url) setEmailAttachments(prev => [...prev, { type: "doc", label: "Document", url }]);
+                      }} style={{
+                        padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a",
+                        backgroundColor: "#09090b", color: "#71717a", fontSize: 10, cursor: "pointer",
+                      }}>📎 Doc</button>
+                    </div>
+                  </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => setEmailEditing(!emailEditing)} style={{
                       padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
@@ -854,6 +894,37 @@ function QueueCard({
                       {smsBody || "No SMS content generated"}
                     </div>
                   )}
+
+                  {/* Attachments */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                    {smsAttachments.map((att, i) => (
+                      <span key={i} style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        padding: "3px 8px", borderRadius: 4, backgroundColor: "#18181b",
+                        border: "1px solid #27272a", fontSize: 10, color: "#a1a1aa",
+                      }}>
+                        {att.type === "link" ? "🔗" : "🖼"} {att.label}
+                        <span onClick={() => setSmsAttachments(prev => prev.filter((_, j) => j !== i))}
+                          style={{ cursor: "pointer", color: "#71717a", marginLeft: 2 }}>✕</span>
+                      </span>
+                    ))}
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={() => {
+                        const url = prompt("Enter link URL:");
+                        if (url) setSmsAttachments(prev => [...prev, { type: "link", label: url.replace(/https?:\/\//, "").substring(0, 30), url }]);
+                      }} style={{
+                        padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a",
+                        backgroundColor: "#09090b", color: "#71717a", fontSize: 10, cursor: "pointer",
+                      }}>🔗 Link</button>
+                      <button onClick={() => {
+                        const url = prompt("Enter photo URL:");
+                        if (url) setSmsAttachments(prev => [...prev, { type: "photo", label: "Photo", url }]);
+                      }} style={{
+                        padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a",
+                        backgroundColor: "#09090b", color: "#71717a", fontSize: 10, cursor: "pointer",
+                      }}>🖼 Photo</button>
+                    </div>
+                  </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => setSmsEditing(!smsEditing)} style={{
                       padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
