@@ -829,20 +829,25 @@ function QueueCard({
                       />
                     </div>
                   ) : (
-                    emailHtml ? (
-                      <div style={{
+                    <div style={{
                         marginBottom: 8, maxHeight: 400, overflow: "auto", borderRadius: 4,
-                        border: "1px solid #27272a",
-                      }} dangerouslySetInnerHTML={{ __html: emailHtml }} />
-                    ) : (
-                      <div style={{
-                        padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #27272a",
-                        borderRadius: 4, fontSize: 12, color: "#a1a1aa", lineHeight: 1.6,
-                        whiteSpace: "pre-wrap", marginBottom: 8, maxHeight: 200, overflow: "auto",
-                      }}>
-                        {emailBody || "No email content generated"}
-                      </div>
-                    )
+                        border: "1px solid #27272a", background: "#fff",
+                      }} dangerouslySetInnerHTML={{ __html: `
+                        <div style="font-family: Georgia, serif; max-width: 100%;">
+                          <div style="background: #1B2A4A; padding: 20px 24px; text-align: center;">
+                            <img src="https://heartbeat-page-designer-production.s3.amazonaws.com/site-8/schell-logo-color-horizontal__76b84a3c12300dd95411702f2f9e9dd6-ebf486218337267c1b432845a3df25be.png" alt="Schell Brothers" style="height: 36px;" />
+                          </div>
+                          <div style="height: 4px; background: #C41230;"></div>
+                          <div style="padding: 24px; color: #444; font-size: 14px; line-height: 1.7;">
+                            ${emailBody || "No email content generated"}
+                          </div>
+                          <div style="height: 4px; background: #C41230;"></div>
+                          <div style="background: #1B2A4A; padding: 16px 24px; text-align: center;">
+                            <div style="color: #fff; font-size: 12px; font-weight: 600;">Our Mission of Happiness</div>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 10px; margin-top: 4px;">schellbrothers.com</div>
+                          </div>
+                        </div>
+                      ` }} />
                   )}
 
                   {/* File Attachments */}
