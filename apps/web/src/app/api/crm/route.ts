@@ -240,28 +240,37 @@ async function generateResponse(opportunity_id: string, ctx: ActionContext) {
   const formType = opp.opportunity_source ?? "unknown";
   const priceFrom = (opp as any).communities?.price_from;
 
-  // TODO: Look up response_templates table for user-customized templates
-  let emailSubject = "", emailBody = "", smsBody = "";
+  // Look up templates: division-specific first, then defaults
+  const divId = opp.division_id;
+  const { data: divTmpl } = await supabase.from("response_templates").select("*")
+    .or(`form_type_code.eq.${formType},form_type_code.eq.default`)
+    .eq("division_id", divId).eq("is_active", true);
+  const { data: defTmpl } = await supabase.from("response_templates").select("*")
+    .or(`form_type_code.eq.${formType},form_type_code.eq.default`)
+    .eq("is_default", true).eq("is_active", true);
+  const allTmpl = [...(divTmpl ?? []), ...(defTmpl ?? [])];
 
-  if (formType === "schedule_visit" || formType === "schedule_appt") {
-    emailSubject = `Your Visit to ${communityName}`;
-    emailBody = `Hi ${firstName}!\n\nThank you for wanting to visit ${communityName}!${priceFrom ? ` Plans start from $${(priceFrom/1000).toFixed(0)}K.` : ""}\n\nWhat day and time works best? We're available weekdays and weekends 10am-5pm.\n\nLooking forward to meeting you!`;
-    smsBody = `Hi ${firstName}! Thanks for wanting to visit ${communityName}! 🏡 When would you like to come by?`;
-  } else if (formType === "subscribe_region") {
-    emailSubject = "Welcome — Schell Brothers";
-    emailBody = `Hi ${firstName}!\n\nThank you for your interest in Schell Brothers. We have incredible communities and I'd love to help you explore what's available.\n\nWould you like to schedule a call or visit?`;
-    smsBody = `Hi ${firstName}! Thanks for your interest in Schell Brothers! Would you like to chat about what we have available? 😊`;
-  } else if (formType === "prelaunch_community" || formType === "subscribe_community") {
-    emailSubject = `${communityName} — We'll Keep You Updated!`;
-    emailBody = `Hi ${firstName}!\n\nThank you for your interest in ${communityName}!${priceFrom ? ` Plans start from $${(priceFrom/1000).toFixed(0)}K.` : ""}\n\nI'll make sure you're first to know about new releases and incentives.\n\nWant to schedule a visit?`;
-    smsBody = `Hi ${firstName}! Thanks for your interest in ${communityName}! 🏡 Want to schedule a visit?`;
-  } else {
-    emailSubject = "Thanks for Reaching Out — Schell Brothers";
-    emailBody = `Hi ${firstName}!\n\nThank you for reaching out. I'd love to help with your home search.\n\nWould you like to schedule a call?`;
-    smsBody = `Hi ${firstName}! Thanks for reaching out to Schell Brothers! When's a good time to chat? 😊`;
+  function render(s: string): string {
+    return s.replace(/\{\{first_name\}\}/g, firstName)
+      .replace(/\{\{community_name\}\}/g, communityName)
+      .replace(/\{\{division_name\}\}/g, "our communities")
+      .replace(/\{\{osc_name\}\}/g, "Your Online Sales Consultant")
+      .replace(/\{\{osc_phone\}\}/g, "").replace(/\{\{osc_email\}\}/g, "")
+      .replace(/\{\{plans_from_price\}\}/g, priceFrom ? `$${(priceFrom/1000).toFixed(0)}K` : "competitive pricing")
+      .replace(/\{\{available_lots\}\}/g, "available");
   }
 
-  if (!smsBody) smsBody = `Hi ${firstName}! Thanks for reaching out to Schell Brothers!`;
+  // Priority: div+formType > generic+formType > div+default > generic+default
+  const ep = allTmpl.find(t => t.channel==="email_personal" && t.form_type_code===formType && t.division_id===divId)
+    ?? allTmpl.find(t => t.channel==="email_personal" && t.form_type_code===formType)
+    ?? allTmpl.find(t => t.channel==="email_personal" && t.form_type_code==="default");
+  const sm = allTmpl.find(t => t.channel==="sms" && t.form_type_code===formType && t.division_id===divId)
+    ?? allTmpl.find(t => t.channel==="sms" && t.form_type_code===formType)
+    ?? allTmpl.find(t => t.channel==="sms" && t.form_type_code==="default");
+
+  let emailSubject = ep ? render(ep.subject ?? "") : `Thank You — Schell Brothers`;
+  let emailBody = ep ? render(ep.body ?? "") : `Hi ${firstName}!\n\nThank you for reaching out. A member of our team will be in touch shortly.`;
+  let smsBody = sm ? render(sm.body ?? "") : `Hi ${firstName}! Thanks for reaching out to Schell Brothers!`;
   
   return { success: true, data: { email: { subject: emailSubject, body: emailBody }, sms: { body: smsBody }, form_type: formType } };
 }
