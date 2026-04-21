@@ -32,7 +32,12 @@ export const NAV_ITEMS = [
   { icon: "◷", label: "Calendar",        href: "/calendar",            group: "tools" },
   { icon: "⟳", label: "Cron",            href: "/cron",               group: "tools" },
   { icon: "◉", label: "Notifications",   href: "#",                   group: "tools" },
-  { icon: "⚙", label: "Settings",        href: "/settings",           group: "tools" },
+  { icon: "⚙", label: "Settings ▾",      href: "/settings",           group: "tools" },
+  { icon: "📧", label: "Templates",       href: "/settings/templates",  group: "tools" },
+  { icon: "👤", label: "Profile",          href: "/settings/profile",    group: "tools" },
+  { icon: "🤖", label: "AI & Automation",  href: "/settings/automation", group: "tools" },
+  { icon: "🔗", label: "Integrations",     href: "/settings/integrations", group: "tools" },
+  { icon: "👥", label: "Team",             href: "/settings/team",       group: "tools" },
   { icon: "◈", label: "Status",          href: "/status",             group: "tools" },
   { icon: "◧", label: "Docs",            href: "/docs",               group: "tools" },
   { icon: "⬡", label: "MCP Tools",       href: "/tools/mcp",          group: "tools" },
@@ -140,14 +145,14 @@ export default function Sidebar() {
                   gap: 10,
                   padding: "6px 10px",
                   borderRadius: 3,
-                  fontSize: 13,
+                  fontSize: item.href.startsWith("/settings/") ? 12 : 13,
                   textDecoration: "none",
                   transition: "background 0.1s, color 0.1s",
                   marginBottom: 1,
                   borderLeft: isActive ? "3px solid #59a6bd" : "3px solid transparent",
                   background: isActive ? "rgba(255,255,255,0.1)" : "transparent",
                   color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.6)",
-                  paddingLeft: 7, // 10px - 3px border = 7px to keep visual alignment
+                  paddingLeft: item.href.startsWith("/settings/") ? 24 : 7, // indent sub-items
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
