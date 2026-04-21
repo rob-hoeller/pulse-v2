@@ -786,16 +786,22 @@ function QueueCard({
                     )}
                   </div>
                   {emailEditing ? (
-                    <textarea
-                      value={emailBody}
-                      onChange={e => setEmailBody(e.target.value)}
-                      rows={6}
-                      style={{
-                        width: "100%", padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #3f3f46",
-                        borderRadius: 4, color: "#a1a1aa", fontSize: 12, outline: "none", resize: "vertical",
-                        lineHeight: 1.6, marginBottom: 8,
-                      }}
-                    />
+                    <div className="quill-dark" style={{ marginBottom: 8 }}>
+                      <ReactQuill
+                        theme="snow"
+                        value={emailBody}
+                        onChange={(val: string) => setEmailBody(val)}
+                        modules={{
+                          toolbar: [
+                            ["bold", "italic", "underline"],
+                            [{ list: "ordered" }, { list: "bullet" }],
+                            ["link", "image"],
+                            ["clean"],
+                          ],
+                        }}
+                        placeholder="Compose email..."
+                      />
+                    </div>
                   ) : (
                     <div style={{
                       padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #27272a",
