@@ -175,6 +175,10 @@ async function assignOpportunity(
   return { success: true, data: { from_stage: opp.crm_stage, to_stage: new_stage, transition_id: transition?.id } };
 }
 
+// TEST MODE: redirect all outbound emails to this address
+const EMAIL_TEST_MODE = true;
+const EMAIL_TEST_REDIRECT = "lance@schellbrothers.com";
+
 async function sendEmail(
   contact_id: string, opportunity_id: string | null, subject: string, body: string, ctx: ActionContext
 ) {
@@ -194,6 +198,33 @@ async function sendEmail(
     }
   }
   
+  // Send via SendGrid
+  const toEmail = EMAIL_TEST_MODE ? EMAIL_TEST_REDIRECT : (contact?.email ?? "");
+  const sgSubject = EMAIL_TEST_MODE ? `[TEST] ${subject}` : subject;
+  
+  if (toEmail) {
+    try {
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.SENDGRID_API_KEY || ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: toEmail }] }],
+          from: { email: "noreply@schellbrothers.com", name: "Schell Brothers" },
+          subject: sgSubject,
+          content: [{ type: "text/html", value: body }],
+          tracking_settings: { open_tracking: { enable: true }, click_tracking: { enable: true } },
+          categories: ["pv2_osc_response"],
+        }),
+      });
+      console.log(`[sendEmail] SendGrid: ${sgRes.status} to ${toEmail}`);
+    } catch (sgErr) {
+      console.error("[sendEmail] SendGrid error:", sgErr);
+    }
+  }
+
   const { data, error } = await supabase.from("activities").insert({
     org_id: ORG_ID, contact_id, opportunity_id,
     channel: "email", direction: "outbound", type: "email",
