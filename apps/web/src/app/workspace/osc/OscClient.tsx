@@ -1,5 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false, loading: () => <div style={{ height: 150, backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: 4 }} /> });
+import "react-quill-new/dist/quill.bubble.css";
+
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
@@ -241,6 +245,7 @@ function AssignModal({
   divisionName: string;
   recommendation: AgentRecommendation | null;
 }) {
+  const isMobile = useIsMobile();
   const defaultStage = recommendation?.stage ?? (() => {
     const src = item.opportunity_source ?? item.source;
     if (src === "subscribe_region") return "lead_div";
@@ -261,7 +266,11 @@ function AssignModal({
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", zIndex: 50, backdropFilter: "blur(2px)" }} />
       <div style={{
-        position: "fixed", inset: 0,
+        position: "fixed",
+        ...(isMobile
+          ? { inset: 0 }
+          : { top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 520, maxHeight: "80vh", borderRadius: 12, border: "1px solid #3f3f46" }
+        ),
         backgroundColor: "#18181b",
         zIndex: 51, overflow: "auto",
         display: "flex", flexDirection: "column" as const,
