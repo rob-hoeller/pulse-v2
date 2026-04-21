@@ -185,10 +185,22 @@ Pv2 is the training and validation layer for that system.
 
 ## Success Criteria
 
+Pv2 is successful if:
+- [ ] Every action can be executed by an agent without UI changes
+- [ ] Agents can run in shadow mode across all major workflows
+- [ ] Decisions are explainable and logged
+- [ ] Switching to Auto Mode requires configuration, not development
 - [ ] Every UI action calls an MCP tool (no direct DB writes from UI)
 - [ ] Every MCP tool is callable by both human UI and agent
-- [ ] Shadow agents run on all core workflows
 - [ ] Every action logs triggered_by, confidence_score, reasoning
-- [ ] System supports Manual/Assisted/Auto mode switching
-- [ ] Zero temporary/hardcoded logic that blocks Pv3
 - [ ] Agent recommendations visible on every decision point
+
+---
+
+## Final Directive
+
+**Build Pv2 as if agents are already running the system.**
+
+Humans are temporarily in the loop — not the center of the system.
+
+Proceed with all design, architecture, and implementation decisions under this framework.
