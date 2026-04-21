@@ -73,6 +73,7 @@ async function evaluateQueueItem(opportunity_id: string, ctx: ActionContext) {
   // Get lot stats for this community
   let lotsAvailable = 0, lotsSold = 0, lotsTotal = 0;
   if (opp?.community_id) {
+    // Community-level: lots for this community
     const { data: lotData } = await supabase
       .from("lots")
       .select("is_available, lot_status")
@@ -81,6 +82,24 @@ async function evaluateQueueItem(opportunity_id: string, ctx: ActionContext) {
       lotsTotal = lotData.length;
       lotsAvailable = lotData.filter((l: Record<string, unknown>) => l.is_available).length;
       lotsSold = lotData.filter((l: Record<string, unknown>) => l.lot_status === "sold").length;
+    }
+  } else if (opp?.division_id) {
+    // Division-level: aggregate lots across ALL communities in division
+    const { data: divComms } = await supabase
+      .from("communities")
+      .select("id")
+      .eq("division_id", opp.division_id);
+    if (divComms && divComms.length > 0) {
+      const commIds = divComms.map((c: Record<string, unknown>) => c.id as string);
+      const { data: lotData } = await supabase
+        .from("lots")
+        .select("is_available, lot_status")
+        .in("community_id", commIds);
+      if (lotData) {
+        lotsTotal = lotData.length;
+        lotsAvailable = lotData.filter((l: Record<string, unknown>) => l.is_available).length;
+        lotsSold = lotData.filter((l: Record<string, unknown>) => l.lot_status === "sold").length;
+      }
     }
   }
 
@@ -298,6 +317,7 @@ async function generateResponse(opportunity_id: string, ctx: ActionContext) {
   // Get lot stats for this community
   let lotsAvailable = 0, lotsSold = 0, lotsTotal = 0;
   if (opp?.community_id) {
+    // Community-level: lots for this community
     const { data: lotData } = await supabase
       .from("lots")
       .select("is_available, lot_status")
@@ -306,6 +326,24 @@ async function generateResponse(opportunity_id: string, ctx: ActionContext) {
       lotsTotal = lotData.length;
       lotsAvailable = lotData.filter((l: Record<string, unknown>) => l.is_available).length;
       lotsSold = lotData.filter((l: Record<string, unknown>) => l.lot_status === "sold").length;
+    }
+  } else if (opp?.division_id) {
+    // Division-level: aggregate lots across ALL communities in division
+    const { data: divComms } = await supabase
+      .from("communities")
+      .select("id")
+      .eq("division_id", opp.division_id);
+    if (divComms && divComms.length > 0) {
+      const commIds = divComms.map((c: Record<string, unknown>) => c.id as string);
+      const { data: lotData } = await supabase
+        .from("lots")
+        .select("is_available, lot_status")
+        .in("community_id", commIds);
+      if (lotData) {
+        lotsTotal = lotData.length;
+        lotsAvailable = lotData.filter((l: Record<string, unknown>) => l.is_available).length;
+        lotsSold = lotData.filter((l: Record<string, unknown>) => l.lot_status === "sold").length;
+      }
     }
   }
 
