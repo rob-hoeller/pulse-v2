@@ -261,6 +261,8 @@ async function generateResponse(opportunity_id: string, ctx: ActionContext) {
     smsBody = `Hi ${firstName}! Thanks for reaching out to Schell Brothers! When's a good time to chat? 😊`;
   }
 
+  if (!smsBody) smsBody = `Hi ${firstName}! Thanks for reaching out to Schell Brothers!`;
+  
   return { success: true, data: { email: { subject: emailSubject, body: emailBody }, sms: { body: smsBody }, form_type: formType } };
 }
 

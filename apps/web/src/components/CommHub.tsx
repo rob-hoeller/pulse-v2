@@ -1,5 +1,6 @@
 "use client";
 
+import { sendEmail, sendSms, markRead } from "@/lib/crm-api";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -511,10 +512,7 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
 
   // ── Actions ──
   async function handleMarkRead(activityId: string) {
-    await supabase.from("activities").update({
-      is_read: true,
-      read_at: new Date().toISOString(),
-    }).eq("id", activityId);
+    await markRead(activityId, { triggered_by: "human" });
 
     setActivities(prev =>
       prev.map(a => a.id === activityId ? { ...a, is_read: true, read_at: new Date().toISOString() } : a)
@@ -536,10 +534,11 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
     });
 
     // Mark original as responded
-    await supabase.from("activities").update({
-      responded_at: new Date().toISOString(),
-      needs_response: false,
-    }).eq("id", activity.id);
+    // Mark original as responded via direct update (response tracking)
+      await supabase.from("activities").update({
+        responded_at: new Date().toISOString(),
+        needs_response: false,
+      }).eq("id", activity.id);
 
     // Update local state
     setActivities(prev =>
