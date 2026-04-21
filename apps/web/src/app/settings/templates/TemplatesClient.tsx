@@ -590,8 +590,8 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
                   No override for this scope — showing default. Edit and save to create an override.
                 </div>
               )}
-              {/* Override active banner */}
-              {!showFallback && !!(scopes[ch.key as Channel]?.divisionId || scopes[ch.key as Channel]?.communityId) && (
+              {/* Override active banner — show when template itself has a division/community scope */}
+              {!showFallback && !!(tpl.division_id || tpl.community_id) && (
                 <div
                   style={{
                     marginBottom: 12,
@@ -606,7 +606,7 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
                     gap: 6,
                   }}
                 >
-                  🟠 Override active — edits here only apply to this {scopes[ch.key as Channel]?.communityId ? "Community" : "Division"}.
+                  🟠 Override active — edits here only apply to this {tpl.community_id ? "Community" : "Division"}.
                 </div>
               )}
 
