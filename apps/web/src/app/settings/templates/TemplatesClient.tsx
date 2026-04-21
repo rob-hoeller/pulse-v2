@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useToast } from "@/components/Toast";
 
@@ -13,12 +13,30 @@ interface Template {
   subject: string | null;
   body: string;
   is_default: boolean;
+  division_id: string | null;
+  community_id: string | null;
   created_at: string;
   updated_at: string;
   [key: string]: unknown;
 }
 
 type Channel = "email_auto" | "email_personal" | "sms";
+
+interface Division {
+  id: string;
+  name: string;
+}
+
+interface Community {
+  id: string;
+  name: string;
+  division_id: string;
+}
+
+interface ScopeState {
+  divisionId: string | null;
+  communityId: string | null;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -93,6 +111,18 @@ function renderPreview(text: string): string {
   return out;
 }
 
+const selectStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  background: "#09090b",
+  border: "1px solid #27272a",
+  borderRadius: 4,
+  color: "#fafafa",
+  fontSize: 12,
+  outline: "none",
+  cursor: "pointer",
+  minWidth: 160,
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TemplatesClient({ templates: initial }: { templates: Template[] }) {
@@ -104,17 +134,91 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [previewing, setPreviewing] = useState<Record<string, boolean>>({});
 
-  // ── Derived ──
+  // ── Scope state per channel card ──
+  const [scopes, setScopes] = useState<Record<Channel, ScopeState>>({
+    email_auto: { divisionId: null, communityId: null },
+    email_personal: { divisionId: null, communityId: null },
+    sms: { divisionId: null, communityId: null },
+  });
 
-  const byChannel = useMemo(() => {
-    const map: Partial<Record<Channel, Template>> = {};
-    for (const t of templates) {
-      if (t.form_type_code === selectedFormType) {
-        map[t.channel as Channel] = t;
+  // ── Divisions & Communities ──
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  const [communities, setCommunities] = useState<Community[]>([]);
+
+  useEffect(() => {
+    const sb = getBrowserSupabase();
+    (async () => {
+      const [divRes, comRes] = await Promise.all([
+        sb.from("divisions").select("id, name").order("name"),
+        sb.from("communities").select("id, name, division_id").order("name"),
+      ]);
+      if (divRes.data) setDivisions(divRes.data as Division[]);
+      if (comRes.data) setCommunities(comRes.data as Community[]);
+    })();
+  }, []);
+
+  // ── Resolve template for a channel given its current scope ──
+
+  const resolveTemplate = useCallback(
+    (channel: Channel): Template | undefined => {
+      const scope = scopes[channel];
+      const candidates = templates.filter(
+        (t) => t.form_type_code === selectedFormType && t.channel === channel
+      );
+
+      // Community-scoped
+      if (scope.communityId) {
+        const match = candidates.find((t) => t.community_id === scope.communityId);
+        if (match) return match;
+        // Fall through to default (show default as starting point for new community override)
       }
-    }
-    return map;
-  }, [templates, selectedFormType]);
+
+      // Division-scoped
+      if (scope.divisionId && !scope.communityId) {
+        const match = candidates.find((t) => t.division_id === scope.divisionId && !t.community_id);
+        if (match) return match;
+        // Fall through to default
+      }
+
+      // Default (system-wide)
+      return candidates.find((t) => t.is_default && !t.division_id && !t.community_id)
+        ?? candidates.find((t) => t.is_default);
+    },
+    [templates, selectedFormType, scopes]
+  );
+
+  // ── Scope handlers ──
+
+  const handleDivisionChange = useCallback(
+    (channel: Channel, divisionId: string | null) => {
+      setScopes((prev) => ({
+        ...prev,
+        [channel]: { divisionId, communityId: null },
+      }));
+      // Clear edits for the old template of this channel — user is switching scope
+    },
+    []
+  );
+
+  const handleCommunityChange = useCallback(
+    (channel: Channel, communityId: string | null) => {
+      setScopes((prev) => ({
+        ...prev,
+        [channel]: { ...prev[channel], communityId },
+      }));
+    },
+    []
+  );
+
+  // ── Derived: communities for a selected division ──
+
+  const communitiesForDivision = useCallback(
+    (divisionId: string | null): Community[] => {
+      if (!divisionId) return [];
+      return communities.filter((c) => c.division_id === divisionId);
+    },
+    [communities]
+  );
 
   // ── Handlers ──
 
@@ -144,37 +248,73 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
   );
 
   const handleSave = useCallback(
-    async (tpl: Template) => {
+    async (tpl: Template, channel: Channel) => {
       const edited = edits[tpl.id];
       if (!edited) return;
+
+      const scope = scopes[channel];
+      const isScopedSave = !!(scope.divisionId || scope.communityId);
+
+      // Determine if we're updating the existing template or upserting a scoped one
+      const isExactMatch =
+        (!scope.divisionId && !scope.communityId && tpl.is_default && !tpl.division_id && !tpl.community_id) ||
+        (scope.divisionId && !scope.communityId && tpl.division_id === scope.divisionId && !tpl.community_id) ||
+        (scope.communityId && tpl.community_id === scope.communityId);
 
       setSaving((p) => ({ ...p, [tpl.id]: true }));
       try {
         const sb = getBrowserSupabase();
-        const updatePayload: Record<string, unknown> = {
-          body: edited.body,
-          updated_at: new Date().toISOString(),
-        };
-        if (tpl.channel !== "sms") {
-          updatePayload.subject = edited.subject;
+
+        if (isExactMatch) {
+          // Update existing template in place
+          const updatePayload: Record<string, unknown> = {
+            body: edited.body,
+            updated_at: new Date().toISOString(),
+          };
+          if (tpl.channel !== "sms") {
+            updatePayload.subject = edited.subject;
+          }
+
+          const { error } = await sb
+            .from("response_templates")
+            .update(updatePayload)
+            .eq("id", tpl.id);
+
+          if (error) throw error;
+
+          setTemplates((prev) =>
+            prev.map((t) => (t.id === tpl.id ? { ...t, ...updatePayload } : t))
+          );
+        } else if (isScopedSave) {
+          // Create a new scoped template (upsert)
+          const insertPayload: Record<string, unknown> = {
+            form_type_code: tpl.form_type_code,
+            channel: tpl.channel,
+            body: edited.body,
+            is_default: false,
+            division_id: scope.communityId
+              ? (communities.find((c) => c.id === scope.communityId)?.division_id ?? scope.divisionId)
+              : scope.divisionId,
+            community_id: scope.communityId ?? null,
+          };
+          if (tpl.channel !== "sms") {
+            insertPayload.subject = edited.subject;
+          }
+
+          const { data, error } = await sb
+            .from("response_templates")
+            .insert(insertPayload)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          if (data) {
+            setTemplates((prev) => [...prev, data as Template]);
+          }
         }
 
-        const { error } = await sb
-          .from("response_templates")
-          .update(updatePayload)
-          .eq("id", tpl.id);
-
-        if (error) throw error;
-
-        // Update local state
-        setTemplates((prev) =>
-          prev.map((t) =>
-            t.id === tpl.id
-              ? { ...t, ...updatePayload }
-              : t
-          )
-        );
-        // Clear edits for this template
+        // Clear edits
         setEdits((prev) => {
           const next = { ...prev };
           delete next[tpl.id];
@@ -189,7 +329,7 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
         setSaving((p) => ({ ...p, [tpl.id]: false }));
       }
     },
-    [edits, showToast]
+    [edits, scopes, communities, showToast]
   );
 
   const handleReset = useCallback(
@@ -210,6 +350,18 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
   // ── Render ──
 
   const isDirty = (tpl: Template) => !!edits[tpl.id];
+
+  // Check if the resolved template is an exact scope match or a fallback
+  const isFallback = useCallback(
+    (tpl: Template, channel: Channel): boolean => {
+      const scope = scopes[channel];
+      if (!scope.divisionId && !scope.communityId) return false; // default scope, no fallback
+      if (scope.communityId) return tpl.community_id !== scope.communityId;
+      if (scope.divisionId) return tpl.division_id !== scope.divisionId || !!tpl.community_id;
+      return false;
+    },
+    [scopes]
+  );
 
   return (
     <div style={{ height: "100%", overflow: "auto", padding: "24px 32px" }}>
@@ -268,7 +420,10 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
         }}
       >
         {CHANNELS.map((ch) => {
-          const tpl = byChannel[ch.key];
+          const tpl = resolveTemplate(ch.key);
+          const scope = scopes[ch.key];
+          const divCommunities = communitiesForDivision(scope.divisionId);
+
           if (!tpl) {
             return (
               <div
@@ -282,6 +437,37 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
               >
                 <div style={{ fontSize: 14, fontWeight: 600, color: "#fafafa" }}>{ch.label}</div>
                 <p style={{ fontSize: 12, color: "#71717a", marginTop: 4 }}>{ch.description}</p>
+
+                {/* Scope selector even when no template */}
+                <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "#71717a" }}>Scope:</label>
+                  <select
+                    value={scope.divisionId ?? ""}
+                    onChange={(e) => handleDivisionChange(ch.key, e.target.value || null)}
+                    style={selectStyle}
+                  >
+                    <option value="">All Divisions (Default)</option>
+                    {divisions.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                  {scope.divisionId && divCommunities.length > 0 && (
+                    <>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "#71717a" }}>Community:</label>
+                      <select
+                        value={scope.communityId ?? ""}
+                        onChange={(e) => handleCommunityChange(ch.key, e.target.value || null)}
+                        style={selectStyle}
+                      >
+                        <option value="">All Communities</option>
+                        {divCommunities.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </div>
+
                 <div
                   style={{
                     marginTop: 16,
@@ -304,6 +490,7 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
           const isSaving = saving[tpl.id] ?? false;
           const isPreview = previewing[tpl.id] ?? false;
           const isSms = ch.key === "sms";
+          const showFallback = isFallback(tpl, ch.key);
 
           return (
             <div
@@ -319,7 +506,7 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
               }}
             >
               {/* Card Header */}
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#fafafa" }}>
                     {ch.label}
@@ -341,6 +528,53 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
                 </div>
                 <p style={{ fontSize: 12, color: "#71717a", marginTop: 2 }}>{ch.description}</p>
               </div>
+
+              {/* Scope Selector */}
+              <div style={{ marginBottom: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "#71717a" }}>Scope:</label>
+                <select
+                  value={scope.divisionId ?? ""}
+                  onChange={(e) => handleDivisionChange(ch.key, e.target.value || null)}
+                  style={selectStyle}
+                >
+                  <option value="">All Divisions (Default)</option>
+                  {divisions.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+                {scope.divisionId && divCommunities.length > 0 && (
+                  <>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "#71717a" }}>Community:</label>
+                    <select
+                      value={scope.communityId ?? ""}
+                      onChange={(e) => handleCommunityChange(ch.key, e.target.value || null)}
+                      style={selectStyle}
+                    >
+                      <option value="">All Communities</option>
+                      {divCommunities.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+
+              {/* Fallback notice */}
+              {showFallback && (
+                <div
+                  style={{
+                    marginBottom: 12,
+                    padding: "6px 10px",
+                    background: "rgba(89,166,189,0.08)",
+                    border: "1px solid rgba(89,166,189,0.2)",
+                    borderRadius: 4,
+                    fontSize: 11,
+                    color: "#59a6bd",
+                  }}
+                >
+                  No override for this scope — showing default. Edit and save to create an override.
+                </div>
+              )}
 
               {/* Subject (email only) */}
               {!isSms && (
@@ -462,7 +696,7 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
               {/* Actions */}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
-                  onClick={() => handleSave(tpl)}
+                  onClick={() => handleSave(tpl, ch.key)}
                   disabled={!dirty || isSaving}
                   style={{
                     padding: "6px 14px",
@@ -477,7 +711,7 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
                     opacity: isSaving ? 0.6 : 1,
                   }}
                 >
-                  {isSaving ? "Saving…" : "Save"}
+                  {isSaving ? "Saving…" : showFallback ? "Save Override" : "Save"}
                 </button>
                 <button
                   onClick={() => handleReset(tpl)}
