@@ -272,26 +272,36 @@ async function generateResponse(opportunity_id: string, ctx: ActionContext) {
   let emailBody = ep ? render(ep.body ?? "") : `Hi ${firstName}!\n\nThank you for reaching out. A member of our team will be in touch shortly.`;
   let smsBody = sm ? render(sm.body ?? "") : `Hi ${firstName}! Thanks for reaching out to Schell Brothers!`;
   
-  // Build branded HTML email (matches SendGrid auto-confirmation style)
+  // Build branded HTML email — must match email-templates.py EXACTLY
+  const bodyHtml = emailBody.replace(/\n/g, "<br>");
   const emailHtml = `
-    <div style="font-family: Georgia, serif; max-width: 640px; margin: 0 auto; background: #ffffff; border: 4px solid #C41230;">
+    <div style="font-family: 'Georgia', 'Times New Roman', serif; max-width: 640px; margin: 0 auto; background: #ffffff; border: 4px solid #C41230;">
       <div style="background: #1B2A4A; padding: 28px 32px; text-align: center;">
         <img src="https://heartbeat-page-designer-production.s3.amazonaws.com/site-8/schell-logo-color-horizontal__76b84a3c12300dd95411702f2f9e9dd6-ebf486218337267c1b432845a3df25be.png" alt="Schell Brothers" style="height: 44px; max-width: 240px;" />
       </div>
       <div style="height: 4px; background: #C41230;"></div>
       <div style="padding: 40px 32px;">
-        <h2 style="color: #1B2A4A; font-size: 26px; font-weight: 400; margin: 0 0 20px;">
+        <h2 style="color: #1B2A4A; font-family: 'Georgia', serif; font-size: 26px; font-weight: 400; margin: 0 0 20px;">
           ${emailSubject}
         </h2>
-        <div style="color: #444; font-size: 15px; line-height: 1.8; white-space: pre-wrap;">
-          ${emailBody}
+        <div style="color: #444; font-size: 15px; line-height: 1.8;">
+          ${bodyHtml}
         </div>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="https://schellbrothers.com" style="display: inline-block; background: #C41230; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 4px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px;">
+            EXPLORE SCHELL BROTHERS
+          </a>
+        </div>
+        <p style="color: #888; font-size: 13px; line-height: 1.6; margin: 0; font-style: italic;">
+          We maximize happiness rather than profit — and it shows in everything we do.
+        </p>
       </div>
       <div style="height: 4px; background: #C41230;"></div>
-      <div style="background: #1B2A4A; padding: 24px 32px; text-align: center;">
+      <div style="background: #1B2A4A; padding: 24px 32px; text-align: center; border-top: 4px solid #C41230;">
         <p style="color: #ffffff; font-size: 13px; font-weight: 600; margin: 0 0 8px;">Our Mission of Happiness</p>
-        <p style="color: rgba(255,255,255,0.6); font-size: 11px; margin: 0 0 8px;">Delaware Beaches · Richmond · Nashville · Boise</p>
+        <p style="color: rgba(255,255,255,0.6); font-size: 11px; line-height: 1.6; margin: 0 0 12px;">Delaware Beaches · Richmond · Nashville · Boise</p>
         <a href="https://schellbrothers.com" style="color: #ffffff; text-decoration: none; font-size: 12px; font-weight: 600;">schellbrothers.com</a>
+        <p style="color: rgba(255,255,255,0.4); font-size: 10px; margin: 12px 0 0;">© 2026 Schell Brothers. All rights reserved.</p>
       </div>
     </div>`;
 

@@ -454,6 +454,40 @@ function QueueCard({
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [emailHtml, setEmailHtml] = useState("");
+  // Rebuild branded HTML whenever body changes
+  function rebuildEmailHtml(body: string, subject: string): string {
+    return `
+    <div style="font-family: 'Georgia', 'Times New Roman', serif; max-width: 640px; margin: 0 auto; background: #ffffff; border: 4px solid #C41230;">
+      <div style="background: #1B2A4A; padding: 28px 32px; text-align: center;">
+        <img src="https://heartbeat-page-designer-production.s3.amazonaws.com/site-8/schell-logo-color-horizontal__76b84a3c12300dd95411702f2f9e9dd6-ebf486218337267c1b432845a3df25be.png" alt="Schell Brothers" style="height: 44px; max-width: 240px;" />
+      </div>
+      <div style="height: 4px; background: #C41230;"></div>
+      <div style="padding: 40px 32px;">
+        <h2 style="color: #1B2A4A; font-family: 'Georgia', serif; font-size: 26px; font-weight: 400; margin: 0 0 20px;">
+          ${subject}
+        </h2>
+        <div style="color: #444; font-size: 15px; line-height: 1.8;">
+          ${body}
+        </div>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="https://schellbrothers.com" style="display: inline-block; background: #C41230; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 4px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px;">
+            EXPLORE SCHELL BROTHERS
+          </a>
+        </div>
+        <p style="color: #888; font-size: 13px; line-height: 1.6; margin: 0; font-style: italic;">
+          We maximize happiness rather than profit — and it shows in everything we do.
+        </p>
+      </div>
+      <div style="height: 4px; background: #C41230;"></div>
+      <div style="background: #1B2A4A; padding: 24px 32px; text-align: center;">
+        <p style="color: #ffffff; font-size: 13px; font-weight: 600; margin: 0 0 8px;">Our Mission of Happiness</p>
+        <p style="color: rgba(255,255,255,0.6); font-size: 11px; line-height: 1.6; margin: 0 0 12px;">Delaware Beaches · Richmond · Nashville · Boise</p>
+        <a href="https://schellbrothers.com" style="color: #ffffff; text-decoration: none; font-size: 12px; font-weight: 600;">schellbrothers.com</a>
+        <p style="color: rgba(255,255,255,0.4); font-size: 10px; margin: 12px 0 0;">© 2026 Schell Brothers. All rights reserved.</p>
+      </div>
+    </div>`;
+  }
+
   const [emailEditing, setEmailEditing] = useState(false);
   const [emailAttachments, setEmailAttachments] = useState<{type: string; label: string; url: string}[]>([]);
   const [smsAttachments, setSmsAttachments] = useState<{type: string; label: string; url: string}[]>([]);
@@ -830,24 +864,8 @@ function QueueCard({
                     </div>
                   ) : (
                     <div style={{
-                        marginBottom: 8, maxHeight: 400, overflow: "auto", borderRadius: 4,
-                        border: "1px solid #27272a", background: "#fff",
-                      }} dangerouslySetInnerHTML={{ __html: `
-                        <div style="font-family: Georgia, serif; max-width: 100%;">
-                          <div style="background: #1B2A4A; padding: 20px 24px; text-align: center;">
-                            <img src="https://heartbeat-page-designer-production.s3.amazonaws.com/site-8/schell-logo-color-horizontal__76b84a3c12300dd95411702f2f9e9dd6-ebf486218337267c1b432845a3df25be.png" alt="Schell Brothers" style="height: 36px;" />
-                          </div>
-                          <div style="height: 4px; background: #C41230;"></div>
-                          <div style="padding: 24px; color: #444; font-size: 14px; line-height: 1.7;">
-                            ${(emailBody || "No email content generated").replace(/\n/g, "<br>")}
-                          </div>
-                          <div style="height: 4px; background: #C41230;"></div>
-                          <div style="background: #1B2A4A; padding: 16px 24px; text-align: center;">
-                            <div style="color: #fff; font-size: 12px; font-weight: 600;">Our Mission of Happiness</div>
-                            <div style="color: rgba(255,255,255,0.5); font-size: 10px; margin-top: 4px;">schellbrothers.com</div>
-                          </div>
-                        </div>
-                      ` }} />
+                        marginBottom: 8, overflow: "auto", borderRadius: 4,
+                      }} dangerouslySetInnerHTML={{ __html: emailHtml || `<div style="padding: 16px; color: #71717a; text-align: center;">Loading preview...</div>` }} />
                   )}
 
                   {/* File Attachments */}
@@ -897,7 +915,7 @@ function QueueCard({
                     }}>🔗 URL</button>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setEmailEditing(!emailEditing)} style={{
+                    <button onClick={() => { if (emailEditing) { setEmailHtml(rebuildEmailHtml(emailBody, emailSubject)); } setEmailEditing(!emailEditing); }} style={{
                       padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
                       backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer",
                     }}>{emailEditing ? "Done Editing" : "✏ Edit"}</button>
