@@ -16,6 +16,7 @@ export interface CommHubProps {
   communityId?: string | null;  // for CSM scope
   divisionId?: string | null;   // for OSC scope
   teamFilter?: string;          // "all" or user ID
+  excludeChannel?: string;      // filter out activities with this channel
 }
 
 interface CommActivity {
@@ -397,7 +398,7 @@ function ActivityCard({
 
 // ─── CommHub Component ────────────────────────────────────────────────────────
 
-export default function CommHub({ communityId, divisionId, teamFilter }: CommHubProps) {
+export default function CommHub({ communityId, divisionId, teamFilter, excludeChannel }: CommHubProps) {
   const isMobile = useIsMobile();
   const [activities, setActivities] = useState<CommActivity[]>([]);
   const [loading, setLoading] = useState(false);
@@ -468,18 +469,24 @@ export default function CommHub({ communityId, divisionId, teamFilter }: CommHub
   }, [scopeId, fetchActivities, communityId, divisionId]);
 
   // ── Computed ──
+  // Apply excludeChannel filter globally
+  const baseActivities = useMemo(() => {
+    if (!excludeChannel) return activities;
+    return activities.filter(a => a.channel !== excludeChannel);
+  }, [activities, excludeChannel]);
+
   const counts = useMemo(() => ({
-    urgent: activities.filter(a => a.is_urgent).length,
-    needs_response: activities.filter(a => a.needs_response && !a.responded_at).length,
-    call: activities.filter(a => a.channel === "phone" || a.channel === "call").length,
-    text: activities.filter(a => a.channel === "sms" || a.channel === "text").length,
-    email: activities.filter(a => a.channel === "email").length,
-  }), [activities]);
+    urgent: baseActivities.filter(a => a.is_urgent).length,
+    needs_response: baseActivities.filter(a => a.needs_response && !a.responded_at).length,
+    call: baseActivities.filter(a => a.channel === "phone" || a.channel === "call").length,
+    text: baseActivities.filter(a => a.channel === "sms" || a.channel === "text").length,
+    email: baseActivities.filter(a => a.channel === "email").length,
+  }), [baseActivities]);
 
   const urgentCount = counts.urgent;
 
   const filteredActivities = useMemo(() => {
-    let items = activities;
+    let items = baseActivities;
 
     // Tab filter
     if (activeTab === "urgent") items = items.filter(a => a.is_urgent);
@@ -500,7 +507,7 @@ export default function CommHub({ communityId, divisionId, teamFilter }: CommHub
     }
 
     return items;
-  }, [activities, activeTab, searchQuery]);
+  }, [baseActivities, activeTab, searchQuery]);
 
   // ── Actions ──
   async function handleMarkRead(activityId: string) {

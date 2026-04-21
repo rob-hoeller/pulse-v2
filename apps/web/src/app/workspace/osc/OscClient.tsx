@@ -7,6 +7,14 @@ import OpportunityPanel, { type OpportunityPanelData } from "@/components/Opport
 import PipelineDetailView, { type PipelineItem } from "@/components/PipelineDetailView";
 import CommHub from "@/components/CommHub";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import {
+  assignOpportunity,
+  sendEmail,
+  sendSms,
+  generateResponse,
+  evaluateQueueItem,
+  markRead,
+} from "@/lib/crm-api";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
@@ -33,7 +41,6 @@ interface QueueItem {
   created_at: string;
   contacts: { first_name: string; last_name: string; email: string | null; phone: string | null } | null;
   communities: { name: string } | null;
-  // Enriched: prior state of contact (other opportunities)
   prior_stage?: string | null;
   prior_community?: string | null;
   is_new_contact?: boolean;
@@ -106,9 +113,20 @@ interface ModelHome {
   hours: string | null;
 }
 
+interface AgentRecommendation {
+  stage: string;
+  confidence: number;
+  reasoning: string;
+  community_id?: string | null;
+  community_name?: string | null;
+}
+
+interface GeneratedResponses {
+  email?: { subject: string; body: string };
+  sms?: { body: string };
+}
+
 type QueueBucket = "new_inbound" | "re_engaged" | "ai_surfaced";
-
-
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -144,11 +162,8 @@ function sourceLabel(src: string | null): string {
 }
 
 function classifyBucket(item: QueueItem): QueueBucket {
-  // AI-surfaced
   if (item.queue_source === "ai_surfaced" || item.opportunity_source === "ai_auto_promote") return "ai_surfaced";
-  // Existing contact (has prior history in the system)
   if (item.is_new_contact === false || item.prior_stage) return "re_engaged";
-  // New contact (never seen before)
   return "new_inbound";
 }
 
@@ -165,12 +180,27 @@ function channelIcon(ch: string | null): string {
   return map[ch ?? ""] ?? "📋";
 }
 
-
-
 function priorityBadge(p: string | null): { color: string; bg: string; label: string } {
   if (p === "high") return { color: "#fca5a5", bg: "#7f1d1d", label: "🔴 High" };
   if (p === "medium") return { color: "#fbbf24", bg: "#422006", label: "🟡 Medium" };
   return { color: "#86efac", bg: "#052e16", label: "🟢 Low" };
+}
+
+function stageLabel(stage: string | null | undefined): string {
+  const map: Record<string, string> = {
+    lead_div: "Lead", lead_com: "Lead", queue: "Queue",
+    prospect_c: "Prospect C", prospect_b: "Prospect B", prospect_a: "Prospect A",
+    homeowner: "Homeowner", archived: "Archived",
+  };
+  return map[stage ?? ""] ?? stage ?? "";
+}
+
+function isWebFormSource(item: QueueItem): boolean {
+  const src = item.opportunity_source ?? item.source ?? "";
+  return [
+    "webform_interest", "subscribe_region", "subscribe_community",
+    "schedule_visit", "schedule_appt", "prelaunch_community", "rsvp",
+  ].includes(src);
 }
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
@@ -187,7 +217,7 @@ function EmptyState() {
   );
 }
 
-// ─── Assign Modal ─────────────────────────────────────────────────────────────
+// ─── Assign Lanes ─────────────────────────────────────────────────────────────
 
 const ASSIGN_LANES = [
   { value: "lead_div", label: "Lead", description: "Division-level lead interest", needsCommunity: false },
@@ -199,32 +229,19 @@ const ASSIGN_LANES = [
   { value: "deleted", label: "Delete", description: "Spam, junk, remove from system", needsCommunity: false },
 ] as const;
 
-function getAiSuggestion(item: QueueItem, communities: CommunityRef[]): string {
-  const communityName = item.communities?.name;
-  const src = item.opportunity_source ?? item.source;
-  if (item.community_id && communityName) {
-    return `Submitted form for ${communityName}. Suggest: Lead at ${communityName}`;
-  }
-  if (src === "schedule_appt" || src === "schedule_visit") {
-    return `Requested a visit. Suggest: Prospect C${communityName ? ` at ${communityName}` : ""}`;
-  }
-  if (src === "subscribe_region") {
-    return "Subscribed to division updates. Suggest: Lead";
-  }
-  return "Review form details and assign to appropriate lane";
-}
+// ─── Assign Modal (Override Flow) ─────────────────────────────────────────────
 
 function AssignModal({
-  item, communities, onClose, onExecute, divisionName,
+  item, communities, onClose, onExecute, divisionName, recommendation,
 }: {
   item: QueueItem;
   communities: CommunityRef[];
   onClose: () => void;
-  onExecute: (oppId: string, newStage: string, communityId: string | null, reason: string) => void;
+  onExecute: (oppId: string, newStage: string, communityId: string | null, reason: string, confidence: number | null) => void;
   divisionName: string;
+  recommendation: AgentRecommendation | null;
 }) {
-  // Default lane based on form type — match the AI suggestion
-  const defaultStage = (() => {
+  const defaultStage = recommendation?.stage ?? (() => {
     const src = item.opportunity_source ?? item.source;
     if (src === "subscribe_region") return "lead_div";
     if (src === "schedule_appt" || src === "schedule_visit") return "prospect_c";
@@ -232,20 +249,12 @@ function AssignModal({
     return "lead_div";
   })();
   const [targetStage, setTargetStage] = useState(defaultStage);
-  const [targetCommunity, setTargetCommunity] = useState(item.community_id ?? "");
+  const [targetCommunity, setTargetCommunity] = useState(recommendation?.community_id ?? item.community_id ?? "");
   const [reason, setReason] = useState("");
 
   const selectedLane = ASSIGN_LANES.find(l => l.value === targetStage);
   const needsCommunity = selectedLane?.needsCommunity ?? false;
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
-  const src = item.opportunity_source ?? item.source ?? "";
-  const suggestedLane = src === "subscribe_region" ? `Lead · ${divisionName}`
-    : (src === "schedule_visit" || src === "schedule_appt") ? `Prospect C${item.communities?.name ? " · " + item.communities.name : ""}`
-    : (src === "prelaunch_community" || src === "subscribe_community") ? `Lead${item.communities?.name ? " · " + item.communities.name : ""}`
-    : item.community_id ? `Lead${item.communities?.name ? " · " + item.communities.name : ""}`
-    : `Lead · ${divisionName}`;
-  const suggestion = getAiSuggestion(item, communities);
-
   const canSubmit = !needsCommunity || !!targetCommunity;
 
   return (
@@ -260,7 +269,7 @@ function AssignModal({
         {/* Header */}
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #27272a" }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: "#fafafa" }}>
-            Assign: {name}
+            Override Assignment: {name}
           </div>
           <div style={{ fontSize: 12, color: "#71717a", marginTop: 4 }}>
             Currently in Queue{item.communities?.name ? ` — ${item.communities.name}` : ""}
@@ -268,23 +277,28 @@ function AssignModal({
         </div>
 
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* AI Suggestion */}
-          <div style={{
-            padding: "10px 14px", backgroundColor: "#052e16", border: "1px solid #166534",
-            borderRadius: 6,
-          }}>
-            <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-              🤖 AI Suggestion
+          {/* Agent Recommendation (if available) */}
+          {recommendation && (
+            <div style={{
+              padding: "10px 14px", backgroundColor: "#052e16", border: "1px solid #166534",
+              borderRadius: 6,
+            }}>
+              <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+                🤖 Agent Recommended
+              </div>
+              <div style={{ fontSize: 13, color: "#86efac", fontWeight: 600 }}>
+                {stageLabel(recommendation.stage)}{recommendation.community_name ? ` · ${recommendation.community_name}` : ""} ({recommendation.confidence}%)
+              </div>
+              <div style={{ fontSize: 11, color: "#86efac", opacity: 0.8, marginTop: 2 }}>
+                {recommendation.reasoning}
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: "#86efac", lineHeight: 1.5 }}>
-              {suggestion}
-            </div>
-          </div>
+          )}
 
           {/* Target lane */}
           <div>
             <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
-              Assign to Lane
+              Override to Lane
             </label>
             <select value={targetStage} onChange={e => setTargetStage(e.target.value)} style={{
               width: "100%", padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a",
@@ -315,7 +329,7 @@ function AssignModal({
           {/* Reason */}
           <div>
             <label style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
-              Reason <span style={{ fontSize: 10, color: "#52525b" }}>(optional)</span>
+              Reason for Override <span style={{ fontSize: 10, color: "#52525b" }}>(optional)</span>
             </label>
             <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2}
               placeholder="e.g., Toured model, very interested in Hadley plan"
@@ -337,7 +351,8 @@ function AssignModal({
               item.id,
               targetStage,
               needsCommunity ? targetCommunity : (targetStage === "lead_div" ? null : item.community_id),
-              reason,
+              reason || "Human override",
+              null, // no confidence for overrides
             )}
             disabled={!canSubmit}
             style={{
@@ -346,7 +361,7 @@ function AssignModal({
               fontSize: 12, fontWeight: 600, cursor: canSubmit ? "pointer" : "default",
               opacity: canSubmit ? 1 : 0.4,
             }}>
-            → Assign
+            → Override & Assign
           </button>
         </div>
       </div>
@@ -373,7 +388,6 @@ function SnoozePicker({ onSnooze, onClose }: { onSnooze: (until: string) => void
       d.setHours(9, 0, 0, 0);
       return d.toISOString();
     }
-    // Next Monday
     const d = new Date(now);
     const dayOfWeek = d.getDay();
     const daysUntilMon = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
@@ -407,36 +421,150 @@ function SnoozePicker({ onSnooze, onClose }: { onSnooze: (until: string) => void
   );
 }
 
-// ─── Queue Card ───────────────────────────────────────────────────────────────
-
-
-function stageLabel(stage: string | null | undefined): string {
-  const map: Record<string, string> = {
-    lead_div: "LEAD", lead_com: "LEAD", queue: "QUEUE",
-    prospect_c: "PROSPECT C", prospect_b: "PROSPECT B", prospect_a: "PROSPECT A",
-    homeowner: "HOMEOWNER", archived: "ARCHIVED",
-  };
-  return map[stage ?? ""] ?? stage ?? "";
-}
+// ─── Queue Card (Agent-First) ─────────────────────────────────────────────────
 
 function QueueCard({
-  item, onAssign, onNameClick, onQuickAssign, divisionName, isMobile,
+  item, onAssign, onNameClick, onApproveAssign, divisionName, isMobile, communities,
 }: {
   item: QueueItem;
-  onAssign: () => void;
+  onAssign: (rec: AgentRecommendation | null) => void;
   onNameClick: () => void;
-  onQuickAssign: () => void;
+  onApproveAssign: (oppId: string, stage: string, communityId: string | null, reasoning: string, confidence: number) => void;
   divisionName: string;
   isMobile?: boolean;
+  communities: CommunityRef[];
 }) {
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
-  const src = item.opportunity_source ?? item.source ?? "";
-  const suggestedLane = src === "subscribe_region" ? `Lead · ${divisionName}`
-    : (src === "schedule_visit" || src === "schedule_appt") ? `Prospect C${item.communities?.name ? " · " + item.communities.name : ""}`
-    : (src === "prelaunch_community" || src === "subscribe_community") ? `Lead${item.communities?.name ? " · " + item.communities.name : ""}`
-    : item.community_id ? `Lead${item.communities?.name ? " · " + item.communities.name : ""}`
-    : `Lead · ${divisionName}`;
   const [expanded, setExpanded] = useState(false);
+  const [recommendation, setRecommendation] = useState<AgentRecommendation | null>(null);
+  const [responses, setResponses] = useState<GeneratedResponses | null>(null);
+  const [loadingRec, setLoadingRec] = useState(false);
+  const [loadingResponses, setLoadingResponses] = useState(false);
+
+  // Email state
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailEditing, setEmailEditing] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailSkipped, setEmailSkipped] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+
+  // SMS state
+  const [smsBody, setSmsBody] = useState("");
+  const [smsEditing, setSmsEditing] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
+  const [smsSkipped, setSmsSkipped] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+
+  const webForm = isWebFormSource(item);
+  const bucket = classifyBucket(item);
+
+  // When card expands, fetch agent recommendation + generated responses
+  useEffect(() => {
+    if (!expanded) return;
+
+    // Fetch recommendation
+    if (!recommendation && !loadingRec) {
+      setLoadingRec(true);
+      evaluateQueueItem(item.id, { triggered_by: "human" }).then(result => {
+        if (result.success && result.data?.recommendation) {
+          const rec = result.data.recommendation as AgentRecommendation;
+          setRecommendation(rec);
+        } else {
+          // Fallback recommendation based on form data
+          const src = item.opportunity_source ?? item.source;
+          const fallbackStage = src === "subscribe_region" ? "lead_div"
+            : (src === "schedule_appt" || src === "schedule_visit") ? "prospect_c"
+            : item.community_id ? "lead_com" : "lead_div";
+          setRecommendation({
+            stage: fallbackStage,
+            confidence: 70,
+            reasoning: `Based on form type: ${src ?? "unknown"}`,
+            community_id: item.community_id,
+            community_name: item.communities?.name ?? null,
+          });
+        }
+        setLoadingRec(false);
+      }).catch(() => setLoadingRec(false));
+    }
+
+    // Fetch generated responses for web forms
+    if (webForm && !responses && !loadingResponses) {
+      setLoadingResponses(true);
+      generateResponse(item.id, { triggered_by: "human" }).then(result => {
+        if (result.success && result.data) {
+          const gen: GeneratedResponses = {};
+          if (result.data.email) {
+            const e = result.data.email as { subject?: string; body?: string };
+            gen.email = { subject: e.subject ?? "", body: e.body ?? "" };
+          }
+          if (result.data.sms) {
+            const s = result.data.sms as { body?: string };
+            gen.sms = { body: s.body ?? "" };
+          }
+          setResponses(gen);
+          if (gen.email) {
+            setEmailSubject(gen.email.subject);
+            setEmailBody(gen.email.body);
+          }
+          if (gen.sms) {
+            setSmsBody(gen.sms.body);
+          }
+        }
+        setLoadingResponses(false);
+      }).catch(() => setLoadingResponses(false));
+    }
+  }, [expanded, item.id, recommendation, loadingRec, webForm, responses, loadingResponses, item.opportunity_source, item.source, item.community_id, item.communities?.name]);
+
+  // Send email via crm-api
+  async function handleSendEmail() {
+    if (!item.contacts?.email) return;
+    setEmailSending(true);
+    const result = await sendEmail(
+      item.contact_id,
+      item.id,
+      emailSubject,
+      emailBody,
+      {
+        triggered_by: "human",
+        confidence_score: recommendation?.confidence ? recommendation.confidence / 100 : undefined,
+        reasoning: "OSC sent email response to web form",
+      }
+    );
+    setEmailSending(false);
+    if (result.success) {
+      setEmailSent(true);
+    } else {
+      alert(`Email send failed: ${result.error ?? "Unknown error"}`);
+    }
+  }
+
+  // Send SMS via crm-api
+  async function handleSendSms() {
+    if (!item.contacts?.phone) return;
+    setSmsSending(true);
+    const result = await sendSms(
+      item.contact_id,
+      item.id,
+      smsBody,
+      {
+        triggered_by: "human",
+        confidence_score: recommendation?.confidence ? recommendation.confidence / 100 : undefined,
+        reasoning: "OSC sent SMS response to web form",
+      }
+    );
+    setSmsSending(false);
+    if (result.success) {
+      setSmsSent(true);
+    } else {
+      alert(`SMS send failed: ${result.error ?? "Unknown error"}`);
+    }
+  }
+
+  // Recommendation display label
+  const recLabel = recommendation
+    ? `${stageLabel(recommendation.stage)}${recommendation.community_name ? ` · ${recommendation.community_name}` : ""}`
+    : null;
 
   return (
     <div style={{
@@ -446,11 +574,11 @@ function QueueCard({
       onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
       onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
     >
-      {/* Main row — desktop */}
+      {/* ── Collapsed Row — Desktop ── */}
       {!isMobile && (
         <div onClick={() => setExpanded(!expanded)} style={{
           padding: "12px 16px", cursor: "pointer",
-          display: "grid", gridTemplateColumns: "1fr auto auto auto auto auto",
+          display: "grid", gridTemplateColumns: "1fr auto auto auto",
           alignItems: "center", gap: 12,
         }}>
           <div>
@@ -464,48 +592,38 @@ function QueueCard({
               {item.is_new_contact && (
                 <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#052e16", color: "#4ade80" }}>NEW</span>
               )}
+              {bucket === "ai_surfaced" && (
+                <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#422006", color: "#fbbf24" }}>🤖 AI</span>
+              )}
             </div>
             <div style={{ fontSize: 10, color: "#52525b", marginTop: 2 }}>
               {divisionName}{item.communities?.name ? ` · ${item.communities.name}` : ""} · {item.opportunity_source ?? item.source ?? "webform"}
             </div>
           </div>
-          <div style={{ fontSize: 11 }}>
-            {item.contacts?.email ? (
-              <a href={`mailto:${item.contacts.email}`} onClick={e => e.stopPropagation()} style={{ color: "#71717a", textDecoration: "none" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#a1a1aa")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#71717a")}
-              >{item.contacts.email}</a>
-            ) : <span style={{ color: "#3f3f46" }}>—</span>}
-          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {item.contacts?.phone ? (
+            {item.contacts?.phone && (
               <>
-                <span style={{ fontSize: 11, color: "#71717a" }}>{item.contacts.phone}</span>
                 <a href={`tel:${item.contacts.phone}`} onClick={e => e.stopPropagation()} title="Call" style={{ fontSize: 18, textDecoration: "none", cursor: "pointer", padding: "2px" }}>📞</a>
                 <a href={`sms:${item.contacts.phone}`} onClick={e => e.stopPropagation()} title="SMS" style={{ fontSize: 18, textDecoration: "none", cursor: "pointer", padding: "2px" }}>💬</a>
               </>
-            ) : <span style={{ color: "#3f3f46", fontSize: 11 }}>—</span>}
+            )}
+            {item.contacts?.email && (
+              <a href={`mailto:${item.contacts.email}`} onClick={e => e.stopPropagation()} title="Email" style={{ fontSize: 18, textDecoration: "none", cursor: "pointer", padding: "2px" }}>📧</a>
+            )}
           </div>
           <div style={{ fontSize: 11, color: "#52525b", textAlign: "right" }}>
             <div>{item.last_activity_at ? new Date(item.last_activity_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + new Date(item.last_activity_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "—"}</div>
             <div style={{ fontSize: 10, color: "#3f3f46" }}>{relativeTime(item.last_activity_at)}</div>
           </div>
-          <button onClick={e => { e.stopPropagation(); onQuickAssign(); }} style={{
-            padding: "4px 12px", borderRadius: 4, border: "1px solid #166534",
-            backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
-          }}>✨ Assign → {suggestedLane}</button>
-          <button onClick={e => { e.stopPropagation(); onAssign(); }} title="Change assignment" style={{
-            padding: "4px 6px", borderRadius: 4, border: "1px solid #3f3f46",
-            backgroundColor: "#18181b", color: "#71717a", fontSize: 11, cursor: "pointer",
-          }}>⋯</button>
+          <div style={{ fontSize: 11, color: "#52525b" }}>
+            {expanded ? "▲" : "▼"}
+          </div>
         </div>
       )}
 
-      {/* Main row — mobile */}
+      {/* ── Collapsed Row — Mobile ── */}
       {isMobile && (
         <div style={{ padding: "12px 14px" }}>
-          {/* Row 1: Name (left) + Action icons (right, big) */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
               <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 15, fontWeight: 600, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "3px" }}>{name}</div>
@@ -524,68 +642,318 @@ function QueueCard({
               {item.contacts?.email && <a href={`mailto:${item.contacts.email}`} onClick={e => e.stopPropagation()} style={{ fontSize: 26, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44 }}>📧</a>}
             </div>
           </div>
-          {/* Row 2: Div · Community · form type · date/time */}
           <div style={{ fontSize: 11, color: "#71717a", marginBottom: 8 }}>
-            {divisionName}{item.communities?.name ? ` · ${item.communities.name}` : ""} · {item.opportunity_source ?? item.source ?? "webform"} · {item.last_activity_at ? new Date(item.last_activity_at).toLocaleDateString("en-US", {month:"short",day:"numeric"}) + " " + new Date(item.last_activity_at).toLocaleTimeString("en-US", {hour:"numeric",minute:"2-digit"}) : ""}
+            {divisionName}{item.communities?.name ? ` · ${item.communities.name}` : ""} · {item.opportunity_source ?? item.source ?? "webform"} · {item.last_activity_at ? new Date(item.last_activity_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " " + new Date(item.last_activity_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}
           </div>
-          {/* Row 3: Single AI assign button + override */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button onClick={onQuickAssign} style={{
-              flex: 1, padding: "8px 12px", borderRadius: 6, border: "1px solid #166534",
-              backgroundColor: "#052e16", color: "#4ade80", fontSize: 12, fontWeight: 600, cursor: "pointer",
-              minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            }}>✨ Assign → {suggestedLane}</button>
-            <button onClick={onAssign} style={{
-              padding: "8px 10px", borderRadius: 6, border: "1px solid #3f3f46",
-              backgroundColor: "#18181b", color: "#71717a", fontSize: 12, cursor: "pointer",
-              minHeight: 44, flexShrink: 0,
-            }}>⋯</button>
-          </div>
+          <button onClick={() => setExpanded(!expanded)} style={{
+            width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #27272a",
+            backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 12, cursor: "pointer",
+            minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          }}>{expanded ? "▲ Collapse" : "▼ Review & Assign"}</button>
         </div>
       )}
 
-      {/* Expanded details */}
+      {/* ── Expanded: Agent-First Workflow ── */}
       {expanded && (
-        <div style={{ padding: "0 16px 12px", borderTop: "1px solid #27272a", paddingTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-            <div>
-              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Email</span>
-              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.contacts?.email ?? "—"}</div>
-            </div>
-            <div>
-              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Source</span>
-              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{sourceLabel(item.source)}</div>
-            </div>
-            <div>
-              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Created</span>
-              <div style={{ fontSize: 12, color: "#a1a1aa" }}>{new Date(item.created_at).toLocaleDateString()}</div>
-            </div>
+        <div style={{ padding: "0 16px 16px", borderTop: "1px solid #27272a", paddingTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {/* ── STEP 0: Agent Recommendation ── */}
+          <div style={{
+            padding: "12px 14px", backgroundColor: "#052e16", border: "1px solid #166534",
+            borderRadius: 8,
+          }}>
+            {loadingRec ? (
+              <div style={{ fontSize: 12, color: "#86efac" }}>🤖 Evaluating...</div>
+            ) : recommendation ? (
+              <>
+                <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  🤖 Recommended
+                </div>
+                <div style={{ fontSize: 14, color: "#fafafa", fontWeight: 600, marginBottom: 4 }}>
+                  {recLabel} ({recommendation.confidence}%)
+                </div>
+                <div style={{ fontSize: 12, color: "#86efac", lineHeight: 1.5, marginBottom: 10 }}>
+                  {recommendation.reasoning}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => onApproveAssign(
+                      item.id,
+                      recommendation.stage,
+                      recommendation.community_id ?? item.community_id,
+                      recommendation.reasoning,
+                      recommendation.confidence,
+                    )}
+                    style={{
+                      padding: "6px 16px", borderRadius: 6, border: "1px solid #166534",
+                      backgroundColor: "#14532d", color: "#4ade80", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    }}
+                  >✅ Approve</button>
+                  <button
+                    onClick={() => onAssign(recommendation)}
+                    style={{
+                      padding: "6px 16px", borderRadius: 6, border: "1px solid #3f3f46",
+                      backgroundColor: "#18181b", color: "#a1a1aa", fontSize: 12, cursor: "pointer",
+                    }}
+                  >✏ Override</button>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: "#86efac" }}>No recommendation available</div>
+            )}
           </div>
-          {item.notes && (
-            <div style={{ marginTop: 4 }}>
-              <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Notes</span>
-              <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{item.notes}</div>
+
+          {/* ── Web Form: Form Details ── */}
+          {webForm && (
+            <div style={{
+              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              borderRadius: 8,
+            }}>
+              <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                Form Details
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div>
+                  <span style={{ fontSize: 10, color: "#52525b" }}>Type</span>
+                  <div style={{ fontSize: 12, color: "#a1a1aa" }}>{sourceLabel(item.opportunity_source ?? item.source)}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: 10, color: "#52525b" }}>Community</span>
+                  <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.communities?.name ?? divisionName}</div>
+                </div>
+                {item.notes && (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <span style={{ fontSize: 10, color: "#52525b" }}>Message / Interest</span>
+                    <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{item.notes}</div>
+                  </div>
+                )}
+                <div>
+                  <span style={{ fontSize: 10, color: "#52525b" }}>Email</span>
+                  <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.contacts?.email ?? "—"}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: 10, color: "#52525b" }}>Phone</span>
+                  <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.contacts?.phone ?? "—"}</div>
+                </div>
+              </div>
             </div>
           )}
-          {/* AI Recommendation */}
-          <div style={{
-            marginTop: 8, padding: "10px 14px", backgroundColor: "#052e16", border: "1px solid #166534",
-            borderRadius: 6,
-          }}>
-            <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-              🤖 AI Recommendation
+
+          {/* ── Web Form: Email Response ── */}
+          {webForm && item.contacts?.email && (
+            <div style={{
+              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              borderRadius: 8, opacity: emailSent || emailSkipped ? 0.5 : 1,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  📧 Email Response
+                </div>
+                {emailSent && <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600 }}>✓ Sent</span>}
+                {emailSkipped && <span style={{ fontSize: 10, color: "#71717a", fontWeight: 600 }}>Skipped</span>}
+              </div>
+              {loadingResponses ? (
+                <div style={{ fontSize: 12, color: "#52525b" }}>Generating email...</div>
+              ) : emailSent || emailSkipped ? null : (
+                <>
+                  <div style={{ marginBottom: 6 }}>
+                    <span style={{ fontSize: 10, color: "#52525b" }}>To: {item.contacts.email}</span>
+                  </div>
+                  <div style={{ marginBottom: 6 }}>
+                    <span style={{ fontSize: 10, color: "#52525b" }}>Subject:</span>
+                    {emailEditing ? (
+                      <input
+                        value={emailSubject}
+                        onChange={e => setEmailSubject(e.target.value)}
+                        style={{
+                          width: "100%", padding: "6px 10px", backgroundColor: "#09090b", border: "1px solid #3f3f46",
+                          borderRadius: 4, color: "#fafafa", fontSize: 12, outline: "none", marginTop: 2,
+                        }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: 12, color: "#a1a1aa", marginTop: 2 }}>{emailSubject || "—"}</div>
+                    )}
+                  </div>
+                  {emailEditing ? (
+                    <textarea
+                      value={emailBody}
+                      onChange={e => setEmailBody(e.target.value)}
+                      rows={6}
+                      style={{
+                        width: "100%", padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #3f3f46",
+                        borderRadius: 4, color: "#a1a1aa", fontSize: 12, outline: "none", resize: "vertical",
+                        lineHeight: 1.6, marginBottom: 8,
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #27272a",
+                      borderRadius: 4, fontSize: 12, color: "#a1a1aa", lineHeight: 1.6,
+                      whiteSpace: "pre-wrap", marginBottom: 8, maxHeight: 200, overflow: "auto",
+                    }}>
+                      {emailBody || "No email content generated"}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setEmailEditing(!emailEditing)} style={{
+                      padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
+                      backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer",
+                    }}>{emailEditing ? "Done Editing" : "✏ Edit"}</button>
+                    <button onClick={handleSendEmail} disabled={emailSending || !emailBody} style={{
+                      padding: "6px 12px", borderRadius: 4, border: "1px solid #166534",
+                      backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      opacity: emailSending || !emailBody ? 0.5 : 1,
+                    }}>{emailSending ? "Sending..." : "📧 Send Email"}</button>
+                    <button onClick={() => setEmailSkipped(true)} style={{
+                      padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
+                      backgroundColor: "#09090b", color: "#71717a", fontSize: 11, cursor: "pointer",
+                    }}>Skip</button>
+                  </div>
+                </>
+              )}
             </div>
-            <div style={{ fontSize: 12, color: "#86efac", lineHeight: 1.5 }}>
-              {item.opportunity_source === "webform_interest"
-                ? `Responded via web form. Suggest calling within 5 minutes — speed-to-lead is critical. Reference their community interest in ${item.communities?.name ?? "the community"}.`
-                : item.opportunity_source === "called_osc"
-                ? "Inbound caller — high intent. Schedule a model home visit within the next 48 hours."
-                : item.opportunity_source === "texted_osc"
-                ? "Texted the sales line. Reply within 2 minutes with a warm greeting and availability for a call."
-                : `Review this contact's activity and engagement. ${item.budget_min ? `Budget range ${formatBudget(item.budget_min, item.budget_max)} fits available inventory.` : "Budget not yet captured — ask during first contact."}`
-              }
+          )}
+
+          {/* ── Web Form: SMS Response ── */}
+          {webForm && item.contacts?.phone && (
+            <div style={{
+              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              borderRadius: 8, opacity: smsSent || smsSkipped ? 0.5 : 1,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  💬 SMS Response
+                </div>
+                {smsSent && <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600 }}>✓ Sent</span>}
+                {smsSkipped && <span style={{ fontSize: 10, color: "#71717a", fontWeight: 600 }}>Skipped</span>}
+              </div>
+              {loadingResponses ? (
+                <div style={{ fontSize: 12, color: "#52525b" }}>Generating SMS...</div>
+              ) : smsSent || smsSkipped ? null : (
+                <>
+                  <div style={{ marginBottom: 6 }}>
+                    <span style={{ fontSize: 10, color: "#52525b" }}>To: {item.contacts.phone}</span>
+                  </div>
+                  {smsEditing ? (
+                    <textarea
+                      value={smsBody}
+                      onChange={e => setSmsBody(e.target.value)}
+                      rows={3}
+                      style={{
+                        width: "100%", padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #3f3f46",
+                        borderRadius: 4, color: "#a1a1aa", fontSize: 12, outline: "none", resize: "vertical",
+                        lineHeight: 1.6, marginBottom: 8,
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #27272a",
+                      borderRadius: 4, fontSize: 12, color: "#a1a1aa", lineHeight: 1.6,
+                      whiteSpace: "pre-wrap", marginBottom: 8,
+                    }}>
+                      {smsBody || "No SMS content generated"}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setSmsEditing(!smsEditing)} style={{
+                      padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
+                      backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer",
+                    }}>{smsEditing ? "Done Editing" : "✏ Edit"}</button>
+                    <button onClick={handleSendSms} disabled={smsSending || !smsBody} style={{
+                      padding: "6px 12px", borderRadius: 4, border: "1px solid #166534",
+                      backgroundColor: "#052e16", color: "#4ade80", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      opacity: smsSending || !smsBody ? 0.5 : 1,
+                    }}>{smsSending ? "Sending..." : "💬 Send SMS"}</button>
+                    <button onClick={() => setSmsSkipped(true)} style={{
+                      padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
+                      backgroundColor: "#09090b", color: "#71717a", fontSize: 11, cursor: "pointer",
+                    }}>Skip</button>
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* ── Promoted/Demoted: Context ── */}
+          {bucket === "re_engaged" && !webForm && (
+            <div style={{
+              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              borderRadius: 8,
+            }}>
+              <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                Context
+              </div>
+              <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
+                {item.prior_stage && (
+                  <div>Previous: <strong style={{ color: "#fafafa" }}>{stageLabel(item.prior_stage)}</strong> at {item.prior_community ?? divisionName}</div>
+                )}
+                {item.notes && <div style={{ marginTop: 4 }}>Notes: {item.notes}</div>}
+                {item.engagement_score != null && (
+                  <div style={{ marginTop: 4 }}>Engagement Score: <strong style={{ color: "#fbbf24" }}>{item.engagement_score}</strong></div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── AI Surfaced: Signals ── */}
+          {bucket === "ai_surfaced" && (
+            <div style={{
+              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              borderRadius: 8,
+            }}>
+              <div style={{ fontSize: 10, color: "#fbbf24", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                🤖 AI Surfaced — Signals
+              </div>
+              <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
+                {item.engagement_score != null && (
+                  <div>Score: <strong style={{ color: "#fbbf24" }}>{item.engagement_score}</strong></div>
+                )}
+                {item.notes && <div style={{ marginTop: 4 }}>{item.notes}</div>}
+                {item.budget_min != null && (
+                  <div style={{ marginTop: 4 }}>Budget: {formatBudget(item.budget_min, item.budget_max)}</div>
+                )}
+              </div>
+              {/* Contact actions */}
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                {item.contacts?.phone && (
+                  <a href={`tel:${item.contacts.phone}`} style={{
+                    padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
+                    backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer", textDecoration: "none",
+                  }}>📞 Call</a>
+                )}
+                {item.contacts?.email && (
+                  <a href={`mailto:${item.contacts.email}`} style={{
+                    padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
+                    backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer", textDecoration: "none",
+                  }}>📧 Email</a>
+                )}
+                {item.contacts?.phone && (
+                  <a href={`sms:${item.contacts.phone}`} style={{
+                    padding: "6px 12px", borderRadius: 4, border: "1px solid #27272a",
+                    backgroundColor: "#09090b", color: "#a1a1aa", fontSize: 11, cursor: "pointer", textDecoration: "none",
+                  }}>💬 Text</a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Basic Details (all card types) ── */}
+          {!webForm && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div>
+                <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Email</span>
+                <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.contacts?.email ?? "—"}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Source</span>
+                <div style={{ fontSize: 12, color: "#a1a1aa" }}>{sourceLabel(item.source)}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Created</span>
+                <div style={{ fontSize: 12, color: "#a1a1aa" }}>{new Date(item.created_at).toLocaleDateString()}</div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -615,7 +983,6 @@ function TaskCard({
       onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
       onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
     >
-      {/* Header: title + priority */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", flex: 1 }}>
           {channelIcon(task.channel)} {task.title}
@@ -626,14 +993,12 @@ function TaskCard({
         }}>{pb.label}</span>
       </div>
 
-      {/* Contact + due */}
       {contactName && (
         <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 4 }}>
           {contactName}
         </div>
       )}
 
-      {/* AI suggestion */}
       {task.ai_suggestion && (
         <div style={{
           fontSize: 11, color: "#86efac", backgroundColor: "#052e16", border: "1px solid #166534",
@@ -649,7 +1014,6 @@ function TaskCard({
         </div>
       )}
 
-      {/* Actions */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", position: "relative" }}>
         {task.channel === "call" || task.channel === "phone" ? (
           <ActionBtn label="📞 Call" />
@@ -738,7 +1102,6 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
     return () => { cancelled = true; };
   }, [selectedCommunityId]);
 
-  // Reset selection when division changes
   useEffect(() => {
     setSelectedCommunityId("");
   }, [divisionId]);
@@ -747,7 +1110,6 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
 
   return (
     <div style={{ borderTop: "1px solid #27272a", marginTop: 20 }}>
-      {/* Toggle bar */}
       <button
         onClick={() => setExpanded(!expanded)}
         style={{
@@ -763,7 +1125,6 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
 
       {expanded && (
         <div style={{ paddingBottom: 16 }}>
-          {/* Community selector */}
           <div style={{ marginBottom: 16 }}>
             <select
               value={selectedCommunityId}
@@ -784,7 +1145,6 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
 
           {!refLoading && detail && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Row 1 — Key Facts */}
               <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "14px 16px" }}>
                 <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 600 }}>Key Facts</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
@@ -799,7 +1159,6 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
                 </div>
               </div>
 
-              {/* Row 2 — Floor Plans */}
               <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "14px 16px" }}>
                 <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 600 }}>
                   Floor Plans {plans.length > 0 && <span style={{ color: "#52525b" }}>({plans.length})</span>}
@@ -830,7 +1189,6 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
                 )}
               </div>
 
-              {/* Row 3 — Available Lots */}
               <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "14px 16px" }}>
                 <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 600 }}>
                   Available Lots {lots.length > 0 && <span style={{ color: "#52525b" }}>({lots.length})</span>}
@@ -860,11 +1218,9 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
                 )}
               </div>
 
-              {/* Row 4 — Quick Reference */}
               <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "14px 16px" }}>
                 <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 600 }}>Quick Reference</div>
 
-                {/* Amenities */}
                 {detail.amenities && detail.amenities.length > 0 && (
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Amenities</div>
@@ -879,7 +1235,6 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
                   </div>
                 )}
 
-                {/* Model Home */}
                 {modelHome && (
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Model Home</div>
@@ -891,7 +1246,6 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
                   </div>
                 )}
 
-                {/* Links */}
                 <div>
                   <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Links</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -946,6 +1300,7 @@ export default function OscClient() {
   const [communities, setCommunities] = useState<CommunityRef[]>([]);
   const [loading, setLoading] = useState(false);
   const [assignItem, setAssignItem] = useState<QueueItem | null>(null);
+  const [assignRec, setAssignRec] = useState<AgentRecommendation | null>(null);
   const [panelItem, setPanelItem] = useState<QueueItem | null>(null);
   const [activeBucket, setActiveBucket] = useState<QueueBucket>("new_inbound");
   const [teamFilter, setTeamFilter] = useState<string>("all");
@@ -953,17 +1308,15 @@ export default function OscClient() {
   const [drillBucket, setDrillBucket] = useState<QueueBucket | null>(null);
   const [mobileTab, setMobileTab] = useState<"queue" | "comm">("queue");
 
-  // ── Fetch queue + tasks ──
+  // ── Fetch queue + tasks (READ only — Supabase reads are fine) ──
   const fetchData = useCallback(async () => {
     if (!filter.divisionId) return;
     setLoading(true);
 
-    // Communities for this division
     const { data: comms } = await supabase
       .from("communities").select("id, name").eq("division_id", filter.divisionId).order("name");
     setCommunities(comms ?? []);
 
-    // OSC team members
     const { data: users } = await supabase
       .from("users")
       .select("id, full_name")
@@ -971,7 +1324,6 @@ export default function OscClient() {
       .eq("is_active", true);
     setOscUsers((users as TeamUser[]) ?? []);
 
-    // Queue items
     const { data: items } = await supabase
       .from("opportunities")
       .select("id, contact_id, crm_stage, community_id, division_id, osc_id, source, opportunity_source, queue_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
@@ -985,7 +1337,7 @@ export default function OscClient() {
       communities: Array.isArray(item.communities) ? (item.communities as Record<string, unknown>[])[0] ?? null : item.communities,
     })) as QueueItem[];
 
-    // Enrich with prior state — check if contact has other (non-queue) opportunities
+    // Enrich with prior state
     const contactIds = [...new Set(flat.map(q => q.contact_id).filter(Boolean))];
     if (contactIds.length > 0) {
       const { data: allOpps } = await supabase
@@ -1022,7 +1374,7 @@ export default function OscClient() {
 
     setQueueItems(flat);
 
-    // Tasks
+    // Tasks (READ)
     const now = new Date().toISOString();
     const { data: taskData } = await supabase
       .from("tasks")
@@ -1051,7 +1403,6 @@ export default function OscClient() {
     }
     fetchData();
 
-    // Supabase Realtime — live updates
     const channel = supabase
       .channel("osc-queue-realtime")
       .on("postgres_changes", {
@@ -1095,7 +1446,7 @@ export default function OscClient() {
   }
   const currentBucketItems = bucketedItems[activeBucket];
 
-  // Drill-down items for PipelineDetailView
+  // Drill-down items
   const drillBucketMeta = drillBucket ? BUCKET_META.find(b => b.id === drillBucket) : null;
   const drillItems: PipelineItem[] = drillBucket
     ? (bucketedItems[drillBucket] ?? []).map(q => ({
@@ -1116,63 +1467,63 @@ export default function OscClient() {
       }))
     : [];
 
-  // ── Execute promotion/demotion ──
-  async function handleAction(oppId: string, newStage: string, communityId: string | null, reason: string) {
-    const update: Record<string, unknown> = { crm_stage: newStage };
-    if (communityId) update.community_id = communityId;
-    if (newStage === "lead_div") update.community_id = null;
-
-    const { error } = await supabase
-      .from("opportunities")
-      .update(update)
-      .eq("id", oppId);
-
-    if (error) {
-      console.error("Stage transition failed:", error);
-      alert(`Error: ${error.message}`);
-    } else {
-      const item = queueItems.find(q => q.id === oppId);
-      if (item) {
-        await supabase.from("stage_transitions").insert({
-          org_id: "00000000-0000-0000-0000-000000000001",
-          opportunity_id: oppId,
-          contact_id: item.contact_id,
-          from_stage: "queue",
-          to_stage: newStage,
-          triggered_by: "manual",
-          reason: reason || null,
-        });
+  // ── AGENT-FIRST: Assign via crm-api ──
+  async function handleAssign(
+    oppId: string,
+    newStage: string,
+    communityId: string | null,
+    reason: string,
+    confidence: number | null,
+  ) {
+    const result = await assignOpportunity(
+      oppId,
+      newStage,
+      communityId,
+      reason,
+      {
+        triggered_by: "human",
+        confidence_score: confidence != null ? confidence / 100 : undefined,
+        reasoning: reason,
       }
+    );
+
+    if (!result.success) {
+      console.error("Assignment failed:", result.error);
+      alert(`Error: ${result.error ?? "Assignment failed"}`);
     }
 
     setAssignItem(null);
+    setAssignRec(null);
     fetchData();
   }
 
-  // ── Complete task ──
+  // ── Complete task via crm-api (markRead as proxy) ──
   async function handleCompleteTask(taskId: string) {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ status: "completed", completed_at: new Date().toISOString() })
-      .eq("id", taskId);
+    const result = await markRead(taskId, {
+      triggered_by: "human",
+      reasoning: "Task completed by OSC",
+    });
 
-    if (error) {
-      console.error("Task completion failed:", error);
-      alert(`Error: ${error.message}`);
+    if (!result.success) {
+      console.error("Task completion failed:", result.error);
+      alert(`Error: ${result.error ?? "Task completion failed"}`);
     }
     fetchData();
   }
 
-  // ── Snooze task ──
+  // ── Snooze task via crm-api (markRead with snooze context) ──
   async function handleSnoozeTask(taskId: string, until: string) {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ snoozed_until: until })
-      .eq("id", taskId);
+    // Note: snooze is a task-specific mutation. Using markRead as the closest
+    // available crm-api function. When a dedicated snoozeTask() is added to
+    // crm-api, swap this call.
+    const result = await markRead(taskId, {
+      triggered_by: "human",
+      reasoning: `Snoozed until ${until}`,
+    });
 
-    if (error) {
-      console.error("Task snooze failed:", error);
-      alert(`Error: ${error.message}`);
+    if (!result.success) {
+      console.error("Task snooze failed:", result.error);
+      alert(`Error: ${result.error ?? "Task snooze failed"}`);
     }
     fetchData();
   }
@@ -1291,8 +1642,7 @@ export default function OscClient() {
                 <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600, backgroundColor: filteredQueueItems.length > 0 ? "#7f1d1d" : "#052e16", color: filteredQueueItems.length > 0 ? "#fca5a5" : "#4ade80" }}>{filteredQueueItems.length}</span>
               </div>}
 
-              {true ? (
-              drillBucket ? (
+              {drillBucket ? (
                 <PipelineDetailView
                   items={drillItems}
                   divisionId={filter.divisionId}
@@ -1302,7 +1652,7 @@ export default function OscClient() {
               ) : (
               <>
               {/* Bucket tabs */}
-              <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12, overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch" as any }}>
+              <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12, overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"] }}>
                 {BUCKET_META.map(b => {
                   const isActive = activeBucket === b.id;
                   const count = bucketCounts[b.id];
@@ -1348,33 +1698,26 @@ export default function OscClient() {
                       item={item}
                       divisionName={labels.division ?? ""}
                       isMobile={isMobile}
-                      onAssign={() => { setAssignItem(item); }}
+                      communities={communities}
+                      onAssign={(rec) => {
+                        setAssignItem(item);
+                        setAssignRec(rec);
+                      }}
                       onNameClick={() => { setPanelItem(item); }}
-                      onQuickAssign={() => {
-                        // Quick assign with AI suggestion — determine default lane
-                        const src = item.opportunity_source ?? item.source;
-                        const defaultStage = src === "subscribe_region" ? "lead_div"
-                          : (src === "schedule_appt" || src === "schedule_visit") ? "prospect_c"
-                          : item.community_id ? "lead_com" : "lead_div";
-                        handleAction(item.id, defaultStage,
-                          defaultStage === "lead_div" ? null : item.community_id,
-                          "AI-suggested quick assign");
+                      onApproveAssign={(oppId, stage, communityId, reasoning, confidence) => {
+                        handleAssign(oppId, stage, communityId, reasoning, confidence);
                       }}
                     />
                   ))}
                 </div>
               )}
               </>
-              )
-            ) : (
-              /* Comm Hub */
-              <CommHub divisionId={filter.divisionId} teamFilter={teamFilter} />
-            )}
+              )}
             </div>
 
-            {/* ── RIGHT: Comm Hub (50%) ── */}
+            {/* ── RIGHT: Comm Hub (50%) — filters out webforms ── */}
             <div style={isMobile ? { display: mobileTab === "comm" ? "block" : "none", width: "100%" } : { flex: "0 0 48%", minWidth: 0 }}>
-              <CommHub divisionId={filter.divisionId} teamFilter={teamFilter} />
+              <CommHub divisionId={filter.divisionId} teamFilter={teamFilter} excludeChannel="webform" />
             </div>
           </div>
           </>)
@@ -1386,8 +1729,7 @@ export default function OscClient() {
         )}
       </div>
 
-      {/* ── Assign Modal ── */}
-      {/* Opportunity Detail Panel */}
+      {/* ── Opportunity Detail Panel ── */}
       {panelItem && (
         <OpportunityPanel
           open={!!panelItem}
@@ -1413,13 +1755,15 @@ export default function OscClient() {
         />
       )}
 
+      {/* ── Override Assign Modal ── */}
       {assignItem && (
         <AssignModal
           item={assignItem}
           communities={communities}
           divisionName={labels.division ?? ""}
-          onClose={() => { setAssignItem(null); }}
-          onExecute={handleAction}
+          recommendation={assignRec}
+          onClose={() => { setAssignItem(null); setAssignRec(null); }}
+          onExecute={handleAssign}
         />
       )}
     </div>
