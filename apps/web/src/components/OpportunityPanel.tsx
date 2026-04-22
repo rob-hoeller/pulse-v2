@@ -187,6 +187,18 @@ function formatDateTime(iso: string): string {
     " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+function formatDatePv1(iso: string): string {
+  const d = new Date(iso);
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  const minutes = d.getMinutes().toString().padStart(2, "0");
+  return `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+}
+
 function formatNoteTimestamp(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
@@ -845,16 +857,20 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
 
             {/* ── Activity Tab ─────────────────────────────────────────── */}
             {activeTab === "activity" && (
-              <div>
+              <div style={{ margin: "0 -20px" }}>
                 {activityLoading ? (
-                  <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Loading…</p>
+                  <p style={{ fontSize: 12, color: "#888", margin: 0, padding: "0 20px" }}>Loading…</p>
                 ) : activities.length === 0 ? (
-                  <p style={{ fontSize: 12, color: "#888", margin: 0 }}>No activities recorded</p>
+                  <p style={{ fontSize: 12, color: "#888", margin: 0, padding: "0 20px" }}>No activities recorded</p>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                     {activities.map(a => {
                       const channelKey = a.channel ?? "";
                       const isPhone = channelKey === "phone" || channelKey === "call";
+                      const isEmail = channelKey === "email";
+                      const isWebForm = channelKey === "webform" || channelKey === "web_form";
+                      const isSms = channelKey === "sms" || channelKey === "text";
+                      const isMeeting = channelKey === "meeting";
                       const isExpanded = expandedActivityId === a.id;
                       const transcript = transcriptCache[a.id];
                       const isLoadingTranscript = transcriptLoading === a.id;
@@ -871,20 +887,20 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                       let description: string;
                       if (isPhone) {
                         const parts: string[] = [];
-                        if (phoneParties?.externalParty) parts.push(phoneParties.externalParty);
-                        else if (phoneParties?.employee) parts.push(phoneParties.employee);
+                        if (phoneParties?.employee) parts.push(phoneParties.employee);
                         if (durationStr) parts.push(durationStr);
-                        description = parts.length > 0 ? parts.join(" — ") : "Unknown";
-                      } else if (channelKey === "email") {
+                        description = parts.length > 0 ? parts.join(" — ") : "A Zoom Phone call";
+                      } else if (isEmail) {
                         description = a.subject || a.body?.slice(0, 80) || "(no subject)";
-                      } else if (channelKey === "sms" || channelKey === "text") {
+                      } else if (isSms) {
                         description = a.body?.slice(0, 80) || "(no message)";
-                      } else if (channelKey === "webform" || channelKey === "web_form") {
+                      } else if (isWebForm) {
                         const formType = a.subject || "form";
                         const preview = a.body?.slice(0, 60) || "";
                         description = preview ? `${formType} — ${preview}` : formType;
-                      } else if (channelKey === "meeting") {
-                        description = a.subject || a.body?.slice(0, 80) || "Meeting";
+                      } else if (isMeeting) {
+                        const meetDur = phoneDuration ? ` — ${durationStr}` : "";
+                        description = (a.subject || "Meeting") + meetDur;
                       } else {
                         description = a.subject || a.body?.slice(0, 80) || "Activity";
                       }
@@ -892,150 +908,252 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                       // Recording URL
                       const recordingUrl = a.recording_url || transcript?.recording_url || null;
 
+                      // Duration formatted for drawer header
+                      const drawerDuration = phoneDuration
+                        ? `${Math.floor(phoneDuration / 60)} MIN(S) ${phoneDuration % 60} SEC(S)`
+                        : null;
+
                       return (
                         <div key={a.id}>
+                          {/* ── Collapsed Row ── */}
                           <div
-                            style={{
-                              borderLeft: `4px solid ${style.borderColor}`,
-                              backgroundColor: style.bgColor,
-                              padding: "8px 12px",
-                              borderRadius: "4px",
-                              cursor: isPhone ? "pointer" : "default",
-                            }}
                             onClick={() => {
-                              if (isPhone) {
-                                const newId = isExpanded ? null : a.id;
-                                setExpandedActivityId(newId);
-                                if (newId && a.transcript_id && !transcriptCache[a.id]) {
-                                  fetchTranscript(a.transcript_id, a.id);
-                                }
+                              const newId = isExpanded ? null : a.id;
+                              setExpandedActivityId(newId);
+                              if (newId && isPhone && a.transcript_id && !transcriptCache[a.id]) {
+                                fetchTranscript(a.transcript_id, a.id);
                               }
                             }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              padding: "8px 12px",
+                              borderLeft: `4px solid ${style.borderColor}`,
+                              backgroundColor: style.bgColor,
+                              cursor: "pointer",
+                              borderBottom: "1px solid #1a1a1a",
+                            }}
                           >
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                              {style.icon.startsWith("/") ? (
-                                <img src={style.icon} alt="" width={14} height={14} />
-                              ) : (
-                                <span style={{ fontSize: 14, lineHeight: "18px" }}>{style.icon}</span>
-                              )}
-                              <span style={{ fontSize: 12, fontWeight: 600, color: "#ededed" }}>{style.label}:</span>
-                              <span style={{ fontSize: 12, color: "#d4d4d8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
-                                {description}
-                              </span>
-                              {isPhone && a.transcript_id && (
-                                <span style={{ fontSize: 9, color: "#34d399", fontWeight: 500, flexShrink: 0 }}>Note</span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 3 }}>
-                              {formatDateTime(a.occurred_at)}
-                              {a.sentiment && <span> · {a.sentiment}</span>}
-                            </div>
-                            {/* Action buttons for phone activities */}
-                            {isPhone && (
-                              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                                {recordingUrl && (
-                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", display: "inline-block" }} />
-                                )}
-                                {a.transcript_id && (
-                                  <button
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      const newId = isExpanded ? null : a.id;
-                                      setExpandedActivityId(newId);
-                                      if (newId && a.transcript_id && !transcriptCache[a.id]) {
-                                        fetchTranscript(a.transcript_id, a.id);
-                                      }
-                                    }}
-                                    style={{
-                                      padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
-                                      cursor: "pointer", border: "1px solid #27272a", background: "#18181b", color: "#a1a1aa",
-                                    }}
-                                  >
-                                    Transcript
-                                  </button>
-                                )}
-                                {transcript?.raw_text && (
-                                  <button
-                                    onClick={e => { e.stopPropagation(); copyTranscript(a.id); }}
-                                    style={{
-                                      padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
-                                      cursor: "pointer", border: "1px solid #27272a", background: "#18181b",
-                                      color: copiedId === a.id ? "#4ade80" : "#a1a1aa",
-                                    }}
-                                  >
-                                    {copiedId === a.id ? "✓ Copied!" : "Copy"}
-                                  </button>
-                                )}
-                              </div>
+                            {style.icon.startsWith("/") ? (
+                              <img src={style.icon} alt="" width={14} height={14} style={{ marginRight: 8, flexShrink: 0 }} />
+                            ) : style.icon ? (
+                              <span style={{ fontSize: 14, lineHeight: "14px", marginRight: 8, flexShrink: 0 }}>{style.icon}</span>
+                            ) : null}
+                            <span style={{ fontSize: 12, color: "#fafafa", fontWeight: 500, marginRight: 4, flexShrink: 0 }}>
+                              {style.label}:
+                            </span>
+                            <span style={{
+                              fontSize: 12, color: "#a1a1aa", flex: 1, overflow: "hidden",
+                              textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+                            }}>
+                              {description}
+                            </span>
+                            {isPhone && recordingUrl && (
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", display: "inline-block", marginLeft: 6, flexShrink: 0 }} />
                             )}
+                            <span style={{ fontSize: 11, color: "#71717a", marginLeft: 8, flexShrink: 0, whiteSpace: "nowrap" }}>
+                              {formatDatePv1(a.occurred_at)}
+                            </span>
                           </div>
 
-                          {/* Expanded transcript section */}
-                          {isPhone && isExpanded && (
-                            <div style={{ padding: "0 0 8px 32px" }}>
-                              {/* Embedded audio player */}
-                              {recordingUrl && (
-                                <div style={{ padding: "8px 0" }}>
-                                  <audio
-                                    controls
-                                    preload="none"
-                                    style={{
-                                      width: "100%", height: 36, borderRadius: 6,
-                                      filter: "invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9)",
-                                    }}
-                                    src={recordingUrl}
-                                  />
-                                </div>
-                              )}
-                              {isLoadingTranscript && (
-                                <div style={{ fontSize: 11, color: "#888", padding: "8px 0" }}>Loading transcript…</div>
-                              )}
-                              {transcript && (
-                                <div style={{ borderRadius: 6, overflow: "hidden" }}>
-                                  {/* AI Summary */}
-                                  {transcript.ai_summary && (
-                                    <div style={{
-                                      padding: "10px 12px", backgroundColor: "#172554", fontSize: 12,
-                                      color: "#93c5fd", lineHeight: 1.6, borderBottom: "1px solid #1e3a5f",
-                                    }}>
-                                      <div style={{ fontSize: 10, fontWeight: 600, color: "#60a5fa", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>AI Summary</div>
-                                      {transcript.ai_summary}
+                          {/* ── Expanded Drawer ── */}
+                          {isExpanded && (
+                            <div style={{
+                              padding: "12px 16px",
+                              backgroundColor: "#0a0a0a",
+                              borderLeft: `4px solid ${style.borderColor}`,
+                              borderBottom: "1px solid #1a1a1a",
+                            }}>
+                              {/* ── Phone Drawer ── */}
+                              {isPhone && (
+                                <>
+                                  {phoneParties?.employee && (
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 6 }}>
+                                      <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>SENT BY: </span>
+                                      {phoneParties.employee}
                                     </div>
                                   )}
-                                  {/* Full transcript — speaker-formatted */}
-                                  <div style={{
-                                    padding: "10px 12px", backgroundColor: "#09090b",
-                                    fontSize: 12, color: "#d4d4d8", lineHeight: 1.7,
-                                    maxHeight: 400, overflowY: "auto",
-                                  }}>
-                                    {transcript.speaker_segments && Array.isArray(transcript.speaker_segments) && transcript.speaker_segments.length > 0 ? (
-                                      (transcript.speaker_segments as Array<{speaker?: string; text?: string}>).map((seg, i) => {
-                                        const speaker = (seg.speaker ?? "Speaker").toLowerCase();
-                                        // Employee/system = dimmer, Prospect/buyer = blue (stands out)
-                                        const isEmployee = speaker.includes("grace") || speaker.includes("brooke") || speaker.includes("tess") || speaker.includes("melissa") || speaker.includes("tarah") || speaker.includes("lisa") || speaker.includes("system");
-                                        const speakerColor = isEmployee ? "#a1a1aa" : "#60a5fa";
-                                        const textColor = isEmployee ? "#a1a1aa" : "#e0edff";
-                                        return (
-                                          <div key={i} style={{ marginBottom: 8, paddingLeft: isEmployee ? 0 : 12, borderLeft: isEmployee ? "none" : "2px solid #60a5fa" }}>
-                                            <span style={{ color: speakerColor, fontWeight: 600, fontSize: 11, textTransform: "uppercase" }}>
-                                              {seg.speaker ?? "Speaker"}:
-                                            </span>
-                                            <span style={{ color: textColor, marginLeft: 6, fontSize: 12 }}>
-                                              {seg.text ?? ""}
-                                            </span>
-                                          </div>
-                                        );
-                                      })
-                                    ) : (
-                                      (transcript.raw_text ?? "No transcript text available.").split("\n\n").map((para, i) => (
-                                        <p key={i} style={{ margin: "0 0 10px", color: "#d4d4d8" }}>{para}</p>
-                                      ))
-                                    )}
+                                  <div style={{ borderTop: "1px solid #27272a", marginBottom: 8 }} />
+                                  <div style={{ fontSize: 12, color: "#d4d4d8", marginBottom: 2 }}>A Zoom Phone call</div>
+                                  {drawerDuration && (
+                                    <div style={{ fontSize: 11, color: "#71717a", marginBottom: 8 }}>{drawerDuration}</div>
+                                  )}
+                                  {recordingUrl && (
+                                    <div style={{ marginBottom: 8 }}>
+                                      <audio
+                                        controls
+                                        preload="none"
+                                        style={{
+                                          width: "100%", height: 36, borderRadius: 6,
+                                          filter: "invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9)",
+                                        }}
+                                        src={recordingUrl}
+                                      />
+                                    </div>
+                                  )}
+                                  {isLoadingTranscript && (
+                                    <div style={{ fontSize: 11, color: "#888", padding: "4px 0" }}>Loading transcript…</div>
+                                  )}
+                                  {transcript && (
+                                    <>
+                                      {transcript.ai_summary && (
+                                        <div style={{
+                                          padding: "10px 12px", backgroundColor: "#172554", fontSize: 12,
+                                          color: "#93c5fd", lineHeight: 1.6, borderRadius: 6, marginBottom: 8,
+                                        }}>
+                                          <div style={{ fontSize: 10, fontWeight: 600, color: "#60a5fa", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>AI Summary</div>
+                                          {transcript.ai_summary}
+                                        </div>
+                                      )}
+                                      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                                        {a.transcript_id && (
+                                          <span style={{ fontSize: 10, fontWeight: 600, color: "#a1a1aa", textTransform: "uppercase" }}>Transcript</span>
+                                        )}
+                                        {transcript.raw_text && (
+                                          <button
+                                            onClick={e => { e.stopPropagation(); copyTranscript(a.id); }}
+                                            style={{
+                                              padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                                              cursor: "pointer", border: "1px solid #27272a", background: "#18181b",
+                                              color: copiedId === a.id ? "#4ade80" : "#a1a1aa", marginLeft: "auto",
+                                            }}
+                                          >
+                                            {copiedId === a.id ? "✓ Copied!" : "Copy"}
+                                          </button>
+                                        )}
+                                      </div>
+                                      <div style={{
+                                        padding: "10px 12px", backgroundColor: "#09090b", borderRadius: 6,
+                                        fontSize: 12, color: "#d4d4d8", lineHeight: 1.7,
+                                        maxHeight: 400, overflowY: "auto",
+                                      }}>
+                                        {transcript.speaker_segments && Array.isArray(transcript.speaker_segments) && transcript.speaker_segments.length > 0 ? (
+                                          (transcript.speaker_segments as Array<{speaker?: string; text?: string}>).map((seg, i) => {
+                                            const speaker = (seg.speaker ?? "Speaker").toLowerCase();
+                                            const isEmp = speaker.includes("grace") || speaker.includes("brooke") || speaker.includes("tess") || speaker.includes("melissa") || speaker.includes("tarah") || speaker.includes("lisa") || speaker.includes("system");
+                                            const speakerColor = isEmp ? "#a1a1aa" : "#60a5fa";
+                                            const textColor = isEmp ? "#a1a1aa" : "#e0edff";
+                                            return (
+                                              <div key={i} style={{ marginBottom: 8, paddingLeft: isEmp ? 0 : 12, borderLeft: isEmp ? "none" : "2px solid #60a5fa" }}>
+                                                <span style={{ color: speakerColor, fontWeight: 600, fontSize: 11, textTransform: "uppercase" }}>
+                                                  {seg.speaker ?? "Speaker"}:
+                                                </span>
+                                                <span style={{ color: textColor, marginLeft: 6, fontSize: 12 }}>
+                                                  {seg.text ?? ""}
+                                                </span>
+                                              </div>
+                                            );
+                                          })
+                                        ) : (
+                                          (transcript.raw_text ?? "No transcript text available.").split("\n\n").map((para, i) => (
+                                            <p key={i} style={{ margin: "0 0 10px", color: "#d4d4d8" }}>{para}</p>
+                                          ))
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+                                  {!transcript && !isLoadingTranscript && !a.transcript_id && (
+                                    <div style={{ fontSize: 11, color: "#555" }}>No transcript available for this call.</div>
+                                  )}
+                                </>
+                              )}
+
+                              {/* ── Email Drawer ── */}
+                              {isEmail && (
+                                <>
+                                  {a.metadata && typeof a.metadata === "object" && (
+                                    <>
+                                      {(a.metadata as Record<string, unknown>).from && (
+                                        <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 2 }}>
+                                          <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>FROM: </span>
+                                          {String((a.metadata as Record<string, unknown>).from)}
+                                        </div>
+                                      )}
+                                      {(a.metadata as Record<string, unknown>).to && (
+                                        <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 2 }}>
+                                          <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>TO: </span>
+                                          {String((a.metadata as Record<string, unknown>).to)}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                  {a.subject && (
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 6 }}>
+                                      <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>SUBJECT: </span>
+                                      {a.subject}
+                                    </div>
+                                  )}
+                                  <div style={{ borderTop: "1px solid #27272a", marginBottom: 8 }} />
+                                  <div style={{ fontSize: 12, color: "#d4d4d8", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 400, overflowY: "auto" }}>
+                                    {a.body || "(no body)"}
                                   </div>
+                                </>
+                              )}
+
+                              {/* ── Web Form Drawer ── */}
+                              {isWebForm && (
+                                <>
+                                  <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 2 }}>
+                                    <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>FORM TYPE: </span>
+                                    {a.subject || "form"}
+                                  </div>
+                                  {a.metadata && (a.metadata as Record<string, unknown>).community && (
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 2 }}>
+                                      <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>COMMUNITY: </span>
+                                      {String((a.metadata as Record<string, unknown>).community)}
+                                    </div>
+                                  )}
+                                  <div style={{ borderTop: "1px solid #27272a", marginBottom: 8, marginTop: 6 }} />
+                                  <div style={{ fontSize: 12, color: "#d4d4d8", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: 300, overflowY: "auto" }}>
+                                    {a.body || "(no message)"}
+                                  </div>
+                                </>
+                              )}
+
+                              {/* ── SMS Drawer ── */}
+                              {isSms && (
+                                <div style={{ fontSize: 12, color: "#d4d4d8", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                                  {a.body || "(no message)"}
                                 </div>
                               )}
-                              {!transcript && !isLoadingTranscript && !a.transcript_id && (
-                                <div style={{ fontSize: 11, color: "#555", padding: "8px 0" }}>No transcript available for this call.</div>
+
+                              {/* ── Meeting Drawer ── */}
+                              {isMeeting && (
+                                <>
+                                  {a.subject && (
+                                    <div style={{ fontSize: 12, color: "#d4d4d8", fontWeight: 500, marginBottom: 4 }}>{a.subject}</div>
+                                  )}
+                                  {drawerDuration && (
+                                    <div style={{ fontSize: 11, color: "#71717a", marginBottom: 6 }}>{drawerDuration}</div>
+                                  )}
+                                  {a.body && (
+                                    <>
+                                      <div style={{ borderTop: "1px solid #27272a", marginBottom: 8 }} />
+                                      <div style={{ fontSize: 12, color: "#d4d4d8", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                                        {a.body}
+                                      </div>
+                                    </>
+                                  )}
+                                </>
+                              )}
+
+                              {/* ── Generic Fallback Drawer ── */}
+                              {!isPhone && !isEmail && !isWebForm && !isSms && !isMeeting && (
+                                <>
+                                  {a.subject && (
+                                    <div style={{ fontSize: 12, color: "#d4d4d8", fontWeight: 500, marginBottom: 4 }}>{a.subject}</div>
+                                  )}
+                                  {a.body && (
+                                    <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                                      {a.body}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Sentiment tag in drawer */}
+                              {a.sentiment && (
+                                <div style={{ fontSize: 10, color: "#71717a", marginTop: 8 }}>Sentiment: {a.sentiment}</div>
                               )}
                             </div>
                           )}
