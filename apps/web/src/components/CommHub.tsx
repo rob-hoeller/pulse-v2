@@ -53,7 +53,7 @@ const COMM_HUB_TABS: { id: CommHubTab; icon: string; label: string }[] = [
   { id: "call", icon: "/icons/activity/phone.svg", label: "Call" },
   { id: "text", icon: "/icons/activity/text.svg", label: "Text" },
   { id: "email", icon: "/icons/activity/email.svg", label: "Email" },
-  { id: "meeting", icon: "🎥", label: "Meeting" },
+  { id: "meeting", icon: "", label: "Meeting" },
 ];
 
 const CHANNEL_META: Record<string, { icon: string; label: string; color: string; bg: string }> = {
@@ -62,10 +62,10 @@ const CHANNEL_META: Record<string, { icon: string; label: string; color: string;
   call: { icon: "/icons/activity/phone.svg", label: "Call", color: "#60a5fa", bg: "#172554" },
   sms: { icon: "/icons/activity/text.svg", label: "Text", color: "#a78bfa", bg: "#2e1065" },
   text: { icon: "/icons/activity/text.svg", label: "Text", color: "#a78bfa", bg: "#2e1065" },
-  voicemail: { icon: "🎙", label: "Voicemail", color: "#f472b6", bg: "#500724" },
-  webform: { icon: "🌐", label: "Web Form", color: "#34d399", bg: "#064e3b" },
-  chat: { icon: "💭", label: "Chat", color: "#818cf8", bg: "#312e81" },
-  walk_in: { icon: "🚶", label: "Walk-in", color: "#fbbf24", bg: "#422006" },
+  voicemail: { icon: "Voice", label: "Voicemail", color: "#f472b6", bg: "#500724" },
+  webform: { icon: "Web", label: "Web Form", color: "#34d399", bg: "#064e3b" },
+  chat: { icon: "Chat", label: "Chat", color: "#818cf8", bg: "#312e81" },
+  walk_in: { icon: "Walk-in", label: "Walk-in", color: "#fbbf24", bg: "#422006" },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ function formatTimestamp(iso: string): string {
 }
 
 function getChannelMeta(ch: string | null) {
-  return CHANNEL_META[ch ?? ""] ?? { icon: "📬", label: ch ?? "Unknown", color: "#a1a1aa", bg: "#27272a" };
+  return CHANNEL_META[ch ?? ""] ?? { icon: "", label: ch ?? "Unknown", color: "#a1a1aa", bg: "#27272a" };
 }
 
 function formatDuration(seconds: number | null | undefined): string {
@@ -354,7 +354,7 @@ function ActivityCard({
             </>
           ) : activity.channel === "meeting" ? (
             <>
-              <span style={{ fontWeight: 500, color: "#f472b6" }}>🎥 </span>
+              <span style={{ fontWeight: 500, color: "#f472b6" }}>Video </span>
               {getMeetingPreview(activity)}
             </>
           ) : (
@@ -392,7 +392,7 @@ function ActivityCard({
                   cursor: "pointer", border: "1px solid #27272a", background: "#18181b",
                   color: showTranscript ? "#34d399" : "#a1a1aa",
                 }}
-              >📝 Transcript</button>
+              >Transcript</button>
             )}
             {transcriptData?.raw_text && (
               <button
@@ -402,7 +402,7 @@ function ActivityCard({
                   cursor: "pointer", border: "1px solid #27272a", background: "#18181b",
                   color: copied ? "#4ade80" : "#a1a1aa",
                 }}
-              >{copied ? "✓ Copied!" : "📋 Copy"}</button>
+              >{copied ? "✓ Copied!" : "Copy"}</button>
             )}
             {!activity.transcript_id && (
               <span style={{ fontSize: 10, color: "#3f3f46" }}>No transcript</span>
@@ -417,7 +417,7 @@ function ActivityCard({
             backgroundColor: "#064e3b", borderRadius: 3,
             display: "inline-flex", alignItems: "center", gap: 4, width: "fit-content",
           }}>
-            📝 Transcript available
+            Transcript available
           </div>
         )}
 
@@ -429,7 +429,7 @@ function ActivityCard({
             border: "1px solid #422006",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
-            🤖 AI: {generateAiReply(activity).split("\n")[2] || "Click to view suggested reply..."}
+            AI: {generateAiReply(activity).split("\n")[2] || "Click to view suggested reply..."}
           </div>
         )}
       </div>
@@ -515,7 +515,7 @@ function ActivityCard({
                       cursor: "pointer", border: "1px solid #27272a", background: "#09090b",
                       color: copied ? "#4ade80" : "#a1a1aa",
                     }}
-                  >{copied ? "✓ Copied!" : "📋 Copy"}</button>
+                  >{copied ? "✓ Copied!" : "Copy"}</button>
                 )}
                 {showTranscript && transcriptData?.recording_url && (
                   <button

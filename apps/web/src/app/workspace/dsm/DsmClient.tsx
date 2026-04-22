@@ -342,7 +342,7 @@ function CommunityDrillDown({
         display: "flex", alignItems: "center", gap: 8,
       }}>
         <span style={{ fontSize: 13, color: "#93c5fd" }}>
-          📊 Viewing as DSM — <strong style={{ color: "#fafafa" }}>{communityName}</strong> — Read Only
+          Viewing as DSM — <strong style={{ color: "#fafafa" }}>{communityName}</strong> — Read Only
         </span>
       </div>
       <CommunityView
@@ -366,7 +366,7 @@ function EmptyState() {
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       height: "100%", gap: 16, color: "#555", padding: 48,
     }}>
-      <div style={{ fontSize: 48, opacity: 0.3 }}>📊</div>
+      <div style={{ fontSize: 48, opacity: 0.3 }}>Stats</div>
       <div style={{ fontSize: 16, fontWeight: 600, color: "#888" }}>DSM Command Center</div>
       <div style={{ fontSize: 13, color: "#555", textAlign: "center", maxWidth: 400, lineHeight: 1.6 }}>
         Select a <strong style={{ color: "#a855f7" }}>Division</strong> from

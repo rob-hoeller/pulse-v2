@@ -632,7 +632,7 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
                     gap: 6,
                   }}
                 >
-                  🟠 Override active — edits here only apply to this {tpl.community_id ? "Community" : "Division"}.
+                  <span style={{width:8,height:8,borderRadius:'50%',background:'#f97316',display:'inline-block',marginRight:4}} /> Override active — edits here only apply to this {tpl.community_id ? "Community" : "Division"}.
                 </div>
               )}
 
@@ -936,7 +936,7 @@ export default function TemplatesClient({ templates: initial }: { templates: Tem
                     marginLeft: "auto",
                   }}
                 >
-                  {isPreview ? "✎ Edit" : "👁 Preview"}
+                  {isPreview ? "Edit" : "Preview"}
                 </button>
               </div>
             </div>

@@ -157,11 +157,11 @@ function formatBudget(min: number | null, max: number | null): string {
 
 function sourceLabel(src: string | null): string {
   const map: Record<string, string> = {
-    called_osc: "Called", texted_osc: "Texted", webform_interest: "🌐 Web Form",
-    schedule_appt: "📅 Appt Request", ai_auto_promote: "🤖 AI Surfaced",
-    website: "🌐 Website", realtor: "🏠 Realtor", walk_in: "🚶 Walk-in",
-    event: "🎪 Event", phone: "Phone", referral: "👤 Referral",
-    zillow: "🏠 Zillow", social_media: "📱 Social",
+    called_osc: "Called", texted_osc: "Texted", webform_interest: "Web Form",
+    schedule_appt: "Appt Request", ai_auto_promote: "AI Surfaced",
+    website: "Website", realtor: "Realtor", walk_in: "Walk-in",
+    event: "Event", phone: "Phone", referral: "Referral",
+    zillow: "Zillow", social_media: "Social",
   };
   return map[src ?? ""] ?? src ?? "—";
 }
@@ -173,9 +173,9 @@ function classifyBucket(item: QueueItem): QueueBucket {
 }
 
 const BUCKET_META: { id: QueueBucket; icon: string; label: string; description: string }[] = [
-  { id: "new_inbound", icon: "🆕", label: "New", description: "Brand new contacts, never in the system" },
-  { id: "re_engaged", icon: "📋", label: "Existing", description: "Existing leads/prospects re-engaging" },
-  { id: "ai_surfaced", icon: "🤖", label: "AI", description: "AI-surfaced based on scoring/signals" },
+  { id: "new_inbound", icon: "", label: "New", description: "Brand new contacts, never in the system" },
+  { id: "re_engaged", icon: "", label: "Existing", description: "Existing leads/prospects re-engaging" },
+  { id: "ai_surfaced", icon: "", label: "AI", description: "AI-surfaced based on scoring/signals" },
 ];
 
 function channelIcon(ch: string | null): React.ReactNode {
@@ -190,9 +190,9 @@ function channelIcon(ch: string | null): React.ReactNode {
 }
 
 function priorityBadge(p: string | null): { color: string; bg: string; label: string } {
-  if (p === "high") return { color: "#fca5a5", bg: "#7f1d1d", label: "🔴 High" };
-  if (p === "medium") return { color: "#fbbf24", bg: "#422006", label: "🟡 Medium" };
-  return { color: "#86efac", bg: "#052e16", label: "🟢 Low" };
+  if (p === "high") return { color: "#fca5a5", bg: "#7f1d1d", label: "High" };
+  if (p === "medium") return { color: "#fbbf24", bg: "#422006", label: "Medium" };
+  return { color: "#86efac", bg: "#052e16", label: "Low" };
 }
 
 function stageLabel(stage: string | null | undefined): string {
@@ -298,7 +298,7 @@ function AssignModal({
               borderRadius: 6,
             }}>
               <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-                🤖 Agent Recommended
+                Agent Recommended
               </div>
               <div style={{ fontSize: 13, color: "#86efac", fontWeight: 600 }}>
                 {stageLabel(recommendation.stage)}{recommendation.community_name ? ` · ${recommendation.community_name}` : ""} ({recommendation.confidence}%)
@@ -689,7 +689,7 @@ function QueueCard({
                 <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#052e16", color: "#4ade80" }}>NEW</span>
               )}
               {bucket === "ai_surfaced" && (
-                <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#422006", color: "#fbbf24" }}>🤖 AI</span>
+                <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#422006", color: "#fbbf24" }}>AI</span>
               )}
             </div>
             <div style={{ fontSize: 10, color: "#52525b", marginTop: 2 }}>
@@ -759,11 +759,11 @@ function QueueCard({
             borderRadius: 8,
           }}>
             {loadingRec ? (
-              <div style={{ fontSize: 12, color: "#86efac" }}>🤖 Evaluating...</div>
+              <div style={{ fontSize: 12, color: "#86efac" }}>Evaluating...</div>
             ) : recommendation ? (
               <>
                 <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                  🤖 Recommended
+                  Recommended
                 </div>
                 <div style={{ fontSize: 14, color: "#fafafa", fontWeight: 600, marginBottom: 4 }}>
                   {recLabel} ({recommendation.confidence}%)
@@ -784,14 +784,14 @@ function QueueCard({
                       padding: "6px 16px", borderRadius: 6, border: "1px solid #166534",
                       backgroundColor: "#14532d", color: "#4ade80", fontSize: 12, fontWeight: 600, cursor: "pointer",
                     }}
-                  >✅ Approve</button>
+                  >Approve</button>
                   <button
                     onClick={() => onAssign(recommendation)}
                     style={{
                       padding: "6px 16px", borderRadius: 6, border: "1px solid #3f3f46",
                       backgroundColor: "#18181b", color: "#a1a1aa", fontSize: 12, cursor: "pointer",
                     }}
-                  >✏ Override</button>
+                  >Override</button>
                 </div>
               </>
             ) : (
@@ -1022,7 +1022,7 @@ function QueueCard({
                         backgroundColor: "#09090b", color: "#71717a", fontSize: 11, cursor: "pointer",
                         display: "inline-flex", alignItems: "center", gap: 4,
                       }}>
-                        📁 Upload File
+                        Upload File
                         <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.webp,.csv,.txt" multiple hidden onChange={e => {
                           const files = e.target.files;
                           if (!files) return;
@@ -1048,7 +1048,7 @@ function QueueCard({
                         padding: "4px 10px", borderRadius: 4, border: "1px solid #27272a",
                         backgroundColor: "#09090b", color: "#71717a", fontSize: 11, cursor: "pointer",
                         display: "inline-flex", alignItems: "center", gap: 4,
-                      }}>🔗 URL</button>
+                      }}>URL</button>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button onClick={() => { if (personalEditing) { setPersonalHtml(rebuildEmailHtml(personalBody, personalSubject)); } setPersonalEditing(!personalEditing); }} style={{
@@ -1139,14 +1139,14 @@ function QueueCard({
                         }} style={{
                           padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a",
                           backgroundColor: "#09090b", color: "#71717a", fontSize: 10, cursor: "pointer",
-                        }}>🔗 Link</button>
+                        }}>Link</button>
                         <button onClick={() => {
                           const url = prompt("Enter photo URL:");
                           if (url) setSmsAttachments(prev => [...prev, { type: "photo", label: "Photo", url }]);
                         }} style={{
                           padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a",
                           backgroundColor: "#09090b", color: "#71717a", fontSize: 10, cursor: "pointer",
-                        }}>🖼 Photo</button>
+                        }}>Photo</button>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
@@ -1198,7 +1198,7 @@ function QueueCard({
               borderRadius: 8,
             }}>
               <div style={{ fontSize: 10, color: "#fbbf24", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-                🤖 AI Surfaced — Signals
+                AI Surfaced — Signals
               </div>
               <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.6 }}>
                 {item.engagement_score != null && (
@@ -1415,7 +1415,7 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
         }}
       >
         <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-          📚 Community Reference
+          Community Reference
         </span>
         <span style={{ fontSize: 11, color: "#52525b" }}>{expanded ? "▲ Collapse" : "▼ Expand"}</span>
       </button>
@@ -1546,9 +1546,9 @@ function ReferenceModule({ communities, divisionId }: { communities: CommunityRe
                 <div>
                   <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase", marginBottom: 6 }}>Links</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {detail.website_url && <RefLink label="🌐 Website" href={detail.website_url} />}
-                    {detail.brochure_url && <RefLink label="📄 Brochure" href={detail.brochure_url} />}
-                    {detail.site_map_url && <RefLink label="🗺️ Site Map" href={detail.site_map_url} />}
+                    {detail.website_url && <RefLink label="Website" href={detail.website_url} />}
+                    {detail.brochure_url && <RefLink label="Brochure" href={detail.brochure_url} />}
+                    {detail.site_map_url && <RefLink label="Site Map" href={detail.site_map_url} />}
                     {!detail.website_url && !detail.brochure_url && !detail.site_map_url && (
                       <span style={{ fontSize: 12, color: "#52525b" }}>No links available</span>
                     )}

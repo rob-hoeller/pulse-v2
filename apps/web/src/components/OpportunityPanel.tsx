@@ -224,9 +224,9 @@ function parseNoteEntries(notes: string | null): Array<{ timestamp: string; text
 }
 
 const CHANNEL_ICONS: Record<string, string> = {
-  email: "/icons/activity/email.svg", phone: "/icons/activity/phone.svg", sms: "/icons/activity/text.svg", video: "🎥", voice: "🎙",
-  web: "🌐", chat: "💭", app: "🖥", walk_in: "🚶", mail: "📬",
-  webform: "📋", form: "📋",
+  email: "/icons/activity/email.svg", phone: "/icons/activity/phone.svg", sms: "/icons/activity/text.svg", video: "Video", voice: "Voice",
+  web: "Web", chat: "Chat", app: "App", walk_in: "Walk-in", mail: "Mail",
+  webform: "Form", form: "Form",
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -936,7 +936,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                 {description}
                               </span>
                               {isPhone && a.transcript_id && (
-                                <span style={{ fontSize: 9, color: "#34d399", fontWeight: 500, flexShrink: 0 }}>📝</span>
+                                <span style={{ fontSize: 9, color: "#34d399", fontWeight: 500, flexShrink: 0 }}>Note</span>
                               )}
                             </div>
                             <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 3 }}>
@@ -947,7 +947,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                             {isPhone && (
                               <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                                 {recordingUrl && (
-                                  <span style={{ fontSize: 10, color: "#4ade80" }}>🎙️</span>
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", display: "inline-block" }} />
                                 )}
                                 {a.transcript_id && (
                                   <button
@@ -964,7 +964,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                       cursor: "pointer", border: "1px solid #27272a", background: "#18181b", color: "#a1a1aa",
                                     }}
                                   >
-                                    📝 Transcript
+                                    Transcript
                                   </button>
                                 )}
                                 {transcript?.raw_text && (
@@ -976,7 +976,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                       color: copiedId === a.id ? "#4ade80" : "#a1a1aa",
                                     }}
                                   >
-                                    {copiedId === a.id ? "✓ Copied!" : "📋 Copy"}
+                                    {copiedId === a.id ? "✓ Copied!" : "Copy"}
                                   </button>
                                 )}
                               </div>

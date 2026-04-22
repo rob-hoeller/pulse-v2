@@ -4,37 +4,37 @@ import Link from "next/link";
 
 const SETTINGS_SECTIONS = [
   {
-    icon: "📧",
+    icon: "",
     title: "Response Templates",
     description: "Customize auto-confirmations, personal follow-ups, and SMS messages per web form type and division.",
     href: "/settings/templates",
   },
   {
-    icon: "👤",
+    icon: "",
     title: "Profile",
     description: "Your name, email, phone, and Zoom number. Used in merge variables for email templates.",
     href: "/settings/profile",
   },
   {
-    icon: "🔔",
+    icon: "",
     title: "Notifications",
     description: "Configure push notifications, alert thresholds, and digest preferences.",
     href: "/settings/notifications",
   },
   {
-    icon: "🤖",
+    icon: "",
     title: "AI & Automation",
     description: "System mode (Manual/Assisted/Auto), scoring thresholds, and agent configuration.",
     href: "/settings/automation",
   },
   {
-    icon: "🔗",
+    icon: "",
     title: "Integrations",
     description: "SendGrid, Microsoft Outlook, Zoom Phone, Rilla API connections and status.",
     href: "/settings/integrations",
   },
   {
-    icon: "👥",
+    icon: "",
     title: "Team",
     description: "Manage OSC and CSM team members, community assignments, and roles.",
     href: "/settings/team",
@@ -65,7 +65,7 @@ export default function SettingsPage() {
               onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <span style={{ fontSize: 20 }}>{section.icon}</span>
+                {section.icon && <span style={{ fontSize: 20 }}>{section.icon}</span>}
                 <span style={{ fontSize: 15, fontWeight: 600, color: "#fafafa" }}>{section.title}</span>
               </div>
               <p style={{ fontSize: 12, color: "#71717a", lineHeight: 1.6, margin: 0 }}>

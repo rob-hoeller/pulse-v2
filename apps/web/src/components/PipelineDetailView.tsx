@@ -60,24 +60,24 @@ const CHANNEL_ICONS: Record<string, string> = {
   call: "/icons/activity/phone.svg",
   sms: "/icons/activity/text.svg",
   text: "/icons/activity/text.svg",
-  video: "🎥",
-  zoom: "🎥",
-  meeting: "🎥",
-  voice: "🎙",
-  web: "🌐",
-  chat: "💭",
-  webbot: "💭",
-  logrocket: "🖥",
-  "walk-in": "🚶",
-  walkin: "🚶",
-  mail: "📬",
-  rilla: "🎙",
+  video: "Video",
+  zoom: "Video",
+  meeting: "Video",
+  voice: "Voice",
+  web: "Web",
+  chat: "Chat",
+  webbot: "Chat",
+  logrocket: "LR",
+  "walk-in": "Walk-in",
+  walkin: "Walk-in",
+  mail: "Mail",
+  rilla: "Rilla",
 };
 
 function channelIcon(channel: string | null): React.ReactNode {
-  if (!channel) return "📋";
+  if (!channel) return "Activity";
   const key = channel.toLowerCase().trim();
-  const val = CHANNEL_ICONS[key] ?? "📋";
+  const val = CHANNEL_ICONS[key] ?? "Activity";
   if (val.startsWith("/")) return <img src={val} alt="" width={14} height={14} style={{ verticalAlign: "middle" }} />;
   return val;
 }

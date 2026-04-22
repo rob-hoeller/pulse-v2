@@ -7,9 +7,9 @@ export async function POST(req: NextRequest) {
   try {
     const { task_id, task_name, task_type, description } = await req.json();
 
-    const typeLabel = task_type === "bugfix" ? "⚡ Bugfix" : "◈ Feature";
+    const typeLabel = task_type === "bugfix" ? "Bugfix" : "Feature";
     const message = [
-      `📋 *New Task Created*`,
+      `*New Task Created*`,
       ``,
       `*${task_name}*`,
       `${typeLabel}${description ? `\n\n${description}` : ""}`,

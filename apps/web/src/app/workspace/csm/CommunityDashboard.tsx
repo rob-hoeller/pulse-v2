@@ -104,10 +104,10 @@ const MONTH_GOALS: MonthGoal[] = [
 ];
 
 const BUCKET_META: { id: CsmBucket; icon: string; label: string; description: string }[] = [
-  { id: "new_from_osc", icon: "🆕", label: "New from OSC", description: "Freshly promoted prospects" },
-  { id: "stale", icon: "⚠️", label: "Stale", description: "No communication in 30+ days" },
-  { id: "ai_hot", icon: "📈", label: "AI Hot", description: "Scoring spike / buying signals" },
-  { id: "followup_due", icon: "📋", label: "Follow-up Due", description: "Scheduled follow-ups due today" },
+  { id: "new_from_osc", icon: "", label: "New from OSC", description: "Freshly promoted prospects" },
+  { id: "stale", icon: "", label: "Stale", description: "No communication in 30+ days" },
+  { id: "ai_hot", icon: "", label: "AI Hot", description: "Scoring spike / buying signals" },
+  { id: "followup_due", icon: "", label: "Follow-up Due", description: "Scheduled follow-ups due today" },
 ];
 
 const STAGE_COLORS: Record<string, { color: string; bg: string; label: string }> = {
@@ -184,9 +184,9 @@ function channelIcon(ch: string | null): React.ReactNode {
 
 
 function priorityBadge(p: string | null): { color: string; bg: string; label: string } {
-  if (p === "high") return { color: "#fca5a5", bg: "#7f1d1d", label: "🔴 High" };
-  if (p === "medium") return { color: "#fbbf24", bg: "#422006", label: "🟡 Medium" };
-  return { color: "#86efac", bg: "#052e16", label: "🟢 Low" };
+  if (p === "high") return { color: "#fca5a5", bg: "#7f1d1d", label: "High" };
+  if (p === "medium") return { color: "#fbbf24", bg: "#422006", label: "Medium" };
+  return { color: "#86efac", bg: "#052e16", label: "Low" };
 }
 
 // ─── MetricCard ───────────────────────────────────────────────────────────────
@@ -676,7 +676,7 @@ function TaskCard({
           fontSize: 11, color: "#86efac", backgroundColor: "#052e16", border: "1px solid #166534",
           borderRadius: 4, padding: "6px 10px", marginBottom: 8, lineHeight: 1.5,
         }}>
-          🤖 {task.ai_suggestion}
+          AI: {task.ai_suggestion}
         </div>
       )}
 
@@ -745,7 +745,7 @@ function ReferenceModule({
         onMouseEnter={e => (e.currentTarget.style.borderColor = "#3f3f46")}
         onMouseLeave={e => (e.currentTarget.style.borderColor = "#27272a")}
       >
-        <span>📚 Community Reference</span>
+        <span>Community Reference</span>
         <span style={{ fontSize: 11, color: "#71717a" }}>{open ? "▲ Collapse" : "▼ Expand"}</span>
       </button>
 

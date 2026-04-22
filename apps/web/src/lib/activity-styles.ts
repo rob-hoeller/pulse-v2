@@ -31,11 +31,11 @@ export function getActivityStyle(channel: string | null, type: string | null, di
   }
   // Web Form
   if (ch === "webform" || ch === "web_form" || ty === "webform") {
-    return { icon: "📋", label: "Web Form", borderColor: "#FF5E5E", bgColor: "rgba(255, 94, 94, 0.15)" };
+    return { icon: "", label: "Web Form", borderColor: "#FF5E5E", bgColor: "rgba(255, 94, 94, 0.15)" };
   }
   // Meeting/Appointment
   if (ch === "meeting" || ty === "meeting" || ty === "appointment") {
-    return { icon: "📅", label: "Appointment", borderColor: "#92af00", bgColor: "rgba(183, 214, 135, 0.15)" };
+    return { icon: "", label: "Appointment", borderColor: "#92af00", bgColor: "rgba(183, 214, 135, 0.15)" };
   }
   // Mass Email
   if (ty.includes("mass_email") || ty.includes("massemail")) {
@@ -43,7 +43,7 @@ export function getActivityStyle(channel: string | null, type: string | null, di
   }
   // Walk-In
   if (ty.includes("walk") || ch === "walkin" || ch === "walk-in") {
-    return { icon: "🚶", label: "Walk-In", borderColor: "#A84264", bgColor: "rgba(168, 66, 100, 0.15)" };
+    return { icon: "", label: "Walk-In", borderColor: "#A84264", bgColor: "rgba(168, 66, 100, 0.15)" };
   }
   // Default
   return { icon: "", label: "Activity", borderColor: "#52525b", bgColor: "rgba(82, 82, 91, 0.15)" };

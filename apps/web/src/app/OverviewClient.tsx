@@ -672,8 +672,8 @@ interface DivisionViewProps {
 type DivisionTabId = "overview" | "communities";
 
 const DIVISION_TABS: { id: DivisionTabId; label: string }[] = [
-  { id: "overview", label: "📊 Overview" },
-  { id: "communities", label: "🏘 Communities" },
+  { id: "overview", label: "Overview" },
+  { id: "communities", label: "Communities" },
 ];
 
 function DivisionView({ communities, divisionPlans, lots, divisions, selectedDivisionId }: DivisionViewProps) {

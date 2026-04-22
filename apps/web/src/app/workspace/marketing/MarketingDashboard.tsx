@@ -66,10 +66,10 @@ function relativeTime(iso: string | null): string {
 
 function sourceLabel(src: string | null): string {
   const map: Record<string, string> = {
-    website: "🌐 Website", realtor: "🏠 Realtor", walk_in: "🚶 Walk-in",
-    event: "🎪 Event", phone: "📞 Phone", referral: "👤 Referral",
-    zillow: "🏠 Zillow", social_media: "📱 Social", webform_interest: "🌐 Web Form",
-    called_osc: "📞 Called", texted_osc: "💬 Texted", schedule_appt: "📅 Appt Request",
+    website: "Website", realtor: "Realtor", walk_in: "Walk-in",
+    event: "Event", phone: "Phone", referral: "Referral",
+    zillow: "Zillow", social_media: "Social", webform_interest: "Web Form",
+    called_osc: "Called", texted_osc: "Texted", schedule_appt: "Appt Request",
   };
   return map[src ?? ""] ?? src ?? "—";
 }
@@ -101,7 +101,7 @@ const STUB_CAMPAIGNS = [
 function EmptyState() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 16, padding: 48 }}>
-      <div style={{ fontSize: 48, opacity: 0.3 }}>📣</div>
+      <div style={{ fontSize: 48, opacity: 0.3 }}>MKT</div>
       <div style={{ fontSize: 16, fontWeight: 600, color: "#a1a1aa" }}>Marketing Command Center</div>
       <div style={{ fontSize: 13, color: "#71717a", textAlign: "center", maxWidth: 400, lineHeight: 1.6 }}>
         Select a <strong style={{ color: "#a855f7" }}>Division</strong> to load your lead pipeline and marketing analytics.
@@ -199,7 +199,7 @@ function LeadCard({
                         onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#27272a")}
                         onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
                       >
-                        🏘 {c.name}
+                        Community: {c.name}
                       </button>
                     ))}
                   </div>
@@ -523,10 +523,10 @@ export default function MarketingDashboard() {
 
   // ── Tab metadata ──
   const TAB_META: { id: LeadTab; icon: string; label: string; count: number }[] = [
-    { id: "lead_div", icon: "📍", label: "Division Leads", count: divLeads.length },
-    { id: "lead_com", icon: "🏘", label: "Community Leads", count: comLeads.length },
-    { id: "new_week", icon: "🆕", label: "New This Week", count: newThisWeek.length },
-    { id: "warming", icon: "📈", label: "Warming Up", count: leads.filter(l => (l.engagement_score ?? 0) > 50).length },
+    { id: "lead_div", icon: "", label: "Division Leads", count: divLeads.length },
+    { id: "lead_com", icon: "", label: "Community Leads", count: comLeads.length },
+    { id: "new_week", icon: "", label: "New This Week", count: newThisWeek.length },
+    { id: "warming", icon: "", label: "Warming Up", count: leads.filter(l => (l.engagement_score ?? 0) > 50).length },
   ];
 
   // ── No division selected ──
@@ -668,7 +668,7 @@ export default function MarketingDashboard() {
                 {/* Mailchimp Campaigns */}
                 <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "16px 18px" }}>
                   <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, fontWeight: 600 }}>
-                    📧 Recent Campaigns
+                    Recent Campaigns
                   </div>
                   {STUB_CAMPAIGNS.map((c, i) => (
                     <div key={i} style={{
@@ -691,7 +691,7 @@ export default function MarketingDashboard() {
                 {/* Web Analytics */}
                 <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "16px 18px" }}>
                   <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, fontWeight: 600 }}>
-                    📊 Web Analytics
+                    Web Analytics
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <div>
@@ -722,7 +722,7 @@ export default function MarketingDashboard() {
                 {/* Ad Spend */}
                 <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "16px 18px" }}>
                   <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, fontWeight: 600 }}>
-                    💰 Ad Spend
+                    Ad Spend
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <div>
