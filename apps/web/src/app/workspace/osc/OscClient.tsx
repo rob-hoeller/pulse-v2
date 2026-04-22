@@ -126,7 +126,7 @@ interface AgentRecommendation {
 }
 
 interface GeneratedResponses {
-  email?: { subject: string; body: string };
+  email?: { subject: string; body: string; html?: string };
   sms?: { body: string };
 }
 
@@ -541,8 +541,8 @@ function QueueCard({
         if (result.success && result.data) {
           const gen: GeneratedResponses = {};
           if (result.data.email) {
-            const e = result.data.email as { subject?: string; body?: string };
-            gen.email = { subject: e.subject ?? "", body: e.body ?? "" };
+            const e = result.data.email as { subject?: string; body?: string; html?: string };
+            gen.email = { subject: e.subject ?? "", body: e.body ?? "", html: e.html ?? "" };
           }
           if (result.data.sms) {
             const s = result.data.sms as { body?: string };
@@ -552,6 +552,7 @@ function QueueCard({
           if (gen.email) {
             setEmailSubject(gen.email.subject);
             setEmailBody(gen.email.body);
+            if (gen.email.html) setEmailHtml(gen.email.html);
           }
           if (gen.sms) {
             setSmsBody(gen.sms.body);
