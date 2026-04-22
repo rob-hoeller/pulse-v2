@@ -1110,46 +1110,60 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                   bodyText = parsed.interested_in || "";
                                 } catch { /* not JSON, use as-is */ }
 
-                                // Parse URL into 3 components: Page URL, Campaign, Ad
-                                let pageUrl = sourceUrl;
-                                let adInfo = "";
-                                let campaignInfo = "";
-                                if (sourceUrl) {
+                                // ── UTM + Ad Tracking ──
+                                // Prefer structured metadata fields (new sync), fall back to URL parsing (legacy)
+                                let pageUrl = (wfMeta.page_url as string) || sourceUrl;
+                                let adPlatform = (wfMeta.ad_platform as string) || "";
+                                let campaignName = (wfMeta.utm_campaign as string) || "";
+                                let utmSource = (wfMeta.utm_source as string) || "";
+                                let utmMedium = (wfMeta.utm_medium as string) || "";
+                                let utmTerm = (wfMeta.utm_term as string) || "";
+                                let utmContent = (wfMeta.utm_content as string) || "";
+                                let clickId = (wfMeta.gclid as string) || (wfMeta.msclkid as string) || (wfMeta.fbclid as string) || "";
+                                let clickIdType = wfMeta.gclid ? "gclid" : wfMeta.msclkid ? "msclkid" : wfMeta.fbclid ? "fbclid" : "";
+
+                                // Fallback: parse from source_url if structured fields missing
+                                if (!adPlatform && !campaignName && sourceUrl) {
                                   try {
                                     const u = new URL(sourceUrl);
-                                    pageUrl = `${u.origin}${u.pathname}`;
-                                    const gclid = u.searchParams.get("gclid");
-                                    const gadCampaign = u.searchParams.get("gad_campaignid");
-                                    const msclkid = u.searchParams.get("msclkid");
-                                    const fbclid = u.searchParams.get("fbclid");
-                                    const utmSource = u.searchParams.get("utm_source");
-                                    const utmCampaign = u.searchParams.get("utm_campaign");
-                                    const utmMedium = u.searchParams.get("utm_medium");
-                                    // Ad detection: Google, Bing, Facebook
-                                    if (gclid || gadCampaign) {
-                                      adInfo = `Google Ads${gadCampaign ? ` (Campaign: ${gadCampaign})` : ""}`;
-                                    } else if (msclkid) {
-                                      adInfo = "Bing Ads";
-                                    } else if (fbclid) {
-                                      adInfo = "Facebook Ad";
-                                    }
-                                    // Campaign: UTM params (Mailchimp, email, etc.)
-                                    if (utmSource || utmCampaign) {
-                                      // If utm_source is bing/google, it's an ad not a campaign
-                                      const src = (utmSource || "").toLowerCase();
-                                      if (src === "bing" || src === "google") {
-                                        // Move to AD if not already set
-                                        if (!adInfo) adInfo = `${utmSource} Ads`;
-                                        // Still show campaign name in CAMPAIGN if it exists and isn't just the ad platform
-                                        if (utmCampaign) campaignInfo = utmCampaign;
-                                      } else {
-                                        campaignInfo = [utmSource, utmMedium, utmCampaign].filter(Boolean).join(" / ");
+                                    if (!wfMeta.page_url) pageUrl = `${u.origin}${u.pathname}`;
+                                    const pGclid = u.searchParams.get("gclid");
+                                    const pGadCampaign = u.searchParams.get("gad_campaignid");
+                                    const pMsclkid = u.searchParams.get("msclkid");
+                                    const pFbclid = u.searchParams.get("fbclid");
+                                    utmSource = utmSource || u.searchParams.get("utm_source") || "";
+                                    utmMedium = utmMedium || u.searchParams.get("utm_medium") || "";
+                                    campaignName = campaignName || u.searchParams.get("utm_campaign") || "";
+                                    utmTerm = utmTerm || u.searchParams.get("utm_term") || "";
+                                    utmContent = utmContent || u.searchParams.get("utm_content") || "";
+                                    if (pGclid || pGadCampaign) {
+                                      adPlatform = "Google Ads";
+                                      clickId = clickId || pGclid || "";
+                                      clickIdType = clickIdType || "gclid";
+                                    } else if (pMsclkid) {
+                                      adPlatform = "Bing Ads";
+                                      clickId = clickId || pMsclkid;
+                                      clickIdType = clickIdType || "msclkid";
+                                    } else if (pFbclid) {
+                                      adPlatform = "Facebook Ads";
+                                      clickId = clickId || pFbclid;
+                                      clickIdType = clickIdType || "fbclid";
+                                    } else if (utmSource) {
+                                      const src = utmSource.toLowerCase();
+                                      if (["bing", "google", "facebook", "meta", "instagram"].includes(src)) {
+                                        adPlatform = `${utmSource} Ads`;
                                       }
                                     }
                                   } catch { /* invalid URL */ }
                                 }
 
+                                // Build display strings
+                                const campaignDisplay = campaignName || "";
+                                // Source / Medium line (e.g. "bing / cpc")
+                                const sourceMedium = [utmSource, utmMedium].filter(Boolean).join(" / ");
+
                                 const labelStyle = { fontWeight: 600 as const, textTransform: "uppercase" as const, letterSpacing: "0.04em", color: "#71717a", fontSize: 10 };
+                                const valDash = <span style={{ color: "#52525b" }}>—</span>;
 
                                 return (
                                   <>
@@ -1164,16 +1178,37 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3, wordBreak: "break-all" }}>
                                       <span style={labelStyle}>PAGE URL:  </span>
-                                      {pageUrl ? <a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a> : <span style={{ color: "#52525b" }}>—</span>}
+                                      {pageUrl ? <a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a> : valDash}
                                     </div>
+
+                                    {/* ── Ad Attribution Section ── */}
+                                    <div style={{ borderTop: "1px solid #27272a", marginBottom: 6, marginTop: 6 }} />
+                                    <div style={{ fontSize: 10, color: "#525252", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>AD ATTRIBUTION</div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
                                       <span style={labelStyle}>CAMPAIGN:  </span>
-                                      {campaignInfo ? <span style={{ color: "#c084fc" }}>{campaignInfo}</span> : <span style={{ color: "#52525b" }}>—</span>}
+                                      {campaignDisplay ? <span style={{ color: "#c084fc" }}>{campaignDisplay}</span> : valDash}
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                      <span style={labelStyle}>AD:  </span>
-                                      {adInfo ? <span style={{ color: "#fb923c" }}>{adInfo}</span> : <span style={{ color: "#52525b" }}>—</span>}
+                                      <span style={labelStyle}>AD PLATFORM:  </span>
+                                      {adPlatform ? <span style={{ color: "#fb923c" }}>{adPlatform}</span> : valDash}
                                     </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>SOURCE / MEDIUM:  </span>
+                                      {sourceMedium ? <span style={{ color: "#94a3b8" }}>{sourceMedium}</span> : valDash}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>SEARCH TERM:  </span>
+                                      {utmTerm ? <span style={{ color: "#67e8f9" }}>{utmTerm}</span> : valDash}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>AD CONTENT:  </span>
+                                      {utmContent ? <span style={{ color: "#a5b4fc" }}>{utmContent}</span> : valDash}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3, wordBreak: "break-all" }}>
+                                      <span style={labelStyle}>CLICK ID:  </span>
+                                      {clickId ? <span style={{ color: "#525252", fontSize: 9, fontFamily: "monospace" }}>{clickIdType}: {clickId}</span> : valDash}
+                                    </div>
+
                                     <div style={{ borderTop: "1px solid #27272a", marginBottom: 8, marginTop: 6 }} />
                                     <div style={{ fontSize: 11, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>DETAILS:</div>
                                     <div style={{ fontSize: 12, color: "#d4d4d8", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
