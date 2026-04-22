@@ -1206,7 +1206,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3, wordBreak: "break-all" }}>
                                       <span style={labelStyle}>CLICK ID:  </span>
-                                      {clickId ? <span style={{ fontSize: 10 }}>{clickIdType}: {clickId}</span> : "—"}
+                                      {clickId ? `${clickIdType}: ${clickId}` : "—"}
                                     </div>
 
                                     <div style={{ borderTop: "1px solid #27272a", marginBottom: 8, marginTop: 6 }} />
