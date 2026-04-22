@@ -1186,27 +1186,27 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                     <div style={{ fontSize: 10, color: "#525252", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>AD ATTRIBUTION</div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
                                       <span style={labelStyle}>CAMPAIGN:  </span>
-                                      {campaignDisplay ? <span style={{ color: "#c084fc" }}>{campaignDisplay}</span> : valDash}
+                                      {campaignDisplay || "—"}
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
                                       <span style={labelStyle}>AD PLATFORM:  </span>
-                                      {adPlatform ? <span style={{ color: "#fb923c" }}>{adPlatform}</span> : valDash}
+                                      {adPlatform || "—"}
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
                                       <span style={labelStyle}>SOURCE / MEDIUM:  </span>
-                                      {sourceMedium ? <span style={{ color: "#94a3b8" }}>{sourceMedium}</span> : valDash}
+                                      {sourceMedium || "—"}
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
                                       <span style={labelStyle}>SEARCH TERM:  </span>
-                                      {utmTerm ? <span style={{ color: "#67e8f9" }}>{utmTerm}</span> : valDash}
+                                      {utmTerm || "—"}
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
                                       <span style={labelStyle}>AD CONTENT:  </span>
-                                      {utmContent ? <span style={{ color: "#a5b4fc" }}>{utmContent}</span> : valDash}
+                                      {utmContent || "—"}
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3, wordBreak: "break-all" }}>
                                       <span style={labelStyle}>CLICK ID:  </span>
-                                      {clickId ? <span style={{ color: "#525252", fontSize: 9, fontFamily: "monospace" }}>{clickIdType}: {clickId}</span> : valDash}
+                                      {clickId ? <span style={{ fontSize: 10 }}>{clickIdType}: {clickId}</span> : "—"}
                                     </div>
 
                                     <div style={{ borderTop: "1px solid #27272a", marginBottom: 8, marginTop: 6 }} />
