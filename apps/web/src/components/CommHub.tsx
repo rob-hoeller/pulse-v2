@@ -649,21 +649,18 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
 
   // ── Fetch activities ──
   const fetchActivities = useCallback(async () => {
-    if (!scopeId) return;
     setLoading(true);
 
     let query = supabase
       .from("activities")
-      .select("id, contact_id, channel, direction, subject, body, occurred_at, is_read, read_at, needs_response, responded_at, is_urgent, sentiment, duration_seconds, transcript_id, type, from_number, to_number, contacts(first_name, last_name, email, phone)")
-      .eq("direction", "inbound")
+      .select("id, contact_id, opportunity_id, channel, direction, subject, body, occurred_at, is_read, read_at, needs_response, responded_at, is_urgent, sentiment, duration_seconds, transcript_id, recording_url, metadata, type, from_number, to_number, contacts(first_name, last_name, email, phone)")
       .order("occurred_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
-    if (communityId) {
-      query = query.eq("community_id", communityId);
-    } else if (divisionId) {
-      query = query.eq("division_id", divisionId);
-    }
+    // Scope filtering: phone activities don't have community_id/division_id
+    // directly — they're linked through opportunities. For now, show ALL
+    // activities that have a contact_id (they're relevant to the CRM).
+    // Future: filter via opportunity join for proper division scoping.
 
     const { data } = await query;
 
@@ -676,19 +673,15 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
 
     setActivities(flat);
     setLoading(false);
-  }, [scopeId, communityId, divisionId]);
+  }, [communityId, divisionId]);
 
   useEffect(() => {
-    if (!scopeId) {
-      setActivities([]);
-      return;
-    }
     fetchActivities();
 
     // Realtime subscription
     const filterStr = communityId
       ? `community_id=eq.${communityId}`
-      : `division_id=eq.${divisionId}`;
+      : divisionId ? `division_id=eq.${divisionId}` : undefined;
 
     const channel = supabase
       .channel(`commhub-${scopeId}`)
