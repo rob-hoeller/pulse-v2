@@ -1120,14 +1120,31 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                     pageUrl = `${u.origin}${u.pathname}`;
                                     const gclid = u.searchParams.get("gclid");
                                     const gadCampaign = u.searchParams.get("gad_campaignid");
+                                    const msclkid = u.searchParams.get("msclkid");
+                                    const fbclid = u.searchParams.get("fbclid");
                                     const utmSource = u.searchParams.get("utm_source");
                                     const utmCampaign = u.searchParams.get("utm_campaign");
                                     const utmMedium = u.searchParams.get("utm_medium");
+                                    // Ad detection: Google, Bing, Facebook
                                     if (gclid || gadCampaign) {
                                       adInfo = `Google Ads${gadCampaign ? ` (Campaign: ${gadCampaign})` : ""}`;
+                                    } else if (msclkid) {
+                                      adInfo = "Bing Ads";
+                                    } else if (fbclid) {
+                                      adInfo = "Facebook Ad";
                                     }
+                                    // Campaign: UTM params (Mailchimp, email, etc.)
                                     if (utmSource || utmCampaign) {
-                                      campaignInfo = [utmSource, utmMedium, utmCampaign].filter(Boolean).join(" / ");
+                                      // If utm_source is bing/google, it's an ad not a campaign
+                                      const src = (utmSource || "").toLowerCase();
+                                      if (src === "bing" || src === "google") {
+                                        // Move to AD if not already set
+                                        if (!adInfo) adInfo = `${utmSource} Ads`;
+                                        // Still show campaign name in CAMPAIGN if it exists and isn't just the ad platform
+                                        if (utmCampaign) campaignInfo = utmCampaign;
+                                      } else {
+                                        campaignInfo = [utmSource, utmMedium, utmCampaign].filter(Boolean).join(" / ");
+                                      }
                                     }
                                   } catch { /* invalid URL */ }
                                 }
