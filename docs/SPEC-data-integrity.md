@@ -7,13 +7,26 @@ Prevent data leakage, misattribution, and slop in the Zoom → Activities → Pr
 
 ## Matching Rules
 
-### Rule 1: Phone → Contact (1:1 only)
-- Normalize both sides to 10 digits
-- If exactly 1 contact matches → auto-link (confidence: 1.0)
-- If 2+ contacts match same number → DO NOT auto-link
+### Rule 1: Phone/Email → Household Unit (aggregate matching)
+- A household is ONE unit. All phone numbers and emails across the contact 
+  AND all contact_members resolve to the SAME contact_id + opportunity.
+- Matching index must include ALL of these for each contact:
+  - `contacts.phone` (primary)
+  - `contacts.phone_secondary`
+  - `contacts.email` (primary)
+  - `contacts.email_secondary`
+  - `contact_members[].phone` (each member)
+  - `contact_members[].email` (each member)
+- Example: Mom's cell, Dad's cell, home landline, Mom's email, Dad's work email
+  = 5 identifiers, 1 contact, 1 opportunity
+- Normalize phones to 10 digits before matching
+- If exactly 1 contact matches ANY identifier → auto-link (confidence: 1.0)
+- If 2+ DIFFERENT contacts match → DO NOT auto-link
   - Store activity with contact_id = NULL
   - Flag in action_log: `match_method: "ambiguous"`, `reasoning: "2+ contacts share +1XXXXXXXXXX"`
   - OSC manually assigns in CommHub
+- CRITICAL: Never create duplicate contacts for the same household
+  - Use contact-matcher.ts dedup logic before creating new contacts
 
 ### Rule 2: Contact → Opportunity (cautious linking)
 - If contact has exactly 1 ACTIVE opportunity → auto-link (confidence: 1.0)
