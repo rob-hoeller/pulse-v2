@@ -1137,45 +1137,31 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                 return (
                                   <>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                      <span style={labelStyle}>FORM TYPE:  </span>{formType}
+                                      <span style={labelStyle}>FORM TYPE:  </span>{formType || "—"}
                                     </div>
-                                    {divName && (
-                                      <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                        <span style={labelStyle}>DIVISION:  </span>{divName}
-                                      </div>
-                                    )}
-                                    {commName && (
-                                      <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                        <span style={labelStyle}>COMMUNITY:  </span>{commName}
-                                      </div>
-                                    )}
-                                    {pageUrl && (
-                                      <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3, wordBreak: "break-all" }}>
-                                        <span style={labelStyle}>PAGE URL:  </span>
-                                        <a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a>
-                                      </div>
-                                    )}
-                                    {campaignInfo && (
-                                      <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                        <span style={labelStyle}>CAMPAIGN:  </span>
-                                        <span style={{ color: "#c084fc" }}>{campaignInfo}</span>
-                                      </div>
-                                    )}
-                                    {adInfo && (
-                                      <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                        <span style={labelStyle}>AD:  </span>
-                                        <span style={{ color: "#fb923c" }}>{adInfo}</span>
-                                      </div>
-                                    )}
-                                    {bodyText && (
-                                      <>
-                                        <div style={{ borderTop: "1px solid #27272a", marginBottom: 8, marginTop: 6 }} />
-                                        <div style={{ fontSize: 11, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>DETAILS:</div>
-                                        <div style={{ fontSize: 12, color: "#d4d4d8", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                                          {bodyText}
-                                        </div>
-                                      </>
-                                    )}
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>DIVISION:  </span>{divName || "—"}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>COMMUNITY:  </span>{commName || "—"}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3, wordBreak: "break-all" }}>
+                                      <span style={labelStyle}>PAGE URL:  </span>
+                                      {pageUrl ? <a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a> : <span style={{ color: "#52525b" }}>—</span>}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>CAMPAIGN:  </span>
+                                      {campaignInfo ? <span style={{ color: "#c084fc" }}>{campaignInfo}</span> : <span style={{ color: "#52525b" }}>—</span>}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>AD:  </span>
+                                      {adInfo ? <span style={{ color: "#fb923c" }}>{adInfo}</span> : <span style={{ color: "#52525b" }}>—</span>}
+                                    </div>
+                                    <div style={{ borderTop: "1px solid #27272a", marginBottom: 8, marginTop: 6 }} />
+                                    <div style={{ fontSize: 11, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>DETAILS:</div>
+                                    <div style={{ fontSize: 12, color: "#d4d4d8", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                                      {bodyText || "—"}
+                                    </div>
                                   </>
                                 );
                               })()}
