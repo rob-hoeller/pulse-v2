@@ -1018,14 +1018,28 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                       {transcript.ai_summary}
                                     </div>
                                   )}
-                                  {/* Full transcript */}
+                                  {/* Full transcript — speaker-formatted */}
                                   <div style={{
                                     padding: "10px 12px", backgroundColor: "#09090b",
-                                    fontSize: 12, color: "#a1a1aa", lineHeight: 1.7,
-                                    whiteSpace: "pre-wrap", maxHeight: 300, overflowY: "auto",
-                                    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+                                    fontSize: 12, color: "#d4d4d8", lineHeight: 1.7,
+                                    maxHeight: 400, overflowY: "auto",
                                   }}>
-                                    {transcript.raw_text ?? "No transcript text available."}
+                                    {transcript.speaker_segments && Array.isArray(transcript.speaker_segments) && transcript.speaker_segments.length > 0 ? (
+                                      (transcript.speaker_segments as Array<{speaker?: string; text?: string}>).map((seg, i) => (
+                                        <div key={i} style={{ marginBottom: 10 }}>
+                                          <span style={{ color: "#60a5fa", fontWeight: 600, fontSize: 11, textTransform: "uppercase" }}>
+                                            {seg.speaker ?? "Speaker"}:
+                                          </span>
+                                          <span style={{ color: "#d4d4d8", marginLeft: 6 }}>
+                                            {seg.text ?? ""}
+                                          </span>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      (transcript.raw_text ?? "No transcript text available.").split("\n\n").map((para, i) => (
+                                        <p key={i} style={{ margin: "0 0 10px", color: "#d4d4d8" }}>{para}</p>
+                                      ))
+                                    )}
                                   </div>
                                 </div>
                               )}
