@@ -99,10 +99,32 @@ function formatDuration(seconds: number | null | undefined): string {
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
+function parseCommPhoneParties(activity: CommActivity): { employee: string | null; externalParty: string | null } {
+  const isOutbound = activity.direction !== "inbound";
+  // Try body: "Duration: 889s | Grace Hoinowski → +16318071237"
+  if (activity.body) {
+    const arrowMatch = activity.body.match(/([^|]+?)\s*→\s*(.+)/);
+    if (arrowMatch) {
+      const left = arrowMatch[1].replace(/^.*\|\s*/, "").trim();
+      const right = arrowMatch[2].trim();
+      if (isOutbound) {
+        return { employee: left, externalParty: right };
+      } else {
+        return { employee: right, externalParty: left };
+      }
+    }
+  }
+  return { employee: null, externalParty: null };
+}
+
 function getCallPreview(activity: CommActivity): string {
   const dur = formatDuration(activity.duration_seconds);
   const dir = activity.direction === "inbound" ? "Inbound" : "Outbound";
-  return `${dir} Call — ${dur}`;
+  const parties = parseCommPhoneParties(activity);
+  const parts = [`${dir} Call`];
+  if (parties.employee) parts.push(parties.employee);
+  if (dur !== "0s") parts.push(dur);
+  return parts.length > 1 ? `${parts[0]} — ${parts.slice(1).join(" · ")}` : parts[0];
 }
 
 function getMeetingPreview(activity: CommActivity): string {
@@ -158,23 +180,33 @@ function ActivityCard({
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
-  const [transcriptText, setTranscriptText] = useState<string | null>(null);
+  const [transcriptData, setTranscriptData] = useState<{ raw_text: string | null; ai_summary: string | null; recording_url: string | null } | null>(null);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function loadTranscript() {
-    if (transcriptText || transcriptLoading || !activity.transcript_id) return;
+    if (transcriptData || transcriptLoading || !activity.transcript_id) return;
     setTranscriptLoading(true);
     try {
       const { data } = await supabase
         .from("transcripts")
-        .select("raw_text")
+        .select("raw_text, ai_summary, recording_url")
         .eq("id", activity.transcript_id)
         .single();
-      setTranscriptText(data?.raw_text ?? "No transcript text available.");
+      setTranscriptData(data ? { raw_text: data.raw_text ?? "No transcript text available.", ai_summary: data.ai_summary ?? null, recording_url: data.recording_url ?? null } : { raw_text: "No transcript text available.", ai_summary: null, recording_url: null });
     } catch {
-      setTranscriptText("Failed to load transcript.");
+      setTranscriptData({ raw_text: "Failed to load transcript.", ai_summary: null, recording_url: null });
     }
     setTranscriptLoading(false);
+  }
+
+  async function copyTranscript() {
+    if (!transcriptData?.raw_text) return;
+    try {
+      await navigator.clipboard.writeText(transcriptData.raw_text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* ignore */ }
   }
 
   // Pre-fill AI reply when expanded
@@ -295,11 +327,19 @@ function ActivityCard({
               <span style={{ fontWeight: 500, color: "#60a5fa" }}>
                 {getCallPreview(activity)}
               </span>
-              {activity.from_number && activity.to_number && (
-                <span style={{ color: "#52525b", fontSize: 11, marginLeft: 8 }}>
-                  {activity.from_number} → {activity.to_number}
-                </span>
-              )}
+              {(() => {
+                const parties = parseCommPhoneParties(activity);
+                return parties.externalParty ? (
+                  <div style={{ fontSize: 11, color: "#a1a1aa", marginTop: 2 }}>
+                    {parties.externalParty}
+                    {parties.employee && <span style={{ color: "#52525b", fontSize: 10 }}> via {parties.employee}</span>}
+                  </div>
+                ) : activity.from_number && activity.to_number ? (
+                  <span style={{ color: "#52525b", fontSize: 11, marginLeft: 8 }}>
+                    {activity.from_number} → {activity.to_number}
+                  </span>
+                ) : null;
+              })()}
             </>
           ) : activity.channel === "sms" || activity.channel === "text" ? (
             <>
@@ -319,8 +359,53 @@ function ActivityCard({
           )}
         </div>
 
-        {/* Transcript badge */}
-        {activity.transcript_id && (
+        {/* Action buttons for phone/call activities */}
+        {(activity.channel === "phone" || activity.channel === "call") && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            {(() => {
+              const recUrl = (transcriptData?.recording_url) || null;
+              return recUrl ? (
+                <button
+                  onClick={e => { e.stopPropagation(); window.open(recUrl, "_blank"); }}
+                  style={{
+                    padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                    cursor: "pointer", border: "1px solid #27272a", background: "#18181b", color: "#a1a1aa",
+                  }}
+                >▶ Play</button>
+              ) : null;
+            })()}
+            {activity.transcript_id && (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  setShowTranscript(!showTranscript);
+                  if (!showTranscript) loadTranscript();
+                }}
+                style={{
+                  padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                  cursor: "pointer", border: "1px solid #27272a", background: "#18181b",
+                  color: showTranscript ? "#34d399" : "#a1a1aa",
+                }}
+              >📝 Transcript</button>
+            )}
+            {transcriptData?.raw_text && (
+              <button
+                onClick={e => { e.stopPropagation(); copyTranscript(); }}
+                style={{
+                  padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                  cursor: "pointer", border: "1px solid #27272a", background: "#18181b",
+                  color: copied ? "#4ade80" : "#a1a1aa",
+                }}
+              >{copied ? "✓ Copied!" : "📋 Copy"}</button>
+            )}
+            {!activity.transcript_id && (
+              <span style={{ fontSize: 10, color: "#3f3f46" }}>No transcript</span>
+            )}
+          </div>
+        )}
+
+        {/* Transcript badge for non-phone channels */}
+        {activity.transcript_id && activity.channel !== "phone" && activity.channel !== "call" && (
           <div style={{
             fontSize: 10, color: "#34d399", padding: "2px 8px",
             backgroundColor: "#064e3b", borderRadius: 3,
@@ -399,30 +484,65 @@ function ActivityCard({
               padding: "10px 14px", backgroundColor: "#18181b", borderRadius: 6,
               border: "1px solid #27272a",
             }}>
-              <button
-                onClick={() => {
-                  setShowTranscript(!showTranscript);
-                  if (!showTranscript) loadTranscript();
-                }}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#34d399", fontSize: 12, fontWeight: 500,
-                  display: "flex", alignItems: "center", gap: 6, padding: 0,
-                }}
-              >
-                📝 {showTranscript ? "Hide Transcript" : "View Transcript"}
-                <span style={{ fontSize: 10, color: "#52525b" }}>
-                  {showTranscript ? "▲" : "▼"}
-                </span>
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: showTranscript ? 10 : 0 }}>
+                <button
+                  onClick={() => {
+                    setShowTranscript(!showTranscript);
+                    if (!showTranscript) loadTranscript();
+                  }}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#34d399", fontSize: 12, fontWeight: 500,
+                    display: "flex", alignItems: "center", gap: 6, padding: 0,
+                  }}
+                >
+                  📝 {showTranscript ? "Hide Transcript" : "View Transcript"}
+                  <span style={{ fontSize: 10, color: "#52525b" }}>
+                    {showTranscript ? "▲" : "▼"}
+                  </span>
+                </button>
+                {showTranscript && transcriptData?.raw_text && (
+                  <button
+                    onClick={copyTranscript}
+                    style={{
+                      padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                      cursor: "pointer", border: "1px solid #27272a", background: "#09090b",
+                      color: copied ? "#4ade80" : "#a1a1aa",
+                    }}
+                  >{copied ? "✓ Copied!" : "📋 Copy"}</button>
+                )}
+                {showTranscript && transcriptData?.recording_url && (
+                  <button
+                    onClick={() => window.open(transcriptData.recording_url!, "_blank")}
+                    style={{
+                      padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                      cursor: "pointer", border: "1px solid #27272a", background: "#09090b", color: "#a1a1aa",
+                    }}
+                  >▶ Play</button>
+                )}
+              </div>
               {showTranscript && (
-                <div style={{
-                  marginTop: 10, padding: "10px 12px",
-                  backgroundColor: "#0f0f12", borderRadius: 4,
-                  fontSize: 12, color: "#a1a1aa", lineHeight: 1.7,
-                  whiteSpace: "pre-wrap", maxHeight: 300, overflowY: "auto",
-                }}>
-                  {transcriptLoading ? "Loading transcript..." : transcriptText}
+                <div style={{ borderRadius: 4, overflow: "hidden" }}>
+                  {/* AI Summary */}
+                  {transcriptData?.ai_summary && (
+                    <div style={{
+                      padding: "10px 12px", backgroundColor: "#172554", fontSize: 12,
+                      color: "#93c5fd", lineHeight: 1.6, borderBottom: "1px solid #1e3a5f",
+                    }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: "#60a5fa", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>AI Summary</div>
+                      {transcriptData.ai_summary}
+                    </div>
+                  )}
+                  {/* Full transcript */}
+                  <div style={{
+                    padding: "10px 12px",
+                    backgroundColor: "#09090b", borderRadius: transcriptData?.ai_summary ? 0 : 4,
+                    fontSize: 12, color: "#a1a1aa", lineHeight: 1.7,
+                    whiteSpace: "pre-wrap", maxHeight: 300, overflowY: "auto",
+                    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+                  }}>
+                    {transcriptLoading ? "Loading transcript..." : transcriptData?.raw_text ?? ""}
+                  </div>
                 </div>
               )}
             </div>

@@ -52,11 +52,23 @@ interface Activity {
   channel: string | null;
   direction: string | null;
   subject: string | null;
+  body: string | null;
+  metadata: Record<string, unknown> | null;
   occurred_at: string;
   duration_sec: number | null;
+  duration_seconds: number | null;
   sentiment: string | null;
   is_read: boolean | null;
   needs_response: boolean | null;
+  transcript_id: string | null;
+  recording_url: string | null;
+}
+
+interface TranscriptData {
+  raw_text: string | null;
+  ai_summary: string | null;
+  speaker_segments: unknown[] | null;
+  recording_url: string | null;
 }
 
 interface ContactSecondary {
@@ -222,6 +234,59 @@ const CHANNEL_LABELS: Record<string, string> = {
   webform: "Web Form", form: "Web Form",
 };
 
+// ─── Phone Activity Helpers ───────────────────────────────────────────────────
+
+function formatDurationCompact(seconds: number | null | undefined): string {
+  if (!seconds || seconds <= 0) return "";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
+function parsePhoneDuration(activity: Activity): number | null {
+  // Try duration_seconds first (canonical), then duration_sec
+  if (activity.duration_seconds && activity.duration_seconds > 0) return activity.duration_seconds;
+  if (activity.duration_sec && activity.duration_sec > 0) return activity.duration_sec;
+  // Try metadata
+  const meta = activity.metadata;
+  if (meta && typeof meta.duration_seconds === "number" && meta.duration_seconds > 0) return meta.duration_seconds;
+  // Try parsing from body: "Duration: 889s | ..."
+  if (activity.body) {
+    const match = activity.body.match(/Duration:\s*(\d+)s/);
+    if (match) return parseInt(match[1], 10);
+  }
+  return null;
+}
+
+function parsePhoneParties(activity: Activity): { employee: string | null; externalParty: string | null } {
+  const meta = activity.metadata;
+  const isOutbound = activity.direction !== "inbound";
+  if (meta) {
+    const callerName = typeof meta.caller_name === "string" ? meta.caller_name : null;
+    const calleeName = typeof meta.callee_name === "string" ? meta.callee_name : null;
+    if (isOutbound) {
+      return { employee: callerName, externalParty: calleeName };
+    } else {
+      return { employee: calleeName, externalParty: callerName };
+    }
+  }
+  // Try parsing from body: "Grace Hoinowski → +16318071237"
+  if (activity.body) {
+    const arrowMatch = activity.body.match(/([^|]+?)\s*→\s*(.+)/);
+    if (arrowMatch) {
+      const left = arrowMatch[1].replace(/^.*\|\s*/, "").trim();
+      const right = arrowMatch[2].trim();
+      if (isOutbound) {
+        return { employee: left, externalParty: right };
+      } else {
+        return { employee: right, externalParty: left };
+      }
+    }
+  }
+  return { employee: null, externalParty: null };
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OpportunityPanel({ open, onClose, opportunity }: OpportunityPanelProps) {
@@ -231,6 +296,12 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
   const [activities, setActivities] = useState<Activity[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
+
+  // Transcript state
+  const [expandedActivityId, setExpandedActivityId] = useState<string | null>(null);
+  const [transcriptCache, setTranscriptCache] = useState<Record<string, TranscriptData>>({});
+  const [transcriptLoading, setTranscriptLoading] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Contact editing state — primary
   const [editing, setEditing] = useState(false);
@@ -271,6 +342,8 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
     setHistory([]);
     setActivities([]);
     setLocalNotes(opportunity?.notes ?? null);
+    setExpandedActivityId(null);
+    setTranscriptCache({});
   }, [opportunity?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch secondary contact fields + secondary member
@@ -330,7 +403,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
       if (opportunity.contact_id) {
         const { data } = await supabase
           .from("activities")
-          .select("id, channel, direction, subject, occurred_at, duration_sec, sentiment, is_read, needs_response")
+          .select("id, channel, direction, subject, body, metadata, occurred_at, duration_sec, duration_seconds, sentiment, is_read, needs_response, transcript_id, recording_url")
           .eq("contact_id", opportunity.contact_id)
           .order("occurred_at", { ascending: false })
           .limit(50);
@@ -343,7 +416,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
       // Fallback: try by opportunity_id
       const { data: fallbackData } = await supabase
         .from("activities")
-        .select("id, channel, direction, subject, occurred_at, duration_sec, sentiment, is_read, needs_response")
+        .select("id, channel, direction, subject, body, metadata, occurred_at, duration_sec, duration_seconds, sentiment, is_read, needs_response, transcript_id, recording_url")
         .eq("opportunity_id", opportunity.id)
         .order("occurred_at", { ascending: false })
         .limit(50);
@@ -424,6 +497,36 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
     setSaving(false);
     setEditing(false);
   }, [opportunity?.contact_id, editFirstName, editLastName, editEmail, editPhone, editFirstName2, editLastName2, editEmail2, editPhone2, secondaryMember]);
+
+  // Fetch transcript on demand
+  const fetchTranscript = useCallback(async (transcriptId: string, activityId: string) => {
+    if (transcriptCache[activityId]) return;
+    setTranscriptLoading(activityId);
+    try {
+      const { data } = await supabase
+        .from("transcripts")
+        .select("raw_text, ai_summary, speaker_segments, recording_url")
+        .eq("id", transcriptId)
+        .single();
+      if (data) {
+        setTranscriptCache(prev => ({ ...prev, [activityId]: data as TranscriptData }));
+      }
+    } catch {
+      setTranscriptCache(prev => ({ ...prev, [activityId]: { raw_text: "Failed to load transcript.", ai_summary: null, speaker_segments: null, recording_url: null } }));
+    }
+    setTranscriptLoading(null);
+  }, [transcriptCache]);
+
+  // Copy transcript to clipboard
+  const copyTranscript = useCallback(async (activityId: string) => {
+    const transcript = transcriptCache[activityId];
+    if (!transcript?.raw_text) return;
+    try {
+      await navigator.clipboard.writeText(transcript.raw_text);
+      setCopiedId(activityId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch { /* ignore */ }
+  }, [transcriptCache]);
 
   // Save notes — APPEND new note with timestamp
   const saveNotes = useCallback(async () => {
@@ -754,7 +857,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
 
             {/* ── Activity Tab ─────────────────────────────────────────── */}
             {activeTab === "activity" && (
-              <div style={{ maxHeight: 320, overflowY: "auto" }}>
+              <div style={{ maxHeight: 420, overflowY: "auto" }}>
                 {activityLoading ? (
                   <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Loading…</p>
                 ) : activities.length === 0 ? (
@@ -765,39 +868,172 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                       const channelKey = a.channel ?? "";
                       const icon = CHANNEL_ICONS[channelKey] ?? "📋";
                       const channelLabel = CHANNEL_LABELS[channelKey] ?? channelKey.replace(/_/g, " ");
-                      const subjectDisplay = a.subject || "(no subject)";
+                      const isPhone = channelKey === "phone" || channelKey === "call";
+                      const isExpanded = expandedActivityId === a.id;
+                      const transcript = transcriptCache[a.id];
+                      const isLoadingTranscript = transcriptLoading === a.id;
+
+                      // Phone-specific parsing
+                      const phoneDuration = isPhone ? parsePhoneDuration(a) : null;
+                      const phoneParties = isPhone ? parsePhoneParties(a) : null;
+                      const durationStr = phoneDuration ? formatDurationCompact(phoneDuration) : null;
+
+                      // Build subject display
+                      let subjectDisplay: string;
+                      if (isPhone) {
+                        const dirLabel = a.direction === "inbound" ? "Inbound Call" : "Outbound Call";
+                        const parts = [dirLabel];
+                        if (phoneParties?.employee) parts.push(phoneParties.employee);
+                        if (durationStr) parts.push(durationStr);
+                        subjectDisplay = parts.join(" — ");
+                        if (parts.length === 1 && durationStr) subjectDisplay = `${dirLabel} — ${durationStr}`;
+                        else if (phoneParties?.employee && durationStr) subjectDisplay = `${dirLabel} — ${phoneParties.employee} · ${durationStr}`;
+                        else if (phoneParties?.employee) subjectDisplay = `${dirLabel} — ${phoneParties.employee}`;
+                        else if (durationStr) subjectDisplay = `${dirLabel} — ${durationStr}`;
+                        else subjectDisplay = dirLabel;
+                      } else {
+                        subjectDisplay = a.subject || "(no subject)";
+                      }
+
+                      // Recording URL
+                      const recordingUrl = a.recording_url || transcript?.recording_url || null;
 
                       return (
-                        <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 0", borderBottom: "1px solid #1a1a1a" }}>
-                          <span style={{ fontSize: 16, flexShrink: 0, lineHeight: "20px" }}>
-                            {icon}
-                          </span>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                              <span style={{ fontSize: 10, fontWeight: 600, color: "#999", textTransform: "uppercase" }}>
-                                {channelLabel}
-                              </span>
-                              <span style={{
-                                color: a.direction === "inbound" ? "#4ade80" : "#60a5fa",
-                                fontSize: 10,
-                                fontWeight: 600,
-                              }}>
-                                {a.direction === "inbound" ? "↓ Inbound" : "↑ Outbound"}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: 12, color: "#ededed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {subjectDisplay}
-                            </div>
-                            <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 0, display: "inline" }}>
-                              {formatDateTime(a.occurred_at)}
-                              {a.duration_sec != null && a.duration_sec > 0 && (
-                                <span> · {Math.round(a.duration_sec / 60)}min</span>
+                        <div key={a.id} style={{ borderBottom: "1px solid #1a1a1a" }}>
+                          <div
+                            style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 0", cursor: isPhone ? "pointer" : "default" }}
+                            onClick={() => {
+                              if (isPhone) {
+                                const newId = isExpanded ? null : a.id;
+                                setExpandedActivityId(newId);
+                                if (newId && a.transcript_id && !transcriptCache[a.id]) {
+                                  fetchTranscript(a.transcript_id, a.id);
+                                }
+                              }
+                            }}
+                          >
+                            <span style={{ fontSize: 16, flexShrink: 0, lineHeight: "20px" }}>
+                              {icon}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                                <span style={{ fontSize: 10, fontWeight: 600, color: "#999", textTransform: "uppercase" }}>
+                                  {channelLabel}
+                                </span>
+                                <span style={{
+                                  color: a.direction === "inbound" ? "#4ade80" : "#60a5fa",
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                }}>
+                                  {a.direction === "inbound" ? "↓ Inbound" : "↑ Outbound"}
+                                </span>
+                                {isPhone && a.transcript_id && (
+                                  <span style={{ fontSize: 9, color: "#34d399", fontWeight: 500 }}>📝</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 12, color: "#ededed", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {subjectDisplay}
+                              </div>
+                              {isPhone && phoneParties?.externalParty && (
+                                <div style={{ fontSize: 11, color: "#a1a1aa", marginTop: 1 }}>
+                                  {phoneParties.externalParty}
+                                  {phoneParties.employee && (
+                                    <span style={{ color: "#555", fontSize: 10 }}> via {phoneParties.employee}</span>
+                                  )}
+                                </div>
                               )}
-                              {a.sentiment && (
-                                <span> · {a.sentiment}</span>
+                              <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 2 }}>
+                                {formatDateTime(a.occurred_at)}
+                                {!isPhone && a.duration_sec != null && a.duration_sec > 0 && (
+                                  <span> · {Math.round(a.duration_sec / 60)}min</span>
+                                )}
+                                {a.sentiment && (
+                                  <span> · {a.sentiment}</span>
+                                )}
+                              </div>
+                              {/* Action buttons for phone activities */}
+                              {isPhone && (
+                                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                                  {recordingUrl && (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); window.open(recordingUrl, "_blank"); }}
+                                      style={{
+                                        padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                                        cursor: "pointer", border: "1px solid #27272a", background: "#18181b", color: "#a1a1aa",
+                                      }}
+                                    >
+                                      ▶ Play
+                                    </button>
+                                  )}
+                                  {a.transcript_id && (
+                                    <button
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        const newId = isExpanded ? null : a.id;
+                                        setExpandedActivityId(newId);
+                                        if (newId && a.transcript_id && !transcriptCache[a.id]) {
+                                          fetchTranscript(a.transcript_id, a.id);
+                                        }
+                                      }}
+                                      style={{
+                                        padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                                        cursor: "pointer", border: "1px solid #27272a", background: "#18181b", color: "#a1a1aa",
+                                      }}
+                                    >
+                                      📝 Transcript
+                                    </button>
+                                  )}
+                                  {transcript?.raw_text && (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); copyTranscript(a.id); }}
+                                      style={{
+                                        padding: "2px 8px", fontSize: 10, fontWeight: 500, borderRadius: 3,
+                                        cursor: "pointer", border: "1px solid #27272a", background: "#18181b",
+                                        color: copiedId === a.id ? "#4ade80" : "#a1a1aa",
+                                      }}
+                                    >
+                                      {copiedId === a.id ? "✓ Copied!" : "📋 Copy"}
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
+
+                          {/* Expanded transcript section */}
+                          {isPhone && isExpanded && (
+                            <div style={{ padding: "0 0 8px 32px" }}>
+                              {isLoadingTranscript && (
+                                <div style={{ fontSize: 11, color: "#888", padding: "8px 0" }}>Loading transcript…</div>
+                              )}
+                              {transcript && (
+                                <div style={{ borderRadius: 6, overflow: "hidden" }}>
+                                  {/* AI Summary */}
+                                  {transcript.ai_summary && (
+                                    <div style={{
+                                      padding: "10px 12px", backgroundColor: "#172554", fontSize: 12,
+                                      color: "#93c5fd", lineHeight: 1.6, borderBottom: "1px solid #1e3a5f",
+                                    }}>
+                                      <div style={{ fontSize: 10, fontWeight: 600, color: "#60a5fa", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>AI Summary</div>
+                                      {transcript.ai_summary}
+                                    </div>
+                                  )}
+                                  {/* Full transcript */}
+                                  <div style={{
+                                    padding: "10px 12px", backgroundColor: "#09090b",
+                                    fontSize: 12, color: "#a1a1aa", lineHeight: 1.7,
+                                    whiteSpace: "pre-wrap", maxHeight: 300, overflowY: "auto",
+                                    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+                                  }}>
+                                    {transcript.raw_text ?? "No transcript text available."}
+                                  </div>
+                                </div>
+                              )}
+                              {!transcript && !isLoadingTranscript && !a.transcript_id && (
+                                <div style={{ fontSize: 11, color: "#555", padding: "8px 0" }}>No transcript available for this call.</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
