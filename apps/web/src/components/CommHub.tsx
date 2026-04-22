@@ -264,7 +264,12 @@ function ActivityCard({
             fontSize: 12, fontWeight: 600, color: "#ededed",
             display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap", flexShrink: 0,
           }}>
-            {actStyle.icon} {actStyle.label}
+            {actStyle.icon.startsWith("/") ? (
+              <img src={actStyle.icon} alt="" width={14} height={14} />
+            ) : (
+              <span>{actStyle.icon}</span>
+            )}
+            {actStyle.label}
           </span>
 
           {/* Priority badges — ALWAYS visible when applicable */}

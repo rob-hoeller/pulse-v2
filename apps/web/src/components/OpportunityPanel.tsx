@@ -926,7 +926,11 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                             }}
                           >
                             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                              <span style={{ fontSize: 14, lineHeight: "18px" }}>{style.icon}</span>
+                              {style.icon.startsWith("/") ? (
+                                <img src={style.icon} alt="" width={14} height={14} />
+                              ) : (
+                                <span style={{ fontSize: 14, lineHeight: "18px" }}>{style.icon}</span>
+                              )}
                               <span style={{ fontSize: 12, fontWeight: 600, color: "#ededed" }}>{style.label}:</span>
                               <span style={{ fontSize: 12, color: "#d4d4d8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
                                 {description}
