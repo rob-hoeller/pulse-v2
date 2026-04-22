@@ -895,9 +895,12 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                       } else if (isSms) {
                         description = a.body?.slice(0, 80) || "(no message)";
                       } else if (isWebForm) {
-                        const formType = a.subject || "form";
-                        const preview = a.body?.slice(0, 60) || "";
-                        description = preview ? `${formType} — ${preview}` : formType;
+                        // Parse form type and community/division from metadata or subject
+                        let meta: Record<string, unknown> = {};
+                        try { meta = typeof a.metadata === "string" ? JSON.parse(a.metadata) : (a.metadata ?? {}); } catch { /* */ }
+                        const formCode = (meta.form_type_code as string) || (a.subject?.replace("Web form: ", "").split(" ")[0]) || "form";
+                        const commName = (meta.community_name as string) || (meta.division_name as string) || "";
+                        description = commName ? `${formCode}: ${commName}` : formCode;
                       } else if (isMeeting) {
                         const meetDur = phoneDuration ? ` — ${durationStr}` : "";
                         description = (a.subject || "Meeting") + meetDur;
@@ -931,7 +934,8 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                               borderLeft: `4px solid ${style.borderColor}`,
                               backgroundColor: style.bgColor,
                               cursor: "pointer",
-                              borderBottom: "1px solid #1a1a1a",
+                              marginBottom: 4,
+                              borderRadius: 3,
                             }}
                           >
                             {style.icon.startsWith("/") ? (
