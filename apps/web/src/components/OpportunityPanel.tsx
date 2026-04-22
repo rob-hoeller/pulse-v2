@@ -1109,28 +1109,62 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                   const parsed = JSON.parse(interested);
                                   bodyText = parsed.interested_in || "";
                                 } catch { /* not JSON, use as-is */ }
+
+                                // Parse URL into 3 components: Page URL, Campaign, Ad
+                                let pageUrl = sourceUrl;
+                                let adInfo = "";
+                                let campaignInfo = "";
+                                if (sourceUrl) {
+                                  try {
+                                    const u = new URL(sourceUrl);
+                                    pageUrl = `${u.origin}${u.pathname}`;
+                                    const gclid = u.searchParams.get("gclid");
+                                    const gadCampaign = u.searchParams.get("gad_campaignid");
+                                    const utmSource = u.searchParams.get("utm_source");
+                                    const utmCampaign = u.searchParams.get("utm_campaign");
+                                    const utmMedium = u.searchParams.get("utm_medium");
+                                    if (gclid || gadCampaign) {
+                                      adInfo = `Google Ads${gadCampaign ? ` (Campaign: ${gadCampaign})` : ""}`;
+                                    }
+                                    if (utmSource || utmCampaign) {
+                                      campaignInfo = [utmSource, utmMedium, utmCampaign].filter(Boolean).join(" / ");
+                                    }
+                                  } catch { /* invalid URL */ }
+                                }
+
+                                const labelStyle = { fontWeight: 600 as const, textTransform: "uppercase" as const, letterSpacing: "0.04em", color: "#71717a", fontSize: 10 };
+
                                 return (
                                   <>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                      <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>FORM TYPE:  </span>
-                                      {formType}
+                                      <span style={labelStyle}>FORM TYPE:  </span>{formType}
                                     </div>
                                     {divName && (
                                       <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                        <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>DIVISION:  </span>
-                                        {divName}
+                                        <span style={labelStyle}>DIVISION:  </span>{divName}
                                       </div>
                                     )}
                                     {commName && (
                                       <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
-                                        <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>COMMUNITY:  </span>
-                                        {commName}
+                                        <span style={labelStyle}>COMMUNITY:  </span>{commName}
                                       </div>
                                     )}
-                                    {sourceUrl && (
+                                    {pageUrl && (
                                       <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3, wordBreak: "break-all" }}>
-                                        <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "#71717a", fontSize: 10 }}>URL:  </span>
-                                        <a href={sourceUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{sourceUrl}</a>
+                                        <span style={labelStyle}>PAGE URL:  </span>
+                                        <a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a>
+                                      </div>
+                                    )}
+                                    {campaignInfo && (
+                                      <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                        <span style={labelStyle}>CAMPAIGN:  </span>
+                                        <span style={{ color: "#c084fc" }}>{campaignInfo}</span>
+                                      </div>
+                                    )}
+                                    {adInfo && (
+                                      <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                        <span style={labelStyle}>AD:  </span>
+                                        <span style={{ color: "#fb923c" }}>{adInfo}</span>
                                       </div>
                                     )}
                                     {bodyText && (
