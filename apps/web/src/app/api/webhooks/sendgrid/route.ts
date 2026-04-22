@@ -50,6 +50,11 @@ export async function POST(request: Request) {
       const email = event.email?.toLowerCase();
       if (!email) continue;
 
+      // FILTER: Only process Pv2 events — skip Pv1/Heartbeat/other SendGrid traffic
+      const categories = event.category ?? [];
+      const isPv2 = categories.some(c => c.startsWith("pv2") || c === "pv2_osc_response" || c === "pv2_auto_confirm");
+      if (!isPv2) continue; // Skip non-Pv2 events entirely
+
       // Find the contact by email
       const { data: contacts } = await supabase
         .from("contacts")
