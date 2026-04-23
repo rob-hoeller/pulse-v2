@@ -89,6 +89,7 @@ const STAGE_CONFIG: Record<string, { label: string; color: string; bg: string }>
   lead_div:       { label: "DIVISION LEAD",   color: "#166534", bg: "#bbf7d0" },
   lead_com:       { label: "COMMUNITY LEAD",  color: "#1e40af", bg: "#bfdbfe" },
   queue:          { label: "OSC QUEUE",        color: "#92400e", bg: "#fde68a" },
+  csm_queue:      { label: "CSM QUEUE",        color: "#7c2d12", bg: "#ffedd5" },
   prospect_c:     { label: "PROSPECT C",       color: "#9a3412", bg: "#fed7aa" },
   prospect_b:     { label: "PROSPECT B",       color: "#1e40af", bg: "#bfdbfe" },
   prospect_a:     { label: "PROSPECT A",       color: "#166534", bg: "#bbf7d0" },

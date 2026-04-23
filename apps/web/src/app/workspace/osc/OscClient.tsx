@@ -203,7 +203,8 @@ function priorityBadge(p: string | null): { color: string; bg: string; label: st
 
 function stageLabel(stage: string | null | undefined): string {
   const map: Record<string, string> = {
-    lead_div: "Lead", lead_com: "Lead", queue: "Queue",
+    lead_div: "Lead", lead_com: "Lead", queue: "OSC Queue",
+    csm_queue: "CSM Queue",
     prospect_c: "Prospect C", prospect_b: "Prospect B", prospect_a: "Prospect A",
     homeowner: "Homeowner", archived: "Archived",
   };
@@ -261,11 +262,9 @@ function EmptyState() {
 // ─── Assign Lanes ─────────────────────────────────────────────────────────────
 
 const ASSIGN_LANES = [
-  { value: "lead_div", label: "Lead", description: "Division-level lead interest", needsCommunity: false },
-  { value: "lead_com", label: "Lead", description: "Community-level lead interest", needsCommunity: true },
-  { value: "prospect_c", label: "Prospect C", description: "30-90 day horizon", needsCommunity: true },
-  { value: "prospect_b", label: "Prospect B", description: "Intent within 30 days", needsCommunity: true },
-  { value: "prospect_a", label: "Prospect A", description: "Contract this week", needsCommunity: true },
+  { value: "lead_div", label: "Lead: Division", description: "Division-level lead interest", needsCommunity: false },
+  { value: "lead_com", label: "Lead: Community", description: "Community-level lead interest", needsCommunity: true },
+  { value: "csm_queue", label: "CSM Queue", description: "Ready for CSM to meet and evaluate", needsCommunity: true },
   { value: "archived", label: "Archive", description: "On ice, opted out, not interested right now", needsCommunity: false },
   { value: "deleted", label: "Delete", description: "Spam, junk, remove from system", needsCommunity: false },
 ] as const;
@@ -286,7 +285,7 @@ function AssignModal({
   const defaultStage = recommendation?.stage ?? (() => {
     const src = item.opportunity_source ?? item.source;
     if (src === "subscribe_region") return "lead_div";
-    if (src === "schedule_appt" || src === "schedule_visit") return "prospect_c";
+    if (src === "schedule_appt" || src === "schedule_visit") return "csm_queue";
     if (item.community_id) return "lead_com";
     return "lead_div";
   })();
@@ -617,7 +616,7 @@ function QueueCard({
           // Fallback recommendation based on form data
           const src = item.opportunity_source ?? item.source;
           const fallbackStage = src === "subscribe_region" ? "lead_div"
-            : (src === "schedule_appt" || src === "schedule_visit") ? "prospect_c"
+            : (src === "schedule_appt" || src === "schedule_visit") ? "csm_queue"
             : item.community_id ? "lead_com" : "lead_div";
           setRecommendation({
             stage: fallbackStage,
