@@ -131,7 +131,7 @@ interface GeneratedResponses {
   sms?: { body: string };
 }
 
-type QueueBucket = "new_inbound" | "re_engaged" | "ai_surfaced";
+type QueueBucket = "new_inbound" | "re_engaged";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -178,15 +178,13 @@ function isSchellieSource(item: QueueItem): boolean {
 }
 
 function classifyBucket(item: QueueItem): QueueBucket {
-  if (item.queue_source === "ai_surfaced" || item.opportunity_source === "ai_auto_promote") return "ai_surfaced";
   if (item.is_new_contact === false || item.prior_stage) return "re_engaged";
   return "new_inbound";
 }
 
 const BUCKET_META: { id: QueueBucket; icon: string; label: string; description: string }[] = [
-  { id: "new_inbound", icon: "", label: "New", description: "Brand new contacts, never in the system" },
-  { id: "re_engaged", icon: "", label: "Existing", description: "Existing leads/prospects re-engaging" },
-  { id: "ai_surfaced", icon: "", label: "AI", description: "AI-surfaced based on scoring/signals" },
+  { id: "new_inbound", icon: "", label: "New", description: "Brand new contacts" },
+  { id: "re_engaged", icon: "", label: "Existing", description: "Returning leads/prospects" },
 ];
 
 function channelIcon(ch: string | null): React.ReactNode {
@@ -1413,7 +1411,7 @@ function QueueCard({
           )}
 
           {/* ── AI Surfaced: Signals ── */}
-          {bucket === "ai_surfaced" && (
+          {(item.queue_source === "ai_surfaced" || item.opportunity_source === "ai_auto_promote") && (
             <div style={{
               padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
               borderRadius: 8,
@@ -1821,6 +1819,7 @@ export default function OscClient() {
   const [assignRec, setAssignRec] = useState<AgentRecommendation | null>(null);
   const [panelItem, setPanelItem] = useState<QueueItem | null>(null);
   const [activeBucket, setActiveBucket] = useState<QueueBucket>("new_inbound");
+  const [queueSearch, setQueueSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [oscUsers, setOscUsers] = useState<TeamUser[]>([]);
   const [drillBucket, setDrillBucket] = useState<QueueBucket | null>(null);
@@ -1952,17 +1951,26 @@ export default function OscClient() {
 
   // ── Bucketed queue ──
   const bucketCounts: Record<QueueBucket, number> = {
-    new_inbound: 0, re_engaged: 0, ai_surfaced: 0,
+    new_inbound: 0, re_engaged: 0,
   };
   const bucketedItems: Record<QueueBucket, QueueItem[]> = {
-    new_inbound: [], re_engaged: [], ai_surfaced: [],
+    new_inbound: [], re_engaged: [],
   };
   for (const item of filteredQueueItems) {
     const bucket = classifyBucket(item);
     bucketCounts[bucket]++;
     bucketedItems[bucket].push(item);
   }
-  const currentBucketItems = bucketedItems[activeBucket];
+  const currentBucketItems = bucketedItems[activeBucket].filter(item => {
+    if (!queueSearch.trim()) return true;
+    const q = queueSearch.toLowerCase();
+    const name = `${item.contacts?.first_name ?? ""} ${item.contacts?.last_name ?? ""}`.toLowerCase();
+    const email = (item.contacts?.email ?? "").toLowerCase();
+    const phone = item.contacts?.phone ?? "";
+    const comm = (item.communities?.name ?? "").toLowerCase();
+    const src = (item.opportunity_source ?? item.source ?? "").toLowerCase();
+    return name.includes(q) || email.includes(q) || phone.includes(q) || comm.includes(q) || src.includes(q);
+  });
 
   // Drill-down items
   const drillBucketMeta = drillBucket ? BUCKET_META.find(b => b.id === drillBucket) : null;
@@ -2155,9 +2163,24 @@ export default function OscClient() {
           <div style={isMobile ? {} : { display: "flex", gap: 20, alignItems: "flex-start" }}>
             {/* ── LEFT: Queue (50%) ── */}
             <div style={isMobile ? { display: mobileTab === "queue" ? "block" : "none" } : { flex: "0 0 50%", minWidth: 0 }}>
-              {!isMobile && <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Queue</span>
-                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600, backgroundColor: filteredQueueItems.length > 0 ? "#7f1d1d" : "#052e16", color: filteredQueueItems.length > 0 ? "#fca5a5" : "#4ade80" }}>{filteredQueueItems.length}</span>
+              {!isMobile && <div style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Queue</span>
+                    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, fontWeight: 600, backgroundColor: filteredQueueItems.length > 0 ? "#7f1d1d" : "#052e16", color: filteredQueueItems.length > 0 ? "#fca5a5" : "#4ade80" }}>{filteredQueueItems.length}</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search queue..."
+                    value={queueSearch}
+                    onChange={e => setQueueSearch(e.target.value)}
+                    style={{
+                      backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: 6,
+                      padding: "5px 10px", fontSize: 11, color: "#a1a1aa", outline: "none",
+                      width: 180,
+                    }}
+                  />
+                </div>
               </div>}
 
               {drillBucket ? (
