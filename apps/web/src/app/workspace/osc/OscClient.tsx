@@ -45,6 +45,7 @@ interface QueueItem {
   created_at: string;
   contacts: { first_name: string; last_name: string; email: string | null; phone: string | null } | null;
   communities: { name: string } | null;
+  divisions: { name: string } | null;
   prior_stage?: string | null;
   prior_community?: string | null;
   is_new_contact?: boolean;
@@ -752,7 +753,7 @@ function QueueCard({
 
   // Recommendation display label
   const recLabel = recommendation
-    ? `${stageLabel(recommendation.stage)}${recommendation.community_name ? ` · ${recommendation.community_name}` : ""}`
+    ? `${stageLabel(recommendation.stage)}${recommendation.community_name ? `: ${recommendation.community_name}` : recommendation.stage === "lead_div" ? `: ${divisionName || "Division"}` : ""}`
     : null;
 
   return (
@@ -1855,7 +1856,7 @@ export default function OscClient() {
 
     const oppQuery = supabase
       .from("opportunities")
-      .select("id, contact_id, crm_stage, community_id, division_id, osc_id, source, opportunity_source, queue_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
+      .select("id, contact_id, crm_stage, community_id, division_id, osc_id, source, opportunity_source, queue_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name), divisions(name)")
       .eq("crm_stage", "queue")
       .order("last_activity_at", { ascending: false });
     if (filter.divisionId) oppQuery.eq("division_id", filter.divisionId);
@@ -1865,6 +1866,7 @@ export default function OscClient() {
       ...item,
       contacts: Array.isArray(item.contacts) ? (item.contacts as Record<string, unknown>[])[0] ?? null : item.contacts,
       communities: Array.isArray(item.communities) ? (item.communities as Record<string, unknown>[])[0] ?? null : item.communities,
+      divisions: Array.isArray(item.divisions) ? (item.divisions as Record<string, unknown>[])[0] ?? null : item.divisions,
     })) as QueueItem[];
 
     // Enrich with prior state
@@ -2230,7 +2232,7 @@ export default function OscClient() {
                     <QueueCard
                       key={item.id}
                       item={item}
-                      divisionName={labels.division ?? ""}
+                      divisionName={item.divisions?.name ?? labels.division ?? ""}
                       isMobile={isMobile}
                       communities={communities}
                       onAssign={(rec) => {
@@ -2294,7 +2296,7 @@ export default function OscClient() {
         <AssignModal
           item={assignItem}
           communities={communities}
-          divisionName={labels.division ?? ""}
+          divisionName={assignItem.divisions?.name ?? labels.division ?? ""}
           recommendation={assignRec}
           onClose={() => { setAssignItem(null); setAssignRec(null); }}
           onExecute={handleAssign}
