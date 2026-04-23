@@ -407,26 +407,26 @@ export default function DsmClient() {
 
   // Fetch division overview data
   const fetchDivisionData = useCallback(async () => {
-    if (!filter.divisionId) return;
     setLoading(true);
-    const divId = filter.divisionId;
 
     try {
-      // Communities in this division
-      const { data: comms } = await supabase
+      // Communities — all or filtered by division
+      const commQuery = supabase
         .from("communities")
         .select("id, name, division_id")
-        .eq("division_id", divId)
         .order("name");
+      if (filter.divisionId) commQuery.eq("division_id", filter.divisionId);
+      const { data: comms } = await commQuery;
       const commList = (comms ?? []) as Community[];
       setCommunities(commList);
       const commIds = commList.map(c => c.id);
 
       // All opportunities in division
-      const { data: opps } = await supabase
+      const oppQuery = supabase
         .from("opportunities")
-        .select("id, crm_stage, community_id, csm_id, created_at, last_activity_at")
-        .eq("division_id", divId);
+        .select("id, crm_stage, community_id, csm_id, created_at, last_activity_at");
+      if (filter.divisionId) oppQuery.eq("division_id", filter.divisionId);
+      const { data: opps } = await oppQuery;
       const oppList = opps ?? [];
 
       // Pipeline counts
@@ -563,7 +563,7 @@ export default function DsmClient() {
   }, [filter.divisionId]);
 
   useEffect(() => {
-    if (filter.divisionId && !filter.communityId) {
+    if (!filter.communityId) {
       fetchDivisionData();
     }
   }, [filter.divisionId, filter.communityId, fetchDivisionData]);
@@ -573,8 +573,8 @@ export default function DsmClient() {
 
   // ── Render ──
 
-  const isDivisionView = filter.divisionId && !filter.communityId;
-  const isCommunityDrill = filter.divisionId && filter.communityId;
+  const isDivisionView = !filter.communityId;
+  const isCommunityDrill = filter.communityId;
 
   return (
     <div style={{
@@ -602,8 +602,8 @@ export default function DsmClient() {
           }}>
             Loading division data...
           </div>
-        ) : !filter.divisionId ? (
-          <EmptyState />
+        ) : false ? (
+          null
         ) : isCommunityDrill ? (
           <CommunityDrillDown
             communityId={filter.communityId!}

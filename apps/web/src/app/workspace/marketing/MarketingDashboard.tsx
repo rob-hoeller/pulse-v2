@@ -347,21 +347,21 @@ export default function MarketingDashboard() {
 
   // ── Fetch data ──
   const fetchData = useCallback(async () => {
-    if (!filter.divisionId) return;
     setLoading(true);
 
+    const oppQuery = supabase
+      .from("opportunities")
+      .select("id, contact_id, crm_stage, community_id, division_id, source, opportunity_source, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
+      .in("crm_stage", ["lead_div", "lead_com"])
+      .order("last_activity_at", { ascending: false });
+    if (filter.divisionId) oppQuery.eq("division_id", filter.divisionId);
+
+    const commQuery = supabase.from("communities").select("id, name").order("name");
+    if (filter.divisionId) commQuery.eq("division_id", filter.divisionId);
+
     const [leadsRes, commsRes, transitionsRes] = await Promise.all([
-      supabase
-        .from("opportunities")
-        .select("id, contact_id, crm_stage, community_id, division_id, source, opportunity_source, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
-        .eq("division_id", filter.divisionId)
-        .in("crm_stage", ["lead_div", "lead_com"])
-        .order("last_activity_at", { ascending: false }),
-      supabase
-        .from("communities")
-        .select("id, name")
-        .eq("division_id", filter.divisionId)
-        .order("name"),
+      oppQuery,
+      commQuery,
       supabase
         .from("stage_transitions")
         .select("id, opportunity_id, from_stage, to_stage, created_at")
@@ -383,12 +383,6 @@ export default function MarketingDashboard() {
   }, [filter.divisionId]);
 
   useEffect(() => {
-    if (!filter.divisionId) {
-      setLeads([]);
-      setCommunities([]);
-      setConversionsThisMonth(0);
-      return;
-    }
     fetchData();
   }, [filter.divisionId, fetchData]);
 
@@ -528,19 +522,6 @@ export default function MarketingDashboard() {
     { id: "new_week", icon: "", label: "New This Week", count: newThisWeek.length },
     { id: "warming", icon: "", label: "Warming Up", count: leads.filter(l => (l.engagement_score ?? 0) > 50).length },
   ];
-
-  // ── No division selected ──
-  if (!filter.divisionId) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#09090b", color: "#fafafa" }}>
-        <div style={{ padding: "10px 24px", borderBottom: "1px solid #27272a", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <span style={{ fontSize: 14, fontWeight: 600 }}>Marketing Command Center</span>
-          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#18181b", border: "1px solid #27272a", color: "#71717a" }}>Lead Management</span>
-        </div>
-        <EmptyState />
-      </div>
-    );
-  }
 
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 

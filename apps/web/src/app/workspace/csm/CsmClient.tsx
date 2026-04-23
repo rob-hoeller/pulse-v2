@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import CommunityView from "./CommunityDashboard";
+import CommHub from "@/components/CommHub";
 
 // ─── Supabase client ──────────────────────────────────────────────────────────
 
@@ -132,10 +133,6 @@ export default function CsmClient() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#555", fontSize: 13 }}>
             Loading community data...
           </div>
-        ) : !filter.divisionId ? (
-          <EmptyState />
-        ) : !filter.communityId ? (
-          <DivisionOnlyState divisionName={labels.division ?? "Division"} />
         ) : community ? (
           <CommunityView
             community={community}
@@ -146,7 +143,16 @@ export default function CsmClient() {
             divisions={divisions}
           />
         ) : (
-          <EmptyState />
+          <div style={{ padding: 24 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#fafafa", marginBottom: 4 }}>CSM Command Center</div>
+            <div style={{ fontSize: 12, color: "#71717a", marginBottom: 16 }}>
+              {filter.divisionId ? `${labels.division} — select a community for full dashboard` : "All Divisions — select a division and community for full dashboard"}
+            </div>
+            <CommHub
+              communityId={filter.communityId ?? undefined}
+              divisionId={filter.divisionId ?? undefined}
+            />
+          </div>
         )}
       </div>
     </div>
