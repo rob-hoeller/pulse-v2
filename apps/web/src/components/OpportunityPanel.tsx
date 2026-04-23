@@ -371,15 +371,22 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
       return;
     }
     if (!opportunity?.id) { setResolvedDivision(null); return; }
+    // Two-step: get division_id from opportunity, then name from divisions
     supabase
       .from("opportunities")
-      .select("division_id, divisions(name)")
+      .select("division_id")
       .eq("id", opportunity.id)
       .single()
       .then(({ data }) => {
-        const div = data?.divisions;
-        const name = Array.isArray(div) ? (div[0] as Record<string, unknown>)?.name as string : (div as Record<string, unknown>)?.name as string;
-        setResolvedDivision(name ?? null);
+        if (!data?.division_id) return;
+        supabase
+          .from("divisions")
+          .select("name")
+          .eq("id", data.division_id as string)
+          .single()
+          .then(({ data: divData }) => {
+            setResolvedDivision(divData?.name ?? null);
+          });
       });
   }, [opportunity?.id, opportunity?.division_name]);
 
