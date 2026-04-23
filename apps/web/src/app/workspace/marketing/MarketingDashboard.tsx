@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
+import OpportunityPanel, { type OpportunityPanelData } from "@/components/OpportunityPanel";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
@@ -128,12 +129,13 @@ function MetricCard({ label, value, sub, accent }: { label: string; value: strin
 // ─── Lead Card ────────────────────────────────────────────────────────────────
 
 function LeadCard({
-  item, communities, onPromoteToQueue, onAssignCommunity,
+  item, communities, onPromoteToQueue, onAssignCommunity, onNameClick,
 }: {
   item: LeadItem;
   communities: CommunityRef[];
   onPromoteToQueue: (id: string) => void;
   onAssignCommunity: (id: string, communityId: string) => void;
+  onNameClick: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showCommunityPicker, setShowCommunityPicker] = useState(false);
@@ -155,7 +157,7 @@ function LeadCard({
       }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: "#fafafa" }}>{name}</span>
+            <span onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{name}</span>
             <span style={{
               fontSize: 9, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
               backgroundColor: isDiv ? "rgba(168,85,247,0.15)" : "rgba(59,130,246,0.15)",
@@ -344,6 +346,7 @@ export default function MarketingDashboard() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<LeadTab>("lead_div");
   const [communityFilter, setCommunityFilter] = useState<string | null>(null);
+  const [selectedPanel, setSelectedPanel] = useState<OpportunityPanelData | null>(null);
 
   // ── Fetch data ──
   const fetchData = useCallback(async () => {
@@ -637,6 +640,12 @@ export default function MarketingDashboard() {
                         communities={communities}
                         onPromoteToQueue={handlePromoteToQueue}
                         onAssignCommunity={handleAssignCommunity}
+                        onNameClick={() => setSelectedPanel({
+                          opportunityId: item.id,
+                          contactId: item.contact_id,
+                          communityId: item.community_id ?? undefined,
+                          divisionId: item.division_id ?? undefined,
+                        })}
                       />
                     ))}
                   </div>
@@ -740,6 +749,14 @@ export default function MarketingDashboard() {
           </div>
         )}
       </div>
+
+      {/* Opportunity Side Panel */}
+      {selectedPanel && (
+        <OpportunityPanel
+          data={selectedPanel}
+          onClose={() => setSelectedPanel(null)}
+        />
+      )}
     </div>
   );
 }
