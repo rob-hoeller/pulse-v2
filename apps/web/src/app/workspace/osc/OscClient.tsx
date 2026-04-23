@@ -288,7 +288,7 @@ function AssignModal({
   const defaultStage = recommendation?.stage ?? (() => {
     const src = item.opportunity_source ?? item.source;
     if (src === "subscribe_region") return "lead_div";
-    if (src === "schedule_appt" || src === "schedule_visit") return "csm_queue";
+    if (src === "schedule_appt" || src === "schedule_visit" || src === "schellie_conversion") return "csm_queue";
     if (item.community_id) return "lead_com";
     return "lead_div";
   })();
@@ -618,13 +618,18 @@ function QueueCard({
         } else {
           // Fallback recommendation based on form data
           const src = item.opportunity_source ?? item.source;
-          const fallbackStage = src === "subscribe_region" ? "lead_div"
-            : (src === "schedule_appt" || src === "schedule_visit") ? "csm_queue"
+          // High-intent signals → CSM Queue
+          const isHighIntent = src === "schedule_appt" || src === "schedule_visit" || src === "schellie_conversion";
+          const fallbackStage = isHighIntent ? "csm_queue"
+            : src === "subscribe_region" ? "lead_div"
             : item.community_id ? "lead_com" : "lead_div";
+          const fallbackReasoning = isHighIntent
+            ? `High intent: ${src === "schellie_conversion" ? "Schellie chat conversion — wants to visit. Connect with buyer, confirm fit, then assign to CSM." : `${sourceLabel(src)} — connect with buyer then assign to CSM.`}`
+            : `Based on form type: ${sourceLabel(src)}`;
           setRecommendation({
             stage: fallbackStage,
-            confidence: 70,
-            reasoning: `Based on form type: ${src ?? "unknown"}`,
+            confidence: isHighIntent ? 85 : 70,
+            reasoning: fallbackReasoning,
             community_id: item.community_id,
             community_name: item.communities?.name ?? null,
           });
