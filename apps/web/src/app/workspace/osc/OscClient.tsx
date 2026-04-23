@@ -497,8 +497,9 @@ function QueueCard({
   const [autoEditing, setAutoEditing] = useState(false);
   const [autoSent, setAutoSent] = useState(false);
   const [autoSkipped, setAutoSkipped] = useState(false);
+  // Start all messaging sections collapsed by default
   const [autoSending, setAutoSending] = useState(false);
-  const [autoCollapsed, setAutoCollapsed] = useState(false);
+  const [autoCollapsed, setAutoCollapsed] = useState(true);
 
   // Personal follow-up email state
   const [personalSubject, setPersonalSubject] = useState("");
@@ -544,7 +545,7 @@ function QueueCard({
   const [personalSent, setPersonalSent] = useState(false);
   const [personalSkipped, setPersonalSkipped] = useState(false);
   const [personalSending, setPersonalSending] = useState(false);
-  const [personalCollapsed, setPersonalCollapsed] = useState(false);
+  const [personalCollapsed, setPersonalCollapsed] = useState(true);
 
   // SMS state
   const [smsBody, setSmsBody] = useState("");
@@ -552,7 +553,7 @@ function QueueCard({
   const [smsSent, setSmsSent] = useState(false);
   const [smsSkipped, setSmsSkipped] = useState(false);
   const [smsSending, setSmsSending] = useState(false);
-  const [smsCollapsed, setSmsCollapsed] = useState(false);
+  const [smsCollapsed, setSmsCollapsed] = useState(true);
 
   const webForm = isWebFormSource(item);
   const isSchellie = isSchellieSource(item);
@@ -1122,15 +1123,14 @@ function QueueCard({
           {/* ── Web Form: Auto-Confirmation Email ── */}
           {(webForm || isSchellie) && item.contacts?.email && (
             <div style={{
-              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              padding: autoCollapsed ? "8px 12px" : "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
               borderRadius: 8, opacity: autoSent || autoSkipped ? 0.5 : 1,
             }}>
-              <div onClick={() => !autoSent && !autoSkipped && setAutoCollapsed(!autoCollapsed)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: autoCollapsed ? 0 : 8, cursor: "pointer" }}>
+              <div onClick={() => !autoSent && !autoSkipped && setAutoCollapsed(!autoCollapsed)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: autoCollapsed ? 0 : 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    <img src="/icons/activity/email.svg" alt="" width={12} height={12} style={{ verticalAlign: "middle", marginRight: 4 }} />Auto-Confirmation
-                  </div>
-                  <span style={{ fontSize: 9, color: "#52525b", fontStyle: "italic" }}>SendGrid noreply@</span>
+                  <img src="/icons/activity/email.svg" alt="" width={12} height={12} />
+                  <span style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Auto-Confirmation</span>
+                  {autoCollapsed && autoSubject && <span style={{ fontSize: 10, color: "#52525b" }}>— {autoSubject.slice(0, 40)}</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   {autoSent && <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600 }}>✓ Sent</span>}
@@ -1200,15 +1200,14 @@ function QueueCard({
           {/* ── Personal Follow-Up Email ── */}
           {(webForm || isSchellie) && item.contacts?.email && (
             <div style={{
-              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              padding: personalCollapsed ? "8px 12px" : "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
               borderRadius: 8, opacity: personalSent || personalSkipped ? 0.5 : 1,
             }}>
-              <div onClick={() => !personalSent && !personalSkipped && setPersonalCollapsed(!personalCollapsed)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: personalCollapsed ? 0 : 8, cursor: "pointer" }}>
+              <div onClick={() => !personalSent && !personalSkipped && setPersonalCollapsed(!personalCollapsed)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: personalCollapsed ? 0 : 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    <img src="/icons/activity/email.svg" alt="" width={12} height={12} style={{ verticalAlign: "middle", marginRight: 4 }} />Personal Follow-Up
-                  </div>
-                  <span style={{ fontSize: 9, color: "#52525b", fontStyle: "italic" }}>OSC via Outlook</span>
+                  <img src="/icons/activity/email.svg" alt="" width={12} height={12} />
+                  <span style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Personal Follow-Up</span>
+                  {personalCollapsed && personalSubject && <span style={{ fontSize: 10, color: "#52525b" }}>— {personalSubject.slice(0, 40)}</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   {personalSent && <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600 }}>✓ Sent</span>}
@@ -1357,14 +1356,14 @@ function QueueCard({
           {/* ── SMS Follow-Up ── */}
           {(webForm || isSchellie) && item.contacts?.phone && (
             <div style={{
-              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              padding: smsCollapsed ? "8px 12px" : "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
               borderRadius: 8, opacity: smsSent || smsSkipped ? 0.5 : 1,
             }}>
-              <div onClick={() => !smsSent && !smsSkipped && setSmsCollapsed(!smsCollapsed)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: smsCollapsed ? 0 : 8, cursor: "pointer" }}>
+              <div onClick={() => !smsSent && !smsSkipped && setSmsCollapsed(!smsCollapsed)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: smsCollapsed ? 0 : 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    <img src="/icons/activity/text.svg" alt="" width={12} height={12} style={{ verticalAlign: "middle", marginRight: 4 }} />SMS Follow-Up
-                  </div>
+                  <img src="/icons/activity/text.svg" alt="" width={12} height={12} />
+                  <span style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>SMS Follow-Up</span>
+                  {smsCollapsed && smsBody && <span style={{ fontSize: 10, color: "#52525b" }}>— {smsBody.slice(0, 40)}...</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   {smsSent && <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600 }}>✓ Sent</span>}
