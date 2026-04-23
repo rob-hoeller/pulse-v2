@@ -1838,11 +1838,12 @@ export default function OscClient() {
 
   // ── Fetch queue + tasks (READ only — Supabase reads are fine) ──
   const fetchData = useCallback(async () => {
-    if (!filter.divisionId) return;
     setLoading(true);
 
-    const { data: comms } = await supabase
-      .from("communities").select("id, name").eq("division_id", filter.divisionId).order("name");
+    // Communities: all if no division filter, or scoped
+    const commQuery = supabase.from("communities").select("id, name").order("name");
+    if (filter.divisionId) commQuery.eq("division_id", filter.divisionId);
+    const { data: comms } = await commQuery;
     setCommunities(comms ?? []);
 
     const { data: users } = await supabase
@@ -1852,12 +1853,13 @@ export default function OscClient() {
       .eq("is_active", true);
     setOscUsers((users as TeamUser[]) ?? []);
 
-    const { data: items } = await supabase
+    const oppQuery = supabase
       .from("opportunities")
       .select("id, contact_id, crm_stage, community_id, division_id, osc_id, source, opportunity_source, queue_source, notes, budget_min, budget_max, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
       .eq("crm_stage", "queue")
-      .eq("division_id", filter.divisionId)
       .order("last_activity_at", { ascending: false });
+    if (filter.divisionId) oppQuery.eq("division_id", filter.divisionId);
+    const { data: items } = await oppQuery;
 
     const flat = (items ?? []).map((item: Record<string, unknown>) => ({
       ...item,
@@ -1923,12 +1925,6 @@ export default function OscClient() {
   }, [filter.divisionId]);
 
   useEffect(() => {
-    if (!filter.divisionId) {
-      setQueueItems([]);
-      setTasks([]);
-      setCommunities([]);
-      return;
-    }
     fetchData();
 
     const channel = supabase
@@ -2065,19 +2061,6 @@ export default function OscClient() {
     fetchData();
   }
 
-  // ── No division selected ──
-  if (!filter.divisionId) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#09090b", color: "#fafafa" }}>
-        <div style={{ padding: "10px 24px", borderBottom: "1px solid #27272a", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <span style={{ fontSize: 14, fontWeight: 600 }}>OSC Command Center</span>
-          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, backgroundColor: "#18181b", border: "1px solid #27272a", color: "#71717a" }}>Online Sales Consultant</span>
-        </div>
-        <EmptyState />
-      </div>
-    );
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", backgroundColor: "#09090b", color: "#fafafa" }}>
       {/* ── Top Bar ── */}
@@ -2089,7 +2072,7 @@ export default function OscClient() {
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "#fafafa" }}>OSC</span>
             <span style={{ fontSize: 9, color: "#71717a" }}>·</span>
-            <span style={{ fontSize: 10, color: "#71717a" }}>{labels.division ?? "Div"}</span>
+            <span style={{ fontSize: 10, color: "#71717a" }}>{labels.division ?? "All Divisions"}</span>
             <span style={{ fontSize: 9, color: "#71717a" }}>·</span>
             <span style={{
               fontSize: 11, fontWeight: 700,
