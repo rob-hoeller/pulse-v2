@@ -1226,7 +1226,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                     </div>
                                     <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3, wordBreak: "break-all" }}>
                                       <span style={labelStyle}>PAGE URL:  </span>
-                                      {pageUrl ? <a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a> : valDash}
+                                      {pageUrl ? <a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#60a5fa", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a> : valDash}
                                     </div>
 
                                     {/* ── Ad Attribution Section ── */}

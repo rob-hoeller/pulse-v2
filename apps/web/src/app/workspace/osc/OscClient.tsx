@@ -904,7 +904,7 @@ function QueueCard({
                       <div><span style={lbl}>Click ID</span><div style={{ ...val, wordBreak: "break-all" }}>{clickId ? `${clickType}: ${clickId}` : "—"}</div></div>
                     </div>
                     {pageUrl && (
-                      <div style={{ marginTop: 4 }}><span style={lbl}>Page URL</span><div style={{ ...val, wordBreak: "break-all" }}><a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a></div></div>
+                      <div style={{ marginTop: 4 }}><span style={lbl}>Page URL</span><div style={{ ...val, wordBreak: "break-all" }}><a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#60a5fa", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a></div></div>
                     )}
                   </div>
                 );
@@ -933,10 +933,62 @@ function QueueCard({
                   <img src="/icons/activity/ai.svg" alt="" width={12} height={12} style={{ opacity: 0.8 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>AI Recommendation</span>
                 </div>
-                {/* Next Steps */}
-                <div style={{ fontSize: 12, color: "#86efac", lineHeight: 1.5, marginBottom: 10 }}>
-                  <span style={{ color: "#4ade80", fontWeight: 600 }}>Next Steps: </span>{recommendation.reasoning}
-                </div>
+                {/* Contextual Analysis */}
+                {(() => {
+                  const m = wfMeta || {} as Record<string, unknown>;
+                  const adPlatform = (m.ad_platform as string) || "";
+                  const campaign = (m.utm_campaign as string) || "";
+                  const formType = sourceLabel(item.opportunity_source ?? item.source);
+                  const hasPhone = !!item.contacts?.phone;
+                  const hasEmail = !!item.contacts?.email;
+                  const interested = (m.interested_in as string) || item.notes || "";
+                  const commName = item.communities?.name || (m.community_name as string) || "";
+                  const divName = divisionName || (m.division_name as string) || "";
+                  const src = item.opportunity_source ?? item.source ?? "";
+
+                  // Build analysis
+                  const analysisParts: string[] = [];
+                  if (adPlatform) {
+                    analysisParts.push(`Opportunity came via ${adPlatform}${campaign ? ` (${campaign})` : ""} paid ad click and submitted ${formType} webform.`);
+                  } else {
+                    analysisParts.push(`Opportunity submitted ${formType} webform${commName ? ` for ${commName}` : divName ? ` for ${divName}` : ""}.`);
+                  }
+                  const captured: string[] = [];
+                  if (hasEmail) captured.push("email");
+                  if (hasPhone) captured.push("phone");
+                  if (item.contacts?.first_name) captured.push("name");
+                  analysisParts.push(`Captured ${captured.join(" and ")}${!hasPhone ? " — no phone" : ""}.`);
+                  if (interested) analysisParts.push(`Interest: ${interested.slice(0, 100)}.`);
+
+                  // Build recommendation
+                  const recParts: string[] = [];
+                  if (src === "schellie_conversion") {
+                    recParts.push("Connect with buyer, confirm community fit, then assign to CSM Queue.");
+                  } else if (src === "schedule_visit" || src === "schedule_appt") {
+                    recParts.push("High intent — call to confirm visit, then assign to CSM Queue.");
+                  } else if (src === "subscribe_region" || src === "subscribe_community" || src === "prelaunch_community") {
+                    if (hasEmail && !hasPhone) {
+                      recParts.push(`Trigger auto and personal email sequence and assign to ${recommendation.stage === "lead_div" ? `LEAD: ${divName}` : `LEAD: ${commName}`} for marketing to nurture.`);
+                    } else {
+                      recParts.push(`Trigger email + SMS sequence and assign to ${recommendation.stage === "lead_div" ? `LEAD: ${divName}` : `LEAD: ${commName}`}.`);
+                    }
+                  } else {
+                    recParts.push(recommendation.reasoning);
+                  }
+
+                  return (
+                    <div style={{ fontSize: 12, color: "#86efac", lineHeight: 1.6, marginBottom: 10 }}>
+                      <div style={{ marginBottom: 4 }}>
+                        <span style={{ color: "#4ade80", fontWeight: 600 }}>Analysis: </span>
+                        {analysisParts.join(" ")}
+                      </div>
+                      <div>
+                        <span style={{ color: "#4ade80", fontWeight: 600 }}>Recommendation: </span>
+                        {recParts.join(" ")}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* Action bar */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
