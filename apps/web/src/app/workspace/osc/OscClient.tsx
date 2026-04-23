@@ -538,10 +538,37 @@ function QueueCard({
         .eq("channel", "webform")
         .order("occurred_at", { ascending: false })
         .limit(1)
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) { console.error("wfMeta fetch error:", error); return; }
           if (data?.[0]?.metadata) {
-            const m = typeof data[0].metadata === "string" ? JSON.parse(data[0].metadata) : data[0].metadata;
-            setWfMeta(m);
+            try {
+              let m = data[0].metadata;
+              if (typeof m === "string") m = JSON.parse(m);
+              // If structured UTM fields missing, parse from source_url
+              if (m && m.source_url && !m.ad_platform) {
+                try {
+                  const u = new URL(m.source_url as string);
+                  if (u.searchParams.get("gclid") || u.searchParams.get("gad_campaignid")) {
+                    m.ad_platform = "Google Ads";
+                    m.gclid = m.gclid || u.searchParams.get("gclid") || "";
+                    m.gad_campaignid = m.gad_campaignid || u.searchParams.get("gad_campaignid") || "";
+                  } else if (u.searchParams.get("msclkid")) {
+                    m.ad_platform = "Bing Ads";
+                    m.msclkid = m.msclkid || u.searchParams.get("msclkid") || "";
+                  } else if (u.searchParams.get("fbclid")) {
+                    m.ad_platform = "Facebook Ads";
+                    m.fbclid = m.fbclid || u.searchParams.get("fbclid") || "";
+                  }
+                  m.utm_source = m.utm_source || u.searchParams.get("utm_source") || "";
+                  m.utm_medium = m.utm_medium || u.searchParams.get("utm_medium") || "";
+                  m.utm_campaign = m.utm_campaign || u.searchParams.get("utm_campaign") || "";
+                  m.utm_term = m.utm_term || u.searchParams.get("utm_term") || "";
+                  m.utm_content = m.utm_content || u.searchParams.get("utm_content") || "";
+                  if (!m.page_url) m.page_url = `${u.origin}${u.pathname}`;
+                } catch { /* invalid URL */ }
+              }
+              setWfMeta(m as Record<string, unknown>);
+            } catch (e) { console.error("wfMeta parse error:", e); }
           }
         });
     }
@@ -854,7 +881,7 @@ function QueueCard({
               </div>
 
               {/* ── Ad Attribution (from webform activity metadata) ── */}
-              {wfMeta && (wfMeta.ad_platform || wfMeta.utm_campaign || wfMeta.utm_source || wfMeta.gclid || wfMeta.msclkid || wfMeta.fbclid) && (() => {
+              {wfMeta && (wfMeta.ad_platform || wfMeta.utm_campaign || wfMeta.utm_source || wfMeta.gclid || wfMeta.msclkid || wfMeta.fbclid || wfMeta.gad_campaignid) && (() => {
                 const adPlatform = (wfMeta.ad_platform as string) || "";
                 const campaign = (wfMeta.utm_campaign as string) || ((wfMeta.gad_campaignid as string) ? `ID: ${wfMeta.gad_campaignid}` : "");
                 const srcMed = [(wfMeta.utm_source as string) || (adPlatform === "Google Ads" ? "google" : ""), (wfMeta.utm_medium as string) || (adPlatform === "Google Ads" ? "cpc" : "")].filter(Boolean).join(" / ");
