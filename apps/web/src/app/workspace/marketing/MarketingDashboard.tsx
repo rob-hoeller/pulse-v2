@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
-import OpportunityPanel, { type OpportunityPanelData } from "@/components/OpportunityPanel";
+import OpportunityPanel, { type OpportunityPanelData, StageBadge } from "@/components/OpportunityPanel";
+import CommHub from "@/components/CommHub";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
@@ -25,6 +26,7 @@ interface LeadItem {
   created_at: string;
   contacts: { first_name: string; last_name: string; email: string | null; phone: string | null } | null;
   communities: { name: string } | null;
+  divisions: { name: string } | null;
 }
 
 interface StageTransition {
@@ -158,16 +160,9 @@ function LeadCard({
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{name}</span>
-            <span style={{
-              fontSize: 9, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
-              backgroundColor: isDiv ? "rgba(168,85,247,0.15)" : "rgba(59,130,246,0.15)",
-              color: isDiv ? "#a855f7" : "#3b82f6",
-            }}>
-              {isDiv ? "DIV" : "COM"}
-            </span>
           </div>
-          <div style={{ fontSize: 11, color: "#52525b", marginTop: 2 }}>
-            {item.communities?.name ?? "No community"} · {sourceLabel(item.opportunity_source ?? item.source)}
+          <div style={{ marginTop: 3 }}>
+            <StageBadge stage={item.crm_stage} context={isDiv ? (item.divisions?.name ?? undefined) : (item.communities?.name ?? undefined)} />
           </div>
         </div>
         <div style={{ fontSize: 11, color: "#71717a" }}>{item.contacts?.email ?? "—"}</div>
@@ -354,7 +349,7 @@ export default function MarketingDashboard() {
 
     const oppQuery = supabase
       .from("opportunities")
-      .select("id, contact_id, crm_stage, community_id, division_id, source, opportunity_source, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name)")
+      .select("id, contact_id, crm_stage, community_id, division_id, source, opportunity_source, engagement_score, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name), divisions(name)")
       .in("crm_stage", ["lead_div", "lead_com"])
       .order("last_activity_at", { ascending: false });
     if (filter.divisionId) oppQuery.eq("division_id", filter.divisionId);
@@ -377,6 +372,7 @@ export default function MarketingDashboard() {
       ...item,
       contacts: Array.isArray(item.contacts) ? (item.contacts as Record<string, unknown>[])[0] ?? null : item.contacts,
       communities: Array.isArray(item.communities) ? (item.communities as Record<string, unknown>[])[0] ?? null : item.communities,
+      divisions: Array.isArray(item.divisions) ? (item.divisions as Record<string, unknown>[])[0] ?? null : item.divisions,
     })) as LeadItem[];
 
     setLeads(flat);
@@ -454,12 +450,13 @@ export default function MarketingDashboard() {
       tabLeads = leads;
   }
 
-  // Apply community filter
-  if (communityFilter) {
-    if (communityFilter === "__none__") {
+  // Apply community filter (global filter OR internal filter)
+  const effectiveCommunityFilter = filter.communityId ?? communityFilter;
+  if (effectiveCommunityFilter) {
+    if (effectiveCommunityFilter === "__none__") {
       tabLeads = tabLeads.filter(l => l.community_id === null);
     } else {
-      tabLeads = tabLeads.filter(l => l.community_id === communityFilter);
+      tabLeads = tabLeads.filter(l => l.community_id === effectiveCommunityFilter);
     }
   }
 
@@ -581,11 +578,11 @@ export default function MarketingDashboard() {
               <MetricCard label="New This Week" value={newThisWeek.length} accent="#fbbf24" />
             </div>
 
-            {/* ── Two-column layout: Pipeline + Analytics ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, alignItems: "start" }}>
+            {/* ── 50/50 Split: Lead Pipeline + Comm Hub ── */}
+            <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
 
-              {/* ── LEFT: Lead Pipeline ── */}
-              <div>
+              {/* ── LEFT: Lead Pipeline (50%) ── */}
+              <div style={{ flex: "0 0 50%", minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>Lead Pipeline</span>
                   <span style={{
@@ -647,89 +644,9 @@ export default function MarketingDashboard() {
                 )}
               </div>
 
-              {/* ── RIGHT: Campaign & Analytics Panel ── */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-                {/* Mailchimp Campaigns */}
-                <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, fontWeight: 600 }}>
-                    Recent Campaigns
-                  </div>
-                  {STUB_CAMPAIGNS.map((c, i) => (
-                    <div key={i} style={{
-                      padding: "10px 0",
-                      borderBottom: i < STUB_CAMPAIGNS.length - 1 ? "1px solid #27272a" : "none",
-                    }}>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: "#fafafa", marginBottom: 4 }}>{c.name}</div>
-                      <div style={{ display: "flex", gap: 16, fontSize: 11 }}>
-                        <span style={{ color: "#a1a1aa" }}>Open: <strong style={{ color: "#4ade80" }}>{c.openRate}%</strong></span>
-                        <span style={{ color: "#a1a1aa" }}>Click: <strong style={{ color: "#3b82f6" }}>{c.clickRate}%</strong></span>
-                        <span style={{ color: "#52525b" }}>{c.sentDate}</span>
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{ fontSize: 10, color: "#52525b", marginTop: 8, fontStyle: "italic" }}>
-                    Connect Mailchimp for live data
-                  </div>
-                </div>
-
-                {/* Web Analytics */}
-                <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, fontWeight: 600 }}>
-                    Web Analytics
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Sessions</div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "#71717a" }}>—</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Page Views</div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "#71717a" }}>—</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Bounce Rate</div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "#71717a" }}>—</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Top Pages</div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "#71717a" }}>—</div>
-                    </div>
-                  </div>
-                  <div style={{
-                    padding: "10px 14px", backgroundColor: "#09090b", border: "1px solid #27272a",
-                    borderRadius: 6, fontSize: 11, color: "#52525b", textAlign: "center",
-                  }}>
-                    Connect Google Analytics
-                  </div>
-                </div>
-
-                {/* Ad Spend */}
-                <div style={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 8, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, fontWeight: 600 }}>
-                    Ad Spend
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>Monthly Spend</div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "#71717a" }}>—</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>CPL</div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "#71717a" }}>—</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#52525b", textTransform: "uppercase" }}>ROI</div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "#71717a" }}>—</div>
-                    </div>
-                  </div>
-                  <div style={{
-                    padding: "10px 14px", backgroundColor: "#09090b", border: "1px solid #27272a",
-                    borderRadius: 6, fontSize: 11, color: "#52525b", textAlign: "center",
-                  }}>
-                    Connect Ad Platform
-                  </div>
-                </div>
+              {/* ── RIGHT: Comm Hub (50%) ── */}
+              <div style={{ flex: "0 0 48%", minWidth: 0 }}>
+                <CommHub divisionId={filter.divisionId ?? undefined} communityId={filter.communityId ?? undefined} />
               </div>
             </div>
 
@@ -760,7 +677,7 @@ export default function MarketingDashboard() {
             stage: panelItem.crm_stage,
             source: panelItem.source ?? panelItem.opportunity_source,
             community_name: panelItem.communities?.name ?? null,
-            division_name: labels.division ?? null,
+            division_name: panelItem.divisions?.name ?? labels.division ?? null,
             budget_min: null,
             budget_max: null,
             floor_plan_name: null,
