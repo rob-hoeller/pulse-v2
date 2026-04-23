@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
+import OpportunityPanel, { type OpportunityPanelData } from "@/components/OpportunityPanel";
 import CommunityView from "../csm/CommunityDashboard";
 
 // ─── Supabase client ──────────────────────────────────────────────────────────
@@ -399,6 +400,7 @@ export default function DsmClient() {
   const [monthData, setMonthData] = useState<MonthSales[]>(STUBBED_MONTHLY_GOALS);
   const [oscTeam, setOscTeam] = useState<TeamMember[]>([]);
   const [csmTeam, setCsmTeam] = useState<TeamMember[]>([]);
+  const [panelData, setPanelData] = useState<OpportunityPanelData | null>(null);
   const [recentTransitions, setRecentTransitions] = useState<StageTransition[]>([]);
   const [oscQueueCounts, setOscQueueCounts] = useState<Record<string, number>>({});
   const [csmProspectCounts, setCsmProspectCounts] = useState<Record<string, number>>({});
@@ -862,6 +864,13 @@ export default function DsmClient() {
           <EmptyState />
         )}
       </div>
+
+      {/* Universal Opportunity Side Panel */}
+      <OpportunityPanel
+        open={!!panelData}
+        onClose={() => setPanelData(null)}
+        opportunity={panelData}
+      />
     </div>
   );
 }
