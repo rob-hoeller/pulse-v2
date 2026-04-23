@@ -233,12 +233,13 @@ interface ProcessResult {
 
 async function processForm(form: HBForm): Promise<ProcessResult> {
   const recordId = String(form.record_id);
+  const extId = `webform_${recordId}`;
 
-  // ── Dedup: check if we already processed this record_id
+  // ── Dedup: check if we already processed this record_id (check both formats)
   const { data: existingActivity } = await getSupabase()
     .from("activities")
     .select("id")
-    .eq("external_message_id", recordId)
+    .in("external_message_id", [extId, recordId])
     .eq("channel", "webform")
     .limit(1);
 
@@ -403,7 +404,7 @@ async function processForm(form: HBForm): Promise<ProcessResult> {
       hb_division_id: form.division_id,
       hb_community_id: form.community_id,
     }),
-    external_message_id: recordId,
+    external_message_id: extId,
     community_id: communityId,
     division_id: divisionId,
     occurred_at: form.created_at || new Date().toISOString(),

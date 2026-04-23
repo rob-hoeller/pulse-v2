@@ -105,8 +105,9 @@ function getStageConfig(stage: string): { label: string; color: string; bg: stri
   return STAGE_CONFIG[stage] ?? { label: stage.toUpperCase().replace(/_/g, " "), color: "#a1a1aa", bg: "#27272a" };
 }
 
-export function StageBadge({ stage }: { stage: string }) {
+export function StageBadge({ stage, context }: { stage: string; context?: string }) {
   const cfg = getStageConfig(stage);
+  const label = context && (stage === "lead_div" || stage === "lead_com") ? `LEAD: ${context}` : cfg.label;
   return (
     <span
       style={{
@@ -123,7 +124,7 @@ export function StageBadge({ stage }: { stage: string }) {
         lineHeight: "16px",
       }}
     >
-      {cfg.label}
+      {label}
     </span>
   );
 }
@@ -814,9 +815,9 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                     {history.map(t => (
                       <div key={t.id} style={{ lineHeight: 1.6 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          {t.from_stage ? <StageBadge stage={t.from_stage} /> : <span style={{ fontSize: 10, color: "#888" }}>—</span>}
+                          {t.from_stage ? <StageBadge stage={t.from_stage} context={t.from_stage === "lead_div" ? (opportunity?.division_name ?? undefined) : t.from_stage === "lead_com" ? (opportunity?.community_name ?? undefined) : undefined} /> : <span style={{ fontSize: 10, color: "#888" }}>—</span>}
                           <span style={{ color: "#888", fontSize: 12 }}>→</span>
-                          {t.to_stage ? <StageBadge stage={t.to_stage} /> : <span style={{ fontSize: 10, color: "#888" }}>—</span>}
+                          {t.to_stage ? <StageBadge stage={t.to_stage} context={t.to_stage === "lead_div" ? (opportunity?.division_name ?? undefined) : t.to_stage === "lead_com" ? (opportunity?.community_name ?? undefined) : undefined} /> : <span style={{ fontSize: 10, color: "#888" }}>—</span>}
                         </div>
                         <div style={{ fontSize: 11, color: "#7aafdf", marginTop: 0, display: "inline" }}>
                           {formatDateTime(t.created_at)}
