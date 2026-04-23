@@ -880,42 +880,39 @@ function QueueCard({
             )}
           </div>
 
-          {/* ── Form / Schellie Details ── */}
+          {/* ── Form / Schellie Details (compact) ── */}
           {(webForm || isSchellie) && (
             <div style={{
-              padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
-              borderRadius: 8,
+              padding: "10px 12px", backgroundColor: "#18181b", border: "1px solid #27272a",
+              borderRadius: 8, fontSize: 11,
             }}>
-              <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-                Form Details
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
                 <div>
-                  <span style={{ fontSize: 10, color: "#52525b" }}>Type</span>
-                  <div style={{ fontSize: 12, color: "#a1a1aa" }}>{sourceLabel(item.opportunity_source ?? item.source)}</div>
+                  <span style={{ fontSize: 9, color: "#52525b", textTransform: "uppercase", letterSpacing: "0.03em" }}>Type</span>
+                  <div style={{ color: "#a1a1aa" }}>{sourceLabel(item.opportunity_source ?? item.source)}</div>
                 </div>
                 <div>
-                  <span style={{ fontSize: 10, color: "#52525b" }}>Community</span>
-                  <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.communities?.name ?? divisionName}</div>
-                </div>
-                {item.notes && (
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <span style={{ fontSize: 10, color: "#52525b" }}>Message / Interest</span>
-                    <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{item.notes}</div>
-                  </div>
-                )}
-                <div>
-                  <span style={{ fontSize: 10, color: "#52525b" }}>Email</span>
-                  <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.contacts?.email ?? "—"}</div>
+                  <span style={{ fontSize: 9, color: "#52525b", textTransform: "uppercase", letterSpacing: "0.03em" }}>Community</span>
+                  <div style={{ color: "#a1a1aa" }}>{item.communities?.name ?? divisionName}</div>
                 </div>
                 <div>
-                  <span style={{ fontSize: 10, color: "#52525b" }}>Phone</span>
-                  <div style={{ fontSize: 12, color: "#a1a1aa" }}>{item.contacts?.phone ?? "—"}</div>
+                  <span style={{ fontSize: 9, color: "#52525b", textTransform: "uppercase", letterSpacing: "0.03em" }}>Email</span>
+                  <div style={{ color: "#a1a1aa" }}>{item.contacts?.email ?? "—"}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: 9, color: "#52525b", textTransform: "uppercase", letterSpacing: "0.03em" }}>Phone</span>
+                  <div style={{ color: "#a1a1aa" }}>{item.contacts?.phone ?? "—"}</div>
                 </div>
               </div>
+              {item.notes && (
+                <div style={{ marginTop: 4 }}>
+                  <span style={{ fontSize: 9, color: "#52525b", textTransform: "uppercase" }}>Interest</span>
+                  <div style={{ color: "#a1a1aa", lineHeight: 1.4 }}>{item.notes}</div>
+                </div>
+              )}
 
-              {/* ── Ad Attribution (from webform activity metadata) ── */}
-              {(() => {
+              {/* ── Ad Attribution — only for web forms, not Schellie ── */}
+              {webForm && (() => {
                 const m = wfMeta || {} as Record<string, unknown>;
                 const adPlatform = (m.ad_platform as string) || "";
                 const campaign = (m.utm_campaign as string) || ((m.gad_campaignid as string) ? `ID: ${m.gad_campaignid}` : "");
@@ -925,43 +922,21 @@ function QueueCard({
                 const pageUrl = (m.page_url as string) || "";
                 const clickId = (m.gclid as string) || (m.msclkid as string) || (m.fbclid as string) || "";
                 const clickType = m.gclid ? "gclid" : m.msclkid ? "msclkid" : m.fbclid ? "fbclid" : "";
-                const lbl = { fontSize: 10 as const, color: "#52525b" };
-                const val = { fontSize: 12 as const, color: "#a1a1aa" };
+                const lbl = { fontSize: 9 as const, color: "#52525b", textTransform: "uppercase" as const, letterSpacing: "0.03em" };
+                const val = { fontSize: 11 as const, color: "#a1a1aa" };
                 return (
-                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #27272a" }}>
-                    <div style={{ fontSize: 10, color: "#525252", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                      Ad Attribution
+                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid #27272a" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+                      <div><span style={lbl}>Campaign</span><div style={val}>{campaign || "—"}</div></div>
+                      <div><span style={lbl}>Ad Platform</span><div style={val}>{adPlatform || "—"}</div></div>
+                      <div><span style={lbl}>Source / Medium</span><div style={val}>{srcMed || "—"}</div></div>
+                      <div><span style={lbl}>Search Term</span><div style={val}>{term || "—"}</div></div>
+                      <div><span style={lbl}>Ad Content</span><div style={val}>{content || "—"}</div></div>
+                      <div><span style={lbl}>Click ID</span><div style={{ ...val, wordBreak: "break-all" }}>{clickId ? `${clickType}: ${clickId}` : "—"}</div></div>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                      <div>
-                        <span style={lbl}>Campaign</span>
-                        <div style={val}>{campaign || "—"}</div>
-                      </div>
-                      <div>
-                        <span style={lbl}>Ad Platform</span>
-                        <div style={val}>{adPlatform || "—"}</div>
-                      </div>
-                      <div>
-                        <span style={lbl}>Source / Medium</span>
-                        <div style={val}>{srcMed || "—"}</div>
-                      </div>
-                      <div>
-                        <span style={lbl}>Search Term</span>
-                        <div style={val}>{term || "—"}</div>
-                      </div>
-                      <div>
-                        <span style={lbl}>Ad Content</span>
-                        <div style={val}>{content || "—"}</div>
-                      </div>
-                      <div>
-                        <span style={lbl}>Click ID</span>
-                        <div style={{ ...val, wordBreak: "break-all" }}>{clickId ? `${clickType}: ${clickId}` : "—"}</div>
-                      </div>
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <span style={lbl}>Page URL</span>
-                        <div style={{ ...val, wordBreak: "break-all" }}>{pageUrl ? <a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 12 }}>{pageUrl}</a> : "—"}</div>
-                      </div>
-                    </div>
+                    {pageUrl && (
+                      <div style={{ marginTop: 4 }}><span style={lbl}>Page URL</span><div style={{ ...val, wordBreak: "break-all" }}><a href={pageUrl} target="_blank" rel="noreferrer" style={{ color: "#92af00", textDecoration: "none", fontSize: 11 }}>{pageUrl}</a></div></div>
+                    )}
                   </div>
                 );
               })()}
@@ -979,37 +954,51 @@ function QueueCard({
             const motivation = (m.motivation as string) || "";
             const commInterest = (m.community_interest as string) || (m.community_name as string) || "";
             const visitInterest = m.visit_interest as boolean;
+            const budget = (m.budget as string) || "";
+
+            // Build AI summary from metadata
+            const summaryParts: string[] = [];
+            if (motivation) summaryParts.push(motivation);
+            if (commInterest) summaryParts.push(`Interested in ${commInterest}.`);
+            if (budget) summaryParts.push(`Budget: ${budget}.`);
+            if (visitInterest) summaryParts.push("Wants to schedule a visit.");
+            // Generate a quick summary from the last few user messages if no metadata
+            if (summaryParts.length === 0 && conversation.length > 0) {
+              const userMsgs = conversation.filter(msg => msg.role === "user" && msg.content !== "__greeting__").slice(-3);
+              summaryParts.push(userMsgs.map(msg => msg.content).join(" | "));
+            }
+            const aiSummary = summaryParts.join(" ");
 
             return (
               <div style={{
-                padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+                padding: "10px 12px", backgroundColor: "#18181b", border: "1px solid #27272a",
                 borderRadius: 8,
               }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    🐚 Schellie Conversation
+                    Schellie Conversation
                   </div>
                   <div style={{ fontSize: 10, color: "#52525b" }}>
                     {msgCount} messages{duration > 0 ? ` · ${durationStr}` : ""}
                   </div>
                 </div>
 
-                {/* Quick context */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
-                  <div>
-                    <span style={{ fontSize: 10, color: "#52525b" }}>Community Interest</span>
-                    <div style={{ fontSize: 12, color: "#a1a1aa" }}>{commInterest || "—"}</div>
+                {/* AI Summary */}
+                {aiSummary && (
+                  <div style={{
+                    padding: "8px 10px", backgroundColor: "#0c1929", border: "1px solid #1e293b",
+                    borderRadius: 6, marginBottom: 8, fontSize: 12, color: "#93c5fd", lineHeight: 1.5,
+                  }}>
+                    <span style={{ fontSize: 9, color: "#475569", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>Summary</span>
+                    <div style={{ marginTop: 2 }}>{aiSummary}</div>
                   </div>
-                  <div>
-                    <span style={{ fontSize: 10, color: "#52525b" }}>Visit Interest</span>
-                    <div style={{ fontSize: 12, color: "#a1a1aa" }}>{visitInterest ? "Yes" : "—"}</div>
-                  </div>
-                  {motivation && (
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <span style={{ fontSize: 10, color: "#52525b" }}>Motivation</span>
-                      <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{motivation}</div>
-                    </div>
-                  )}
+                )}
+
+                {/* Quick context - compact inline */}
+                <div style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 11, flexWrap: "wrap" }}>
+                  {commInterest && <span style={{ color: "#71717a" }}>Community: <span style={{ color: "#a1a1aa" }}>{commInterest}</span></span>}
+                  {visitInterest && <span style={{ color: "#71717a" }}>Visit: <span style={{ color: "#4ade80" }}>Yes</span></span>}
+                  {budget && <span style={{ color: "#71717a" }}>Budget: <span style={{ color: "#a1a1aa" }}>{budget}</span></span>}
                 </div>
 
                 {/* Chat bubbles */}
