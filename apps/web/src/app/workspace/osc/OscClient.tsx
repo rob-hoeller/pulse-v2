@@ -981,28 +981,21 @@ function QueueCard({
                   <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Schellie Conversation
                   </div>
-                  <div style={{ fontSize: 10, color: "#52525b" }}>
-                    {msgCount} messages{duration > 0 ? ` · ${durationStr}` : ""}
-                  </div>
                 </div>
 
-                {/* AI Summary */}
+                {/* AI Summary — green like Recommended */}
                 {aiSummary && (
                   <div style={{
-                    padding: "8px 10px", backgroundColor: "#0c1929", border: "1px solid #1e293b",
-                    borderRadius: 6, marginBottom: 8, fontSize: 12, color: "#93c5fd", lineHeight: 1.5,
+                    padding: "10px 12px", backgroundColor: "#052e16", border: "1px solid #166534",
+                    borderRadius: 6, marginBottom: 8,
                   }}>
-                    <span style={{ fontSize: 9, color: "#475569", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 }}>Summary</span>
-                    <div style={{ marginTop: 2 }}>{aiSummary}</div>
+                    <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                      <img src="/icons/activity/ai.svg" alt="" width={12} height={12} style={{ opacity: 0.8 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      AI Summary
+                    </div>
+                    <div style={{ fontSize: 12, color: "#86efac", lineHeight: 1.5 }}>{aiSummary}</div>
                   </div>
                 )}
-
-                {/* Quick context - compact inline */}
-                <div style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 11, flexWrap: "wrap" }}>
-                  {commInterest && <span style={{ color: "#71717a" }}>Community: <span style={{ color: "#a1a1aa" }}>{commInterest}</span></span>}
-                  {visitInterest && <span style={{ color: "#71717a" }}>Visit: <span style={{ color: "#4ade80" }}>Yes</span></span>}
-                  {budget && <span style={{ color: "#71717a" }}>Budget: <span style={{ color: "#a1a1aa" }}>{budget}</span></span>}
-                </div>
 
                 {/* Chat bubbles */}
                 {conversation.length > 0 ? (
