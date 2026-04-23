@@ -210,6 +210,15 @@ function stageLabel(stage: string | null | undefined): string {
   return map[stage ?? ""] ?? stage ?? "";
 }
 
+function sourceChannel(item: QueueItem): { label: string; color: string; bg: string } {
+  const src = item.opportunity_source ?? item.source ?? "";
+  if (src === "schellie_conversion") return { label: "Schellie", color: "#f9a8d4", bg: "#500724" };
+  if (src === "ai_auto_promote" || item.queue_source === "ai_surfaced") return { label: "AI", color: "#fbbf24", bg: "#422006" };
+  if (src === "promotion" || src === "demotion") return { label: "Pipeline", color: "#818cf8", bg: "#1e1b4b" };
+  // Everything else is a web form variant
+  return { label: "Web", color: "#4ade80", bg: "#052e16" };
+}
+
 function isWebFormSource(item: QueueItem): boolean {
   const src = item.opportunity_source ?? item.source ?? "";
   return [
@@ -732,18 +741,22 @@ function QueueCard({
           alignItems: "center", gap: 12,
         }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 13, fontWeight: 500, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{name}</div>
+              {/* Source channel badge — always shown */}
+              {(() => {
+                const ch = sourceChannel(item);
+                return (
+                  <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, fontWeight: 600, backgroundColor: ch.bg, color: ch.color, whiteSpace: "nowrap" }}>
+                    {ch.label}
+                  </span>
+                );
+              })()}
+              {/* Prior stage path — for existing/re-engaged contacts */}
               {item.prior_stage && (
-                <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#1e1b4b", color: "#818cf8", whiteSpace: "nowrap" }}>
-                  {stageLabel(item.prior_stage)} · {item.prior_community ?? divisionName}
+                <span style={{ fontSize: 9, color: "#71717a", whiteSpace: "nowrap" }}>
+                  {stageLabel(item.prior_stage)}{item.prior_community ? `: ${item.prior_community}` : ""} → Queue
                 </span>
-              )}
-              {item.is_new_contact && (
-                <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#052e16", color: "#4ade80" }}>NEW</span>
-              )}
-              {bucket === "ai_surfaced" && (
-                <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600, backgroundColor: "#422006", color: "#fbbf24" }}>AI</span>
               )}
             </div>
             <div style={{ fontSize: 10, color: "#52525b", marginTop: 2 }}>
@@ -777,13 +790,18 @@ function QueueCard({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
               <div onClick={e => { e.stopPropagation(); onNameClick(); }} style={{ fontSize: 15, fontWeight: 600, color: "#fafafa", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "3px" }}>{name}</div>
+              {(() => {
+                const ch = sourceChannel(item);
+                return (
+                  <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, fontWeight: 600, backgroundColor: ch.bg, color: ch.color, whiteSpace: "nowrap" }}>
+                    {ch.label}
+                  </span>
+                );
+              })()}
               {item.prior_stage && (
-                <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, fontWeight: 600, backgroundColor: "#1e1b4b", color: "#818cf8", whiteSpace: "nowrap" }}>
-                  {stageLabel(item.prior_stage)} · {item.prior_community ?? divisionName}
+                <span style={{ fontSize: 9, color: "#71717a", whiteSpace: "nowrap" }}>
+                  {stageLabel(item.prior_stage)}{item.prior_community ? `: ${item.prior_community}` : ""} → Queue
                 </span>
-              )}
-              {item.is_new_contact && (
-                <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, fontWeight: 600, backgroundColor: "#052e16", color: "#4ade80" }}>NEW</span>
               )}
             </div>
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
