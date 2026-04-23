@@ -239,12 +239,14 @@ const CHANNEL_ICONS: Record<string, string> = {
   email: "/icons/activity/email.svg", phone: "/icons/activity/phone.svg", sms: "/icons/activity/text.svg", video: "Video", voice: "Voice",
   web: "Web", chat: "Chat", app: "App", walk_in: "Walk-in", mail: "Mail",
   webform: "Form", form: "Form",
+  schellie: "Schellie",
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
   email: "Email", phone: "Phone", sms: "SMS", video: "Video", voice: "Voice",
   web: "Web", chat: "Chat", app: "App", walk_in: "Walk-in", mail: "Mail",
   webform: "Web Form", form: "Web Form",
+  schellie: "Schellie Chat",
 };
 
 // ─── Phone Activity Helpers ───────────────────────────────────────────────────
@@ -869,6 +871,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                       const isPhone = channelKey === "phone" || channelKey === "call";
                       const isEmail = channelKey === "email";
                       const isWebForm = channelKey === "webform" || channelKey === "web_form";
+                      const isSchellie = channelKey === "schellie";
                       const isSms = channelKey === "sms" || channelKey === "text";
                       const isMeeting = channelKey === "meeting";
                       const isExpanded = expandedActivityId === a.id;
@@ -901,6 +904,12 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                         const formCode = (meta.form_type_code as string) || (a.subject?.replace("Web form: ", "").split(" ")[0]) || "form";
                         const commName = (meta.community_name as string) || (meta.division_name as string) || "";
                         description = commName ? `${formCode}: ${commName}` : formCode;
+                      } else if (isSchellie) {
+                        let meta: Record<string, unknown> = {};
+                        try { meta = typeof a.metadata === "string" ? JSON.parse(a.metadata) : (a.metadata ?? {}); } catch { /* */ }
+                        const msgCount = (meta.message_count as number) || 0;
+                        const commName = (meta.community_name as string) || (meta.division_name as string) || "";
+                        description = `🐚 Schellie chat${commName ? `: ${commName}` : ""}${msgCount ? ` (${msgCount} msgs)` : ""}`;
                       } else if (isMeeting) {
                         const meetDur = phoneDuration ? ` — ${durationStr}` : "";
                         description = (a.subject || "Meeting") + meetDur;
@@ -1225,6 +1234,65 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                                 );
                               })()}
 
+                              {/* ── Schellie Conversation Drawer ── */}
+                              {isSchellie && (() => {
+                                let sMeta: Record<string, unknown> = {};
+                                try { sMeta = typeof a.metadata === "string" ? JSON.parse(a.metadata) : (a.metadata ?? {}); } catch { /* */ }
+                                const convo = (sMeta.conversation as Array<{ role: string; content: string }>) || [];
+                                const msgCount = (sMeta.message_count as number) || convo.length;
+                                const duration = (sMeta.duration_seconds as number) || 0;
+                                const durationStr = duration > 60 ? `${Math.round(duration / 60)}m ${duration % 60}s` : `${duration}s`;
+                                const commName = (sMeta.community_name as string) || "";
+                                const divName = (sMeta.division_name as string) || "";
+                                const motivation = (sMeta.motivation as string) || "";
+                                const visitInterest = sMeta.visit_interest as boolean;
+                                const labelStyle = { fontWeight: 600 as const, textTransform: "uppercase" as const, letterSpacing: "0.04em", color: "#71717a", fontSize: 10 };
+
+                                return (
+                                  <>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>DIVISION:  </span>{divName || "—"}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>COMMUNITY:  </span>{commName || "—"}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>MESSAGES:  </span>{msgCount} {duration > 0 ? `· ${durationStr}` : ""}
+                                    </div>
+                                    {motivation && (
+                                      <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                        <span style={labelStyle}>MOTIVATION:  </span>{motivation}
+                                      </div>
+                                    )}
+                                    <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 3 }}>
+                                      <span style={labelStyle}>VISIT INTEREST:  </span>{visitInterest ? "Yes" : "—"}
+                                    </div>
+                                    <div style={{ borderTop: "1px solid #27272a", marginBottom: 8, marginTop: 6 }} />
+                                    <div style={{ fontSize: 11, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>CONVERSATION:</div>
+                                    {convo.length > 0 ? (
+                                      <div style={{ maxHeight: 300, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4, padding: 8, backgroundColor: "#0c1929", borderRadius: 6, border: "1px solid #1e293b" }}>
+                                        {convo.map((msg, ci) => {
+                                          if (msg.content === "__greeting__") return null;
+                                          const isAst = msg.role === "assistant";
+                                          return (
+                                            <div key={ci} style={{ display: "flex", justifyContent: isAst ? "flex-start" : "flex-end" }}>
+                                              {isAst && (
+                                                <div style={{ width: 18, height: 18, borderRadius: "50%", backgroundColor: "#9f1239", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 5, flexShrink: 0, marginTop: 2, fontSize: 9, color: "#fff", fontWeight: 700, fontFamily: "'Playfair Display', Georgia, serif" }}>S</div>
+                                              )}
+                                              <div style={{ maxWidth: "78%", padding: "6px 10px", borderRadius: isAst ? "4px 12px 12px 12px" : "12px 12px 4px 12px", backgroundColor: isAst ? "transparent" : "#1e3a5f", border: isAst ? "1px solid #1e293b" : "none", fontSize: 11, lineHeight: 1.5, color: "#d4d4d8" }}>
+                                                {msg.content}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <div style={{ fontSize: 11, color: "#52525b", fontStyle: "italic" }}>No conversation data</div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+
                               {/* ── SMS Drawer ── */}
                               {isSms && (
                                 <div style={{ fontSize: 12, color: "#d4d4d8", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
@@ -1253,7 +1321,7 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
                               )}
 
                               {/* ── Generic Fallback Drawer ── */}
-                              {!isPhone && !isEmail && !isWebForm && !isSms && !isMeeting && (
+                              {!isPhone && !isEmail && !isWebForm && !isSchellie && !isSms && !isMeeting && (
                                 <>
                                   {a.subject && (
                                     <div style={{ fontSize: 12, color: "#d4d4d8", fontWeight: 500, marginBottom: 4 }}>{a.subject}</div>

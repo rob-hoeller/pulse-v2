@@ -162,8 +162,14 @@ function sourceLabel(src: string | null): string {
     website: "Website", realtor: "Realtor", walk_in: "Walk-in",
     event: "Event", phone: "Phone", referral: "Referral",
     zillow: "Zillow", social_media: "Social",
+    schellie_conversion: "Schellie Chat",
   };
   return map[src ?? ""] ?? src ?? "—";
+}
+
+function isSchellieSource(item: QueueItem): boolean {
+  const src = item.opportunity_source ?? item.source ?? "";
+  return src === "schellie_conversion";
 }
 
 function classifyBucket(item: QueueItem): QueueBucket {
@@ -520,22 +526,23 @@ function QueueCard({
   const [smsCollapsed, setSmsCollapsed] = useState(false);
 
   const webForm = isWebFormSource(item);
+  const isSchellie = isSchellieSource(item);
   const bucket = classifyBucket(item);
 
-  // Webform activity metadata (ad attribution, UTM, etc.)
+  // Webform/Schellie activity metadata (ad attribution, UTM, conversation, etc.)
   const [wfMeta, setWfMeta] = useState<Record<string, unknown> | null>(null);
 
   // When card expands, fetch agent recommendation + generated responses
   useEffect(() => {
     if (!expanded) return;
 
-    // Fetch webform activity metadata for ad attribution
-    if (webForm && !wfMeta) {
+    // Fetch webform/schellie activity metadata for ad attribution + conversation
+    if ((webForm || isSchellie) && !wfMeta) {
       supabase
         .from("activities")
         .select("metadata")
         .eq("opportunity_id", item.id)
-        .eq("channel", "webform")
+        .in("channel", ["webform", "schellie"])
         .order("occurred_at", { ascending: false })
         .limit(1)
         .then(({ data, error }) => {
@@ -598,8 +605,8 @@ function QueueCard({
       }).catch(() => setLoadingRec(false));
     }
 
-    // Fetch generated responses for web forms
-    if (webForm && !responses && !loadingResponses) {
+    // Fetch generated responses for web forms and Schellie conversions
+    if ((webForm || isSchellie) && !responses && !loadingResponses) {
       setLoadingResponses(true);
       generateResponse(item.id, { triggered_by: "human" }).then(result => {
         if (result.success && result.data) {
@@ -634,7 +641,7 @@ function QueueCard({
         setLoadingResponses(false);
       }).catch(() => setLoadingResponses(false));
     }
-  }, [expanded, item.id, recommendation, loadingRec, webForm, wfMeta, responses, loadingResponses, item.opportunity_source, item.source, item.community_id, item.communities?.name]);
+  }, [expanded, item.id, recommendation, loadingRec, webForm, isSchellie, wfMeta, responses, loadingResponses, item.opportunity_source, item.source, item.community_id, item.communities?.name]);
 
   // Send auto-confirmation email via crm-api (SendGrid noreply@)
   async function handleSendAutoEmail() {
@@ -846,8 +853,8 @@ function QueueCard({
             )}
           </div>
 
-          {/* ── Web Form: Form Details ── */}
-          {webForm && (
+          {/* ── Form / Schellie Details ── */}
+          {(webForm || isSchellie) && (
             <div style={{
               padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
               borderRadius: 8,
@@ -935,8 +942,94 @@ function QueueCard({
           )}
 
 
+          {/* ── Schellie Conversation ── */}
+          {isSchellie && (() => {
+            const m = wfMeta || {} as Record<string, unknown>;
+            const conversation = (m.conversation as Array<{ role: string; content: string }>) || [];
+            const msgCount = (m.message_count as number) || conversation.length;
+            const duration = (m.duration_seconds as number) || 0;
+            const durationStr = duration > 60 ? `${Math.round(duration / 60)}m ${duration % 60}s` : `${duration}s`;
+            const motivation = (m.motivation as string) || "";
+            const commInterest = (m.community_interest as string) || (m.community_name as string) || "";
+            const visitInterest = m.visit_interest as boolean;
+
+            return (
+              <div style={{
+                padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
+                borderRadius: 8,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: "#71717a", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    🐚 Schellie Conversation
+                  </div>
+                  <div style={{ fontSize: 10, color: "#52525b" }}>
+                    {msgCount} messages{duration > 0 ? ` · ${durationStr}` : ""}
+                  </div>
+                </div>
+
+                {/* Quick context */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+                  <div>
+                    <span style={{ fontSize: 10, color: "#52525b" }}>Community Interest</span>
+                    <div style={{ fontSize: 12, color: "#a1a1aa" }}>{commInterest || "—"}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 10, color: "#52525b" }}>Visit Interest</span>
+                    <div style={{ fontSize: 12, color: "#a1a1aa" }}>{visitInterest ? "Yes" : "—"}</div>
+                  </div>
+                  {motivation && (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <span style={{ fontSize: 10, color: "#52525b" }}>Motivation</span>
+                      <div style={{ fontSize: 12, color: "#a1a1aa", lineHeight: 1.5 }}>{motivation}</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chat bubbles */}
+                {conversation.length > 0 ? (
+                  <div style={{
+                    maxHeight: 320, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
+                    padding: 8, backgroundColor: "#0c1929", borderRadius: 6, border: "1px solid #1e293b",
+                  }}>
+                    {conversation.map((msg, i) => {
+                      if (msg.content === "__greeting__") return null;
+                      const isAssistant = msg.role === "assistant";
+                      return (
+                        <div key={i} style={{ display: "flex", justifyContent: isAssistant ? "flex-start" : "flex-end" }}>
+                          {isAssistant && (
+                            <div style={{
+                              width: 20, height: 20, borderRadius: "50%", backgroundColor: "#9f1239",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              marginRight: 6, flexShrink: 0, marginTop: 2,
+                              fontSize: 10, color: "#fff", fontWeight: 700,
+                              fontFamily: "'Playfair Display', Georgia, serif",
+                            }}>S</div>
+                          )}
+                          <div style={{
+                            maxWidth: "78%",
+                            padding: "8px 12px",
+                            borderRadius: isAssistant ? "4px 14px 14px 14px" : "14px 14px 4px 14px",
+                            backgroundColor: isAssistant ? "transparent" : "#1e3a5f",
+                            border: isAssistant ? "1px solid #1e293b" : "none",
+                            fontSize: 11, lineHeight: 1.5, color: "#d4d4d8",
+                          }}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: "#52525b", fontStyle: "italic", textAlign: "center", padding: 12 }}>
+                    Conversation loading...
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── Web Form: Auto-Confirmation Email ── */}
-          {webForm && item.contacts?.email && (
+          {(webForm || isSchellie) && item.contacts?.email && (
             <div style={{
               padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
               borderRadius: 8, opacity: autoSent || autoSkipped ? 0.5 : 1,
@@ -1013,8 +1106,8 @@ function QueueCard({
             </div>
           )}
 
-          {/* ── Web Form: Personal Follow-Up Email ── */}
-          {webForm && item.contacts?.email && (
+          {/* ── Personal Follow-Up Email ── */}
+          {(webForm || isSchellie) && item.contacts?.email && (
             <div style={{
               padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
               borderRadius: 8, opacity: personalSent || personalSkipped ? 0.5 : 1,
@@ -1170,8 +1263,8 @@ function QueueCard({
             </div>
           )}
 
-          {/* ── Web Form: SMS Follow-Up ── */}
-          {webForm && item.contacts?.phone && (
+          {/* ── SMS Follow-Up ── */}
+          {(webForm || isSchellie) && item.contacts?.phone && (
             <div style={{
               padding: "12px 14px", backgroundColor: "#18181b", border: "1px solid #27272a",
               borderRadius: 8, opacity: smsSent || smsSkipped ? 0.5 : 1,
