@@ -61,11 +61,13 @@ interface TeamMember {
 
 interface StageTransition {
   id: string;
+  contact_id: string;
+  opportunity_id: string;
   created_at: string;
   from_stage: string;
   to_stage: string;
   triggered_by: string | null;
-  contacts: { first_name: string; last_name: string } | null;
+  contacts: { first_name: string; last_name: string; email: string | null; phone: string | null } | null;
   communities: { name: string } | null;
 }
 
@@ -546,7 +548,7 @@ export default function DsmClient() {
       // Recent stage transitions
       const { data: transitions } = await supabase
         .from("stage_transitions")
-        .select("id, created_at, from_stage, to_stage, triggered_by, contacts(first_name, last_name), communities(name)")
+        .select("id, contact_id, opportunity_id, created_at, from_stage, to_stage, triggered_by, contacts(first_name, last_name, email, phone), communities(name)")
         .in("community_id", commIds.length > 0 ? commIds : ["__none__"])
         .order("created_at", { ascending: false })
         .limit(20);
@@ -838,7 +840,31 @@ export default function DsmClient() {
                           {relativeTime(t.created_at)}
                         </td>
                         <td style={{ padding: "8px 12px", fontSize: 12, color: "#fafafa", fontWeight: 500, borderBottom: "1px solid #18181b" }}>
-                          {t.contacts ? `${t.contacts.first_name} ${t.contacts.last_name}` : "—"}
+                          {t.contacts ? (
+                            <span
+                              onClick={e => { e.stopPropagation(); setPanelData({
+                                id: t.opportunity_id,
+                                contact_id: t.contact_id,
+                                first_name: t.contacts!.first_name,
+                                last_name: t.contacts!.last_name,
+                                email: t.contacts!.email ?? null,
+                                phone: t.contacts!.phone ?? null,
+                                stage: t.to_stage,
+                                source: null,
+                                community_name: t.communities?.name ?? null,
+                                division_name: labels.division ?? null,
+                                budget_min: null,
+                                budget_max: null,
+                                floor_plan_name: null,
+                                notes: null,
+                                last_activity_at: t.created_at,
+                                created_at: t.created_at,
+                              }); }}
+                              style={{ cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}
+                            >
+                              {t.contacts.first_name} {t.contacts.last_name}
+                            </span>
+                          ) : "—"}
                         </td>
                         <td style={{ padding: "8px 12px", fontSize: 12, color: "#a1a1aa", borderBottom: "1px solid #18181b" }}>
                           {stageLabel(t.from_stage)}

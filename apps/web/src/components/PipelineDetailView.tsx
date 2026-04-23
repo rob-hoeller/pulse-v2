@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import OpportunityPanel, { type OpportunityPanelData } from "@/components/OpportunityPanel";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 
@@ -181,6 +182,30 @@ export default function PipelineDetailView({
   const [panelItemId, setPanelItemId] = useState<string | null>(null);
   const [panelTab, setPanelTab] = useState<SidePanelTab>("profile");
   const [panelActivities, setPanelActivities] = useState<Activity[]>([]);
+
+  // Universal OpportunityPanel
+  const [oppPanelData, setOppPanelData] = useState<OpportunityPanelData | null>(null);
+
+  function openOppPanel(item: PipelineItem) {
+    setOppPanelData({
+      id: item.id,
+      contact_id: item.contact_id,
+      first_name: item.first_name,
+      last_name: item.last_name,
+      email: item.email,
+      phone: item.phone,
+      stage: item.crm_stage,
+      source: item.source,
+      community_name: null,
+      division_name: null,
+      budget_min: item.budget_min,
+      budget_max: item.budget_max,
+      floor_plan_name: null,
+      notes: item.notes,
+      last_activity_at: item.last_activity_at,
+      created_at: item.created_at,
+    });
+  }
   const [panelTransitions, setPanelTransitions] = useState<StageTransition[]>([]);
   const [loadingPanel, setLoadingPanel] = useState(false);
 
@@ -405,7 +430,7 @@ export default function PipelineDetailView({
         {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: TEXT_PRIMARY }}>
+            <span onClick={e => { e.stopPropagation(); openOppPanel(item); }} style={{ fontSize: 13, fontWeight: 500, color: TEXT_PRIMARY, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>
               {item.first_name} {item.last_name}
             </span>
             {renderScoreBadge(item.engagement_score)}
@@ -503,7 +528,7 @@ export default function PipelineDetailView({
                   {initials(item.first_name, item.last_name)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: TEXT_PRIMARY }}>
+                  <div onClick={e => { e.stopPropagation(); openOppPanel(item); }} style={{ fontSize: 14, fontWeight: 500, color: TEXT_PRIMARY, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>
                     {item.first_name} {item.last_name}
                   </div>
                   <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
@@ -624,7 +649,7 @@ export default function PipelineDetailView({
                         }}>
                           {initials(item.first_name, item.last_name)}
                         </div>
-                        {item.first_name} {item.last_name}
+                        <span onClick={e => { e.stopPropagation(); openOppPanel(item); }} style={{ cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{item.first_name} {item.last_name}</span>
                         <span style={stageBadgeStyle(item.crm_stage)}>{item.crm_stage}</span>
                       </div>
                     </td>
@@ -981,6 +1006,13 @@ export default function PipelineDetailView({
 
       {/* Side Panel */}
       {panelItemId && renderSidePanel()}
+
+      {/* Universal Opportunity Panel */}
+      <OpportunityPanel
+        open={!!oppPanelData}
+        onClose={() => setOppPanelData(null)}
+        opportunity={oppPanelData}
+      />
     </div>
   );
 }
