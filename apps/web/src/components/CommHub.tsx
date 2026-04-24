@@ -232,8 +232,9 @@ function ActivityCard({
   }
 
   // Parse from/to for display
-  const metaObj = typeof activity.metadata === "string" ? (() => { try { return JSON.parse(activity.metadata); } catch { return {}; } })() : (activity.metadata ?? {});
-  const mRec = metaObj as Record<string, unknown>;
+  let metaObj: Record<string, unknown> = {};
+  try { metaObj = typeof activity.metadata === "string" ? JSON.parse(activity.metadata) : (activity.metadata ?? {}); } catch { /* */ }
+  const mRec = metaObj;
   let fromLabel = "";
   let toLabel = "";
   if (activity.channel === "email") {
