@@ -48,9 +48,17 @@ function stageForFormType(_formTypeCode: string): string {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+function titleCase(s: string): string {
+  return s.split(" ").map(w => {
+    if (!w) return w;
+    if (w.length <= 2 && /^[a-zA-Z]+$/.test(w)) return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }).join(" ");
+}
+
 function parseName(fullName: string): { first_name: string; last_name: string } {
-  const trimmed = (fullName || "").trim();
-  if (!trimmed) return { first_name: "Unknown", last_name: "" };
+  const trimmed = titleCase((fullName || "").trim());
+  if (!trimmed || trimmed === "Unknown") return { first_name: "Unknown", last_name: "" };
   const spaceIdx = trimmed.indexOf(" ");
   if (spaceIdx === -1) return { first_name: trimmed, last_name: "" };
   return {
