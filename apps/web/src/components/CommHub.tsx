@@ -588,9 +588,37 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
     return activities.filter(a => a.channel !== excludeChannel);
   }, [activities, excludeChannel]);
 
+  // Smart NR: an inbound is NOT "needs response" if there's an outbound
+  // to the same contact_id with a later timestamp
+  const smartNR = useMemo(() => {
+    const responded = new Set<string>();
+    // Build a map: contact_id -> latest outbound timestamp
+    const latestOutbound: Record<string, string> = {};
+    for (const a of baseActivities) {
+      if (a.direction === "outbound" && a.contact_id) {
+        const existing = latestOutbound[a.contact_id];
+        if (!existing || a.occurred_at > existing) {
+          latestOutbound[a.contact_id] = a.occurred_at;
+        }
+      }
+    }
+    // Mark inbound NR items as responded if outbound exists after them
+    for (const a of baseActivities) {
+      if (a.needs_response && !a.responded_at && a.direction === "inbound" && a.contact_id) {
+        const lastOut = latestOutbound[a.contact_id];
+        if (lastOut && lastOut > a.occurred_at) {
+          responded.add(a.id);
+        }
+      }
+    }
+    return responded;
+  }, [baseActivities]);
+
+  const isSmartNR = (a: CommActivity) => a.needs_response && !a.responded_at && !smartNR.has(a.id);
+
   const counts = useMemo(() => ({
     urgent: baseActivities.filter(a => a.is_urgent).length,
-    needs_response: baseActivities.filter(a => a.needs_response && !a.responded_at).length,
+    needs_response: baseActivities.filter(a => isSmartNR(a)).length,
     call: baseActivities.filter(a => a.channel === "phone" || a.channel === "call").length,
     text: baseActivities.filter(a => a.channel === "sms" || a.channel === "text").length,
     email: baseActivities.filter(a => a.channel === "email").length,
@@ -604,7 +632,7 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
 
     // Tab filter
     if (activeTab === "urgent") items = items.filter(a => a.is_urgent);
-    else if (activeTab === "needs_response") items = items.filter(a => a.needs_response && !a.responded_at);
+    else if (activeTab === "needs_response") items = items.filter(a => isSmartNR(a));
     else if (activeTab === "call") items = items.filter(a => a.channel === "phone" || a.channel === "call");
     else if (activeTab === "text") items = items.filter(a => a.channel === "sms" || a.channel === "text");
     else if (activeTab === "email") items = items.filter(a => a.channel === "email");
@@ -730,7 +758,7 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
           <div style={{
             padding: 32, textAlign: "center", backgroundColor: "#18181b", border: "1px solid #27272a",
             borderRadius: 6, color: "#52525b", fontSize: 12,
-          }}>No activities in this view (loaded: {activities.length}, base: {baseActivities.length}, filtered: {filteredActivities.length})</div>
+          }}>No activities in this view</div>
         ) : (
           filteredActivities.map(a => (
             <ActivityCard
