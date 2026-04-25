@@ -141,17 +141,46 @@ function generateAiReply(activity: CommActivity): string {
   const name = activity.contacts?.first_name ?? "there";
   const channel = activity.channel ?? "email";
   const subject = activity.subject ?? "";
+  const body = (activity.body ?? "").slice(0, 500).toLowerCase();
+  const isSms = channel === "sms" || channel === "text";
 
-  if (channel === "webform" || channel === "chat" || channel === "walk_in") {
-    return `Hi ${name},\n\nThank you for your interest! We'd love to help you explore your options. Would you have time for a quick call this week to discuss what you're looking for?\n\nLooking forward to connecting!`;
+  // Parse body for context clues
+  const mentionsSchedule = /schedul|visit|tour|appoint|meet|come (by|in|out)/i.test(body);
+  const mentionsCommunity = /community|neighborhood|development/i.test(body);
+  const mentionsPricing = /price|cost|afford|budget|how much|payment/i.test(body);
+  const mentionsTimeline = /when|timeline|move|moving|retire|month|year/i.test(body);
+  const mentionsSpecific = /brentwood|riverwood|monarch|peninsula|cardinal|walden|miralon|independence|black oak|whisper/i.test(body);
+  const communityMatch = body.match(/(?:brentwood|riverwood|monarch|peninsula lakes?|cardinal grove|walden|miralon|independence|black oak|whisper run)/i);
+  const communityName = communityMatch ? communityMatch[0].replace(/\b\w/g, c => c.toUpperCase()) : "";
+
+  if (isSms) {
+    if (mentionsSchedule) return `Hi ${name}! Absolutely — I'd love to set up a visit. What day works best for you this week?`;
+    if (mentionsPricing) return `Hi ${name}! Great question — I can send over some pricing details. Would you prefer email or a quick call to go over options?`;
+    return `Hi ${name}! Thanks for reaching out. Would you have a few minutes for a quick call to chat about what you're looking for?`;
   }
-  if (channel === "phone" || channel === "call" || channel === "voicemail") {
-    return `Hi ${name},\n\nThank you for calling! I wanted to follow up on our conversation${subject ? ` about ${subject}` : ""}. Please don't hesitate to reach out if you have any questions.\n\nBest regards`;
+
+  // Email replies
+  if (mentionsSchedule) {
+    return `Hi ${name},\n\nAbsolutely! I'd love to set up a time for you to visit${communityName ? ` ${communityName}` : ""}. We're available most days — what works best for your schedule?\n\nI'll make sure everything is ready for when you arrive. Looking forward to meeting you!\n\nWarm regards,\nGrace`;
   }
-  if (subject) {
-    return `Hi ${name},\n\nThank you for your message. In response to "${subject}", I wanted to let you know we're happy to help.\n\nPlease let me know if you have any additional questions!`;
+
+  if (mentionsPricing && communityName) {
+    return `Hi ${name},\n\nGreat question! ${communityName} has some wonderful options. I'd love to walk you through the current pricing and any incentives we have available.\n\nWould you prefer I send over a detailed breakdown, or would a quick call work better?\n\nBest,\nGrace`;
   }
-  return `Hi ${name},\n\nThank you for reaching out! I'd be happy to assist you. Could you let me know the best time to connect?\n\nBest regards`;
+
+  if (mentionsSpecific && communityName) {
+    return `Hi ${name},\n\nI'm so glad you're interested in ${communityName}! It's a wonderful community — I think you'd really love it.\n\nI'd be happy to share more details or set up a visit. What would be most helpful for you right now?\n\nWarm regards,\nGrace`;
+  }
+
+  if (mentionsTimeline) {
+    return `Hi ${name},\n\nThanks for sharing that! It's great to start planning ahead. I'd love to help you find the perfect fit for your timeline.\n\nWould you have time for a quick call this week to go over some options?\n\nBest,\nGrace`;
+  }
+
+  if (subject.toLowerCase().includes("re:")) {
+    return `Hi ${name},\n\nThank you for getting back to me! I appreciate you sharing that.\n\nPlease don't hesitate to reach out anytime — I'm here to help however I can. Would you like to schedule a visit or would a call work better for next steps?\n\nWarm regards,\nGrace`;
+  }
+
+  return `Hi ${name},\n\nThank you for reaching out! I'd love to learn more about what you're looking for so I can point you in the right direction.\n\nWould you have a few minutes for a quick call this week?\n\nLooking forward to connecting!\nGrace`;
 }
 
 // ─── Activity Card ────────────────────────────────────────────────────────────
@@ -462,6 +491,15 @@ function ActivityCard({
                   <option value="low">Low</option>
                 </select>
               </div>
+
+              {/* AI Suggested Reply indicator */}
+              {replyText && needsResponse && (
+                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", backgroundColor: "#052e16", border: "1px solid #166534", borderRadius: 6 }}>
+                  <img src="/icons/activity/ai.svg" alt="" width={12} height={12} style={{ opacity: 0.8 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>AI Suggested Reply</span>
+                  <span style={{ fontSize: 10, color: "#86efac", marginLeft: "auto" }}>Edit below or send as-is</span>
+                </div>
+              )}
 
               {/* Textarea */}
               <textarea
