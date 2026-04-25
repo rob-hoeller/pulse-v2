@@ -1313,7 +1313,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
 
         {/* RIGHT: Comm Hub (48%) */}
         <div style={isMobile ? { display: mobileTab === "comm" ? "block" : "none" } : { flex: "0 0 48%", minWidth: 0 }}>
-          <CommHub communityId={community.id} teamFilter={teamFilter} />
+          <CommHub communityId={community.id} teamFilter={teamFilter} excludeChannel={["webform", "schellie"]} />
         </div>
       </div>
       </div>

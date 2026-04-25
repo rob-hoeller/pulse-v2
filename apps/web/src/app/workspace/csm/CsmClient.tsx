@@ -151,6 +151,7 @@ export default function CsmClient() {
             <CommHub
               communityId={filter.communityId ?? undefined}
               divisionId={filter.divisionId ?? undefined}
+              excludeChannel={["webform", "schellie"]}
             />
           </div>
         )}

@@ -646,7 +646,7 @@ export default function MarketingDashboard() {
 
               {/* ── RIGHT: Comm Hub (50%) ── */}
               <div style={{ flex: "0 0 48%", minWidth: 0 }}>
-                <CommHub divisionId={filter.divisionId ?? undefined} communityId={filter.communityId ?? undefined} />
+                <CommHub divisionId={filter.divisionId ?? undefined} communityId={filter.communityId ?? undefined} excludeChannel={["webform", "schellie"]} />
               </div>
             </div>
 
