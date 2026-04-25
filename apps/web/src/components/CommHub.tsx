@@ -254,9 +254,28 @@ function ActivityCard({
   }
 
   // Pre-fill AI reply when expanded
+  const [aiLoading, setAiLoading] = useState(false);
   useEffect(() => {
     if (isExpanded && needsResponse && !replyText) {
-      setReplyText(generateAiReply(activity));
+      // Try DGX Spark AI server first, fall back to local templates
+      setAiLoading(true);
+      setReplyText(generateAiReply(activity)); // Immediate template fallback
+      const AI_URL = process.env.NEXT_PUBLIC_AI_REPLY_URL || "https://near-stuck-component-ozone.trycloudflare.com";
+      fetch(`${AI_URL}/generate-reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contact_id: activity.contact_id,
+          activity_id: activity.id,
+          channel: activity.channel === "sms" || activity.channel === "text" ? "sms" : "email",
+        }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.reply) setReplyText(data.reply);
+        })
+        .catch(() => { /* keep template fallback */ })
+        .finally(() => setAiLoading(false));
     }
   }, [isExpanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -497,7 +516,7 @@ function ActivityCard({
                 <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", backgroundColor: "#052e16", border: "1px solid #166534", borderRadius: 6 }}>
                   <img src="/icons/activity/ai.svg" alt="" width={12} height={12} style={{ opacity: 0.8 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>AI Suggested Reply</span>
-                  <span style={{ fontSize: 10, color: "#86efac", marginLeft: "auto" }}>Edit below or send as-is</span>
+                  <span style={{ fontSize: 10, color: "#86efac", marginLeft: "auto" }}>{aiLoading ? "Generating personalized reply..." : "Edit below or send as-is"}</span>
                 </div>
               )}
 
