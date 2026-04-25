@@ -2303,7 +2303,7 @@ export default function OscClient() {
 
             {/* ── RIGHT: Comm Hub (50%) — filters out webforms ── */}
             <div style={isMobile ? { display: mobileTab === "comm" ? "block" : "none", width: "100%" } : { flex: "0 0 48%", minWidth: 0 }}>
-              <CommHub divisionId={filter.divisionId ?? undefined} teamFilter={teamFilter} excludeChannel="webform" />
+              <CommHub divisionId={filter.divisionId ?? undefined} teamFilter={teamFilter} excludeChannel={["webform", "schellie"]} />
             </div>
           </div>
           </>)

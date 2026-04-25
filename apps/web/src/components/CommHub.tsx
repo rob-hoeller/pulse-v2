@@ -18,7 +18,7 @@ export interface CommHubProps {
   communityId?: string | null;  // for CSM scope
   divisionId?: string | null;   // for OSC scope
   teamFilter?: string;          // "all" or user ID
-  excludeChannel?: string;      // filter out activities with this channel
+  excludeChannel?: string | string[];  // filter out activities with these channels
 }
 
 interface CommActivity {
@@ -283,7 +283,7 @@ function ActivityCard({
         <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ fontSize: 11, color: "#ededed", fontWeight: 500, flexShrink: 0 }}>
-              {actStyle.label} {isInbound ? "In" : "Out"}{activity.subject ? ":" : ""}
+              {actStyle.label}{activity.subject ? ":" : ""}
             </span>
             <span style={{ fontSize: 11, color: "#a1a1aa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {activity.subject || (activity.body ?? "").slice(0, 60)}
@@ -601,7 +601,8 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
   // Apply excludeChannel filter globally
   const baseActivities = useMemo(() => {
     if (!excludeChannel) return activities;
-    return activities.filter(a => a.channel !== excludeChannel);
+    const excluded = Array.isArray(excludeChannel) ? excludeChannel : [excludeChannel];
+    return activities.filter(a => !excluded.includes(a.channel ?? ""));
   }, [activities, excludeChannel]);
 
   // Smart NR: an inbound is NOT "needs response" if there's an outbound
@@ -609,6 +610,7 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
   // Smart NR: determine which inbound items truly need a response
   // 1. Already responded (outbound to same contact after this inbound)
   // 2. AI inference: message doesn't warrant a reply ("thanks", "got it", closers)
+  // Patterns that indicate NO reply is needed
   const NO_REPLY_PATTERNS = [
     /^thanks?[!.\s]*$/i, /^thank you[!.\s]*$/i, /^ty[!.\s]*$/i,
     /^ok[!.\s]*$/i, /^okay[!.\s]*$/i, /^got it[!.\s]*$/i,
@@ -621,11 +623,33 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
     /^(unsubscribe|remove me|stop)/i,
   ];
 
+  // Broader patterns — check first 200 chars of email body
+  const NO_REPLY_BODY_PATTERNS = [
+    /^thank(s| you)[^?]*$/im, // "Thanks" or "Thank you" without a question
+    /we have already purchased/i,
+    /looking for a rental/i,
+    /not interested/i,
+    /please remove/i,
+    /wrong (number|person|email)/i,
+    /^(I'll look into|will check|let me look)/i,
+    /thanks for the info/i,
+  ];
+
   function isNoReplyMessage(body: string | null): boolean {
     if (!body) return false;
     const trimmed = body.trim();
-    if (trimmed.length > 100) return false; // Long messages probably need a reply
-    return NO_REPLY_PATTERNS.some(p => p.test(trimmed));
+    // Short messages — check strict patterns
+    if (trimmed.length <= 100) {
+      if (NO_REPLY_PATTERNS.some(p => p.test(trimmed))) return true;
+    }
+    // First 200 chars — check broader patterns (email body starts)
+    const head = trimmed.slice(0, 200);
+    // If it's just a short thanks with no question marks, no reply needed
+    if (head.length < 80 && /^thank/i.test(head) && !head.includes("?")) return true;
+    if (NO_REPLY_BODY_PATTERNS.some(p => p.test(head))) return true;
+    // "Have a great weekend" anywhere in short message
+    if (trimmed.length < 150 && /have a (good|great|nice|wonderful) (weekend|evening|night|day)/i.test(trimmed) && !trimmed.includes("?")) return true;
+    return false;
   }
 
   const { smartNR, replyTimes } = useMemo(() => {
