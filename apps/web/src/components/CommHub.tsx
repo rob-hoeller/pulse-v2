@@ -586,7 +586,7 @@ export default function CommHub({ communityId, divisionId, teamFilter, excludeCh
       .from("activities")
       .select("id, contact_id, opportunity_id, channel, direction, subject, body, occurred_at, is_read, read_at, needs_response, responded_at, is_urgent, sentiment, duration_seconds, transcript_id, recording_url, metadata, type, from_number, to_number, contacts(first_name, last_name, email, phone)")
       .order("occurred_at", { ascending: false })
-      .limit(200);
+      .limit(1000);
 
     // Scope filtering by division/community when set
     if (communityId) {
