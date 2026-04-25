@@ -442,6 +442,16 @@ export default function MCPToolsPage() {
           </div>
         </>
       )}
+
+      {/* MCP Tool Inspector */}
+      {inspectTool && (
+        <CodeViewer
+          open={!!inspectTool}
+          onClose={() => setInspectTool(null)}
+          type="mcp"
+          name={inspectTool}
+        />
+      )}
     </div>
   );
 }
@@ -470,15 +480,5 @@ function Stat({
         {value}
       </div>
 
-      {/* MCP Tool Inspector */}
-      {inspectTool && (
-        <CodeViewer
-          open={!!inspectTool}
-          onClose={() => setInspectTool(null)}
-          type="mcp"
-          name={inspectTool}
-        />
-      )}
-    </div>
   );
 }
