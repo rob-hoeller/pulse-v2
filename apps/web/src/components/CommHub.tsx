@@ -376,6 +376,87 @@ function ActivityCard({
             }}>Close</button>
           </div>
 
+{/* Reply area */}
+          {needsResponse && (
+            <div style={{
+              padding: "12px 14px", backgroundColor: "#18181b", borderRadius: 6,
+              border: "1px solid #27272a",
+              display: "flex", flexDirection: "column", gap: 10,
+            }}>
+              {/* To + channel selector */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, color: "#71717a" }}>To:</span>
+                <span style={{ fontSize: 12, color: "#fafafa", fontWeight: 500 }}>{contactName}</span>
+                <span style={{ flex: 1 }} />
+                <select
+                  value={replyChannel}
+                  onChange={e => setReplyChannel(e.target.value)}
+                  style={{
+                    fontSize: 11, padding: "4px 8px", backgroundColor: "#09090b",
+                    border: "1px solid #27272a", borderRadius: 4, color: "#a1a1aa", outline: "none",
+                  }}
+                >
+                  <option value="email">Email</option>
+                  <option value="text">Text</option>
+                  <option value="phone">Phone</option>
+                </select>
+                <select
+                  style={{
+                    fontSize: 11, padding: "4px 8px", backgroundColor: "#09090b",
+                    border: "1px solid #27272a", borderRadius: 4, color: "#a1a1aa", outline: "none",
+                  }}
+                >
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+
+              {/* AI Suggested Reply — full green block */}
+              <div style={{
+                padding: "10px 12px", backgroundColor: "#052e16", border: "1px solid #166534",
+                borderRadius: 6,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
+                  <img src="/icons/activity/ai.svg" alt="" width={12} height={12} style={{ opacity: 0.8 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>AI Suggested Reply</span>
+                  <span style={{ fontSize: 10, color: "#86efac", marginLeft: "auto" }}>{aiLoading ? "Generating personalized reply..." : "Edit below or send as-is"}</span>
+                </div>
+                <textarea
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  rows={6}
+                  placeholder="Type your reply..."
+                  style={{
+                    width: "100%", padding: "10px 12px", backgroundColor: "#0a1f0a",
+                    border: "1px solid #166534", borderRadius: 6, color: "#86efac",
+                    fontSize: 12, lineHeight: 1.6, outline: "none", resize: "vertical",
+                    fontFamily: "inherit",
+                  }}
+                />
+              </div>
+
+              {/* Send row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 10, color: "#52525b" }}>Press Ctrl+Enter to send</span>
+                <button
+                  onClick={handleSend}
+                  disabled={!replyText.trim() || sending}
+                  style={{
+                    width: 32, height: 32, borderRadius: "50%",
+                    border: "none", cursor: replyText.trim() && !sending ? "pointer" : "default",
+                    backgroundColor: replyText.trim() && !sending ? "#6366f1" : "#27272a",
+                    color: replyText.trim() && !sending ? "#fff" : "#52525b",
+                    fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "all 0.15s",
+                  }}
+                >↑</button>
+              </div>
+            </div>
+          )}
+
+
           {/* Original message */}
           <div style={{
             padding: "12px 14px", backgroundColor: "#18181b", borderRadius: 6,
@@ -472,85 +553,6 @@ function ActivityCard({
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Reply area */}
-          {needsResponse && (
-            <div style={{
-              padding: "12px 14px", backgroundColor: "#18181b", borderRadius: 6,
-              border: "1px solid #27272a",
-              display: "flex", flexDirection: "column", gap: 10,
-            }}>
-              {/* To + channel selector */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 12, color: "#71717a" }}>To:</span>
-                <span style={{ fontSize: 12, color: "#fafafa", fontWeight: 500 }}>{contactName}</span>
-                <span style={{ flex: 1 }} />
-                <select
-                  value={replyChannel}
-                  onChange={e => setReplyChannel(e.target.value)}
-                  style={{
-                    fontSize: 11, padding: "4px 8px", backgroundColor: "#09090b",
-                    border: "1px solid #27272a", borderRadius: 4, color: "#a1a1aa", outline: "none",
-                  }}
-                >
-                  <option value="email">Email</option>
-                  <option value="text">Text</option>
-                  <option value="phone">Phone</option>
-                </select>
-                <select
-                  style={{
-                    fontSize: 11, padding: "4px 8px", backgroundColor: "#09090b",
-                    border: "1px solid #27272a", borderRadius: 4, color: "#a1a1aa", outline: "none",
-                  }}
-                >
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-
-              {/* AI Suggested Reply indicator */}
-              {replyText && needsResponse && (
-                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", backgroundColor: "#052e16", border: "1px solid #166534", borderRadius: 6 }}>
-                  <img src="/icons/activity/ai.svg" alt="" width={12} height={12} style={{ opacity: 0.8 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                  <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>AI Suggested Reply</span>
-                  <span style={{ fontSize: 10, color: "#86efac", marginLeft: "auto" }}>{aiLoading ? "Generating personalized reply..." : "Edit below or send as-is"}</span>
-                </div>
-              )}
-
-              {/* Textarea */}
-              <textarea
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                rows={5}
-                placeholder="Type your reply..."
-                style={{
-                  width: "100%", padding: "10px 12px", backgroundColor: "#09090b",
-                  border: "1px solid #27272a", borderRadius: 6, color: "#d4d4d8",
-                  fontSize: 12, lineHeight: 1.6, outline: "none", resize: "vertical",
-                  fontFamily: "inherit",
-                }}
-              />
-
-              {/* Send row */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 10, color: "#52525b" }}>Press Ctrl+Enter to send</span>
-                <button
-                  onClick={handleSend}
-                  disabled={!replyText.trim() || sending}
-                  style={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    border: "none", cursor: replyText.trim() && !sending ? "pointer" : "default",
-                    backgroundColor: replyText.trim() && !sending ? "#6366f1" : "#27272a",
-                    color: replyText.trim() && !sending ? "#fff" : "#52525b",
-                    fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "all 0.15s",
-                  }}
-                >↑</button>
-              </div>
             </div>
           )}
 
