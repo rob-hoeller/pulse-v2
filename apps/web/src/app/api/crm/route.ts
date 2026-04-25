@@ -226,8 +226,8 @@ async function assignOpportunity(
 }
 
 // TEST MODE: redirect all outbound emails to this address
-const EMAIL_TEST_MODE = false;
-const EMAIL_TEST_REDIRECT = "lance@schellbrothers.com";
+const EMAIL_TEST_MODE = true; // DEV MODE — no emails to real buyers
+const EMAIL_TEST_REDIRECT = ""; // Empty = skip sending entirely in dev mode
 
 async function sendEmail(
   contact_id: string, opportunity_id: string | null, subject: string, body: string, ctx: ActionContext
