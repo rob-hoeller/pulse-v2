@@ -253,29 +253,22 @@ function ActivityCard({
     } catch { /* ignore */ }
   }
 
-  // Pre-fill AI reply when expanded
+  // Pre-fill AI reply when expanded — use pre-generated from metadata, fall back to templates
   const [aiLoading, setAiLoading] = useState(false);
   useEffect(() => {
     if (isExpanded && needsResponse && !replyText) {
-      // Try DGX Spark AI server first, fall back to local templates
-      setAiLoading(true);
-      setReplyText(generateAiReply(activity)); // Immediate template fallback
-      const AI_URL = process.env.NEXT_PUBLIC_AI_REPLY_URL || "https://near-stuck-component-ozone.trycloudflare.com";
-      fetch(`${AI_URL}/generate-reply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contact_id: activity.contact_id,
-          activity_id: activity.id,
-          channel: activity.channel === "sms" || activity.channel === "text" ? "sms" : "email",
-        }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.reply) setReplyText(data.reply);
-        })
-        .catch(() => { /* keep template fallback */ })
-        .finally(() => setAiLoading(false));
+      // Check if metadata has a pre-generated AI reply from Spark
+      let preGenerated: string | null = null;
+      try {
+        const m = typeof activity.metadata === "string" ? JSON.parse(activity.metadata) : activity.metadata;
+        preGenerated = (m as Record<string, unknown>)?.ai_reply as string || null;
+      } catch { /* */ }
+
+      if (preGenerated) {
+        setReplyText(preGenerated);
+      } else {
+        setReplyText(generateAiReply(activity)); // Template fallback
+      }
     }
   }, [isExpanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
