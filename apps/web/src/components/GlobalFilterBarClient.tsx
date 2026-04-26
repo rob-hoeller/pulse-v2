@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -9,6 +9,7 @@ import type { DivisionOption, CommunityOption } from "./GlobalFilterBar";
 interface UserOption {
   id: string;
   full_name: string;
+  division_id?: string | null;
 }
 
 interface Props {
@@ -39,7 +40,7 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
         onClick={() => !disabled && setOpen(!open)}
         onTouchEnd={(e) => { if (!disabled) { e.preventDefault(); setOpen(!open); } }}
         style={{
-          width: compact ? 130 : 170,
+          width: compact ? 110 : 170,
           height: compact ? 38 : 44,
           touchAction: "manipulation",
           WebkitTapHighlightColor: "transparent",
@@ -61,7 +62,7 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
           </span>
           <span style={{ fontSize: 10, color: isActive ? "#80B602" : "#666" }}>▾</span>
         </div>
-        <div style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? "#ededed" : "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontSize: 11, fontWeight: isActive ? 600 : 400, color: isActive ? "#ededed" : "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {isActive ? displayValue : `${count} available`}
         </div>
       </div>
@@ -117,61 +118,101 @@ function CompoundFilter({ label, value, displayValue, count, options, onChange, 
 
 // ─── GlobalFilterBarClient ────────────────────────────────────────────────────
 
+const sb = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_XGwL4p2FD0Af58_sidErwg_In1FU_9o"
+);
+
 export default function GlobalFilterBarClient({ divisions, communities }: Props) {
   const isMobile = useIsMobile();
-  const { filter, setDivision, setCommunity, setUser, setLabels } =
-    useGlobalFilter();
+  const { filter, setDivision, setCommunity, setUser, setLabels } = useGlobalFilter();
 
-  const [users, setUsers] = useState<UserOption[]>([]);
+  // All users (for unfiltered dropdown + reverse lookup)
+  const [allUsers, setAllUsers] = useState<UserOption[]>([]);
+  // User→community assignments for reverse lookup
+  const [userCommunities, setUserCommunities] = useState<Record<string, string[]>>({});
+  // Visible users in dropdown (filtered by div/community)
+  const [visibleUsers, setVisibleUsers] = useState<UserOption[]>([]);
 
-  // Load users based on community or division selection
+  // Load all users + assignments once
   useEffect(() => {
-    const sb = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-    );
+    Promise.all([
+      sb.from("users").select("id, full_name, division_id").order("full_name"),
+      sb.from("user_community_assignments").select("user_id, community_id"),
+    ]).then(([usersRes, assignRes]) => {
+      setAllUsers((usersRes.data ?? []) as UserOption[]);
+      // Build user→communities map
+      const map: Record<string, string[]> = {};
+      for (const a of (assignRes.data ?? []) as { user_id: string; community_id: string }[]) {
+        if (!map[a.user_id]) map[a.user_id] = [];
+        map[a.user_id].push(a.community_id);
+      }
+      setUserCommunities(map);
+    });
+  }, []);
 
+  // Update visible users when filter changes
+  useEffect(() => {
     if (filter.communityId) {
-      // Get users assigned to this community via user_community_assignments
-      sb.from("user_community_assignments")
-        .select("user_id, users(id, full_name)")
-        .eq("community_id", filter.communityId)
-        .then(({ data }) => {
-          const userList: UserOption[] = (data ?? [])
-            .map((a: any) => {
-              const u = Array.isArray(a.users) ? a.users[0] : a.users;
-              return u ? { id: u.id, full_name: u.full_name } : null;
-            })
-            .filter(Boolean) as UserOption[];
-          // Deduplicate
-          const seen = new Set<string>();
-          setUsers(userList.filter(u => { if (seen.has(u.id)) return false; seen.add(u.id); return true; }));
-        });
+      // Users assigned to this community
+      const communityUserIds = new Set(
+        Object.entries(userCommunities)
+          .filter(([, comms]) => comms.includes(filter.communityId!))
+          .map(([uid]) => uid)
+      );
+      setVisibleUsers(allUsers.filter(u => communityUserIds.has(u.id)));
     } else if (filter.divisionId) {
-      // Get all users in this division
-      sb.from("users")
-        .select("id, full_name")
-        .eq("division_id", filter.divisionId)
-        .order("full_name")
-        .then(({ data }) => setUsers(data ?? []));
+      setVisibleUsers(allUsers.filter(u => u.division_id === filter.divisionId));
     } else {
-      // No filter — get all users
-      sb.from("users")
-        .select("id, full_name")
-        .order("full_name")
-        .limit(100)
-        .then(({ data }) => setUsers(data ?? []));
+      setVisibleUsers(allUsers);
     }
-  }, [filter.communityId, filter.divisionId]);
+  }, [filter.communityId, filter.divisionId, allUsers, userCommunities]);
 
+  // Reverse lookup: when user is selected directly, auto-set division/community
+  const handleUserSelect = useCallback((userId: string | null) => {
+    if (!userId) {
+      setUser(null);
+      return;
+    }
+
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) { setUser(userId); return; }
+
+    // If no division set, auto-set from user's division
+    if (!filter.divisionId && user.division_id) {
+      setDivision(user.division_id);
+    }
+
+    // If no community set, auto-set from user's first community assignment
+    const userComms = userCommunities[userId] ?? [];
+    if (!filter.communityId && userComms.length > 0) {
+      // If user has exactly one community, auto-select it
+      // If multiple, set the first one (user can change)
+      const targetComm = userComms[0];
+      // Make sure it's in the right division
+      const comm = communities.find(c => c.id === targetComm);
+      if (comm) {
+        if (!filter.divisionId) {
+          setDivision(comm.division_id);
+        }
+        // Use setTimeout to allow division state to settle first
+        setTimeout(() => setCommunity(targetComm), 0);
+      }
+    }
+
+    // Set user after div/community are set
+    setTimeout(() => setUser(userId), 10);
+  }, [allUsers, userCommunities, communities, filter.divisionId, filter.communityId, setDivision, setCommunity, setUser]);
+
+  // Labels
   useEffect(() => {
     const divLabel = divisions.find(d => d.id === filter.divisionId)?.name;
     const commLabel = communities.find(c => c.id === filter.communityId)?.name;
-    const userLabel = users.find(u => u.id === filter.userId)?.full_name;
+    const userLabel = allUsers.find(u => u.id === filter.userId)?.full_name;
     if (typeof setLabels === "function") {
       setLabels({ division: divLabel, community: commLabel, user: userLabel });
     }
-  }, [filter, divisions, communities, users, setLabels]);
+  }, [filter, divisions, communities, allUsers, setLabels]);
 
   const filteredCommunities = filter.divisionId
     ? communities.filter(c => c.division_id === filter.divisionId)
@@ -182,7 +223,7 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
       display: "flex",
       alignItems: "center",
       gap: isMobile ? 4 : 8,
-      padding: isMobile ? "0 8px" : "0 16px",
+      padding: isMobile ? "0 4px" : "0 16px",
       height: isMobile ? 48 : 56,
       background: "#0d0d0d",
       borderBottom: "1px solid #222",
@@ -209,10 +250,10 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
       <CompoundFilter
         label="User"
         value={filter.userId}
-        displayValue={users.find(u => u.id === filter.userId)?.full_name ?? ""}
-        count={users.length}
-        options={users.map(u => ({ id: u.id, name: u.full_name }))}
-        onChange={id => setUser(id)}
+        displayValue={allUsers.find(u => u.id === filter.userId)?.full_name ?? ""}
+        count={visibleUsers.length}
+        options={visibleUsers.map(u => ({ id: u.id, name: u.full_name }))}
+        onChange={handleUserSelect}
         compact={isMobile}
       />
 
