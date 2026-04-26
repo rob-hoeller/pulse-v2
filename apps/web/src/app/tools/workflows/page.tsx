@@ -266,7 +266,25 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
 export default function WorkflowsPage() {
   const [selWf, setSelWf] = useState(WORKFLOWS[0].id);
   const [selNode, setSelNode] = useState<WNode | null>(null);
+  const [slaEdit, setSlaEdit] = useState<{ id: string; value: number; unit: string } | null>(null);
+  const [slaSaving, setSlaSaving] = useState(false);
+  const [slaSaved, setSlaSaved] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Save SLA timer to Supabase
+  const saveSlaTimer = useCallback(async (slaId: string, newMinutes: number) => {
+    setSlaSaving(true);
+    try {
+      const sb = (await import("@supabase/supabase-js")).createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_XGwL4p2FD0Af58_sidErwg_In1FU_9o"
+      );
+      await sb.from("sla_config").update({ target_minutes: newMinutes, updated_at: new Date().toISOString() }).eq("id", slaId);
+      setSlaSaved(true);
+      setTimeout(() => setSlaSaved(false), 2000);
+    } catch (e) { console.error("SLA save error:", e); }
+    setSlaSaving(false);
+  }, []);
 
   const wf = WORKFLOWS.find(w => w.id === selWf) || WORKFLOWS[0];
   const maxX = Math.max(...wf.nodes.map(n => n.x)) + NODE_W + 60;

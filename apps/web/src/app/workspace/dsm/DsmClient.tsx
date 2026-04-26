@@ -410,6 +410,7 @@ export default function DsmClient() {
   const [oscQueueCounts, setOscQueueCounts] = useState<Record<string, number>>({});
   const [csmProspectCounts, setCsmProspectCounts] = useState<Record<string, number>>({});
   const [csmCommAssignments, setCsmCommAssignments] = useState<Record<string, string>>({});
+  const [taskCount, setTaskCount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
   // Fetch division overview data
@@ -534,6 +535,15 @@ export default function DsmClient() {
       }
       setOscQueueCounts(qCounts);
 
+      // Division task count (SLA breaches)
+      const taskQuery = supabase
+        .from("tasks")
+        .select("id")
+        .eq("status", "pending");
+      if (filter.divisionId) taskQuery.eq("division_id", filter.divisionId);
+      const { data: divTasks } = await taskQuery;
+      setTaskCount((divTasks ?? []).length);
+
       // CSM prospect counts + community assignments
       const csmPCounts: Record<string, number> = {};
       const csmComms: Record<string, string> = {};
@@ -655,6 +665,12 @@ export default function DsmClient() {
                 <MetricCard label="Prospect A" value={pipeline.prospect_a} color="#4ade80" />
                 <MetricCard label="Prospect B" value={pipeline.prospect_b} color="#60a5fa" />
                 <MetricCard label="Prospect C" value={pipeline.prospect_c} color="#fbbf24" />
+                <MetricCard 
+                  label="Tasks" 
+                  value={taskCount} 
+                  color={taskCount > 0 ? "#f87171" : "#4ade80"}
+                  subtitle="SLA breaches"
+                />
               </div>
             </Section>
 

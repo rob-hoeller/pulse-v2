@@ -62,6 +62,10 @@ interface TaskItem {
   priority: string | null;
   channel: string | null;
   status: string;
+  sla_id: string | null;
+  sla_breach_at: string | null;
+  sla_target_minutes: number | null;
+  actual_minutes: number | null;
   due_at: string | null;
   snoozed_until: string | null;
   completed_at: string | null;
@@ -70,6 +74,7 @@ interface TaskItem {
   opportunity_id: string | null;
   assigned_to_id: string | null;
   community_id: string | null;
+  division_id: string | null;
   created_at: string;
   contacts: { first_name: string; last_name: string } | null;
 }
@@ -949,6 +954,13 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
   const [csmUsers, setCsmUsers] = useState<TeamUser[]>([]);
   const [drillBucket, setDrillBucket] = useState<CsmBucket | null>(null);
 
+  // CSM-relevant tasks: sla_id starting with 'csm_', 'prospect_', or 'nr_'
+  const csmTasks = tasks.filter(t => 
+    t.status === 'pending' && 
+    (t.sla_id?.startsWith('csm_') || t.sla_id?.startsWith('prospect_') || t.sla_id?.startsWith('nr_')) &&
+    (teamFilter === 'all' || t.assigned_to_id === teamFilter)
+  ).slice(0, 5); // Show up to 5 tasks
+
   const availableLots = lots.filter((l: any) => l.is_available);
   const underConstruction = lots.filter((l: any) => l.construction_status === "under-construction" || l.lot_status === "under-construction");
   const qdLots = lots.filter((l: any) => l.lot_status === "quick-delivery");
@@ -991,7 +1003,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
       supabase.from("home_owners").select("*, contacts(first_name, last_name, email, phone)").eq("community_id", cid),
       supabase
         .from("tasks")
-        .select("id, title, description, priority, channel, status, due_at, snoozed_until, completed_at, ai_suggestion, contact_id, opportunity_id, assigned_to_id, community_id, created_at, contacts(first_name, last_name)")
+        .select("id, title, description, priority, channel, status, sla_id, sla_breach_at, sla_target_minutes, actual_minutes, due_at, snoozed_until, completed_at, ai_suggestion, contact_id, opportunity_id, assigned_to_id, community_id, division_id, created_at, contacts(first_name, last_name)")
         .eq("community_id", cid)
         .eq("status", "pending")
         .or(`snoozed_until.is.null,snoozed_until.lte.${now}`)
@@ -1157,6 +1169,23 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
     fetchData();
   }
 
+  async function handleDismissTask(taskId: string) {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ 
+        status: 'dismissed',
+        snoozed_until: new Date(Date.now() + 60*60*1000).toISOString()
+      })
+      .eq('id', taskId);
+    
+    if (error) {
+      console.error('Task dismiss failed:', error);
+      alert(`Error: ${error.message}`);
+    } else {
+      fetchData();
+    }
+  }
+
 
 
   function toggleDrill(panel: DrillPanel) {
@@ -1294,6 +1323,82 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
       <div style={isMobile ? {} : { display: "flex", gap: 20, alignItems: "flex-start" }}>
         {/* LEFT: CSM Prospect Queue (50%) */}
         <div style={isMobile ? { display: mobileTab === "queue" ? "block" : "none" } : { flex: "0 0 50%", minWidth: 0 }}>
+          {/* Tasks Section */}
+          {csmTasks.length > 0 && (
+            <div style={{ marginBottom: 16, padding: "12px", backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#fafafa" }}>Tasks</span>
+                  <span style={{ 
+                    fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 600,
+                    backgroundColor: csmTasks.length > 0 ? "#7f1d1d" : "#052e16",
+                    color: csmTasks.length > 0 ? "#fca5a5" : "#4ade80"
+                  }}>
+                    {csmTasks.length > 0 ? `${csmTasks.length} pending` : "0"}
+                  </span>
+                </div>
+                {csmTasks.length > 5 && (
+                  <a href="/crm-tasks" style={{ fontSize: 10, color: "#60a5fa", textDecoration: "none" }}>View all →</a>
+                )}
+              </div>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {csmTasks.map(task => {
+                  const age = task.sla_breach_at ? 
+                    relativeTime(task.sla_breach_at) : 
+                    relativeTime(task.created_at);
+                  const contactName = task.contacts ? 
+                    `${task.contacts.first_name} ${task.contacts.last_name}`.trim() : 
+                    "Unknown";
+                  
+                  return (
+                    <div 
+                      key={task.id} 
+                      style={{ 
+                        padding: "8px 10px", backgroundColor: "#09090b", border: "1px solid #27272a", 
+                        borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "space-between"
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ 
+                          fontSize: 11, fontWeight: 500, color: "#fafafa", 
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const
+                        }}>
+                          {task.title}
+                        </div>
+                        <div style={{ fontSize: 9, color: "#71717a", marginTop: 2 }}>
+                          {contactName} • {age}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 4, marginLeft: 8 }}>
+                        <button 
+                          onClick={() => handleCompleteTask(task.id)}
+                          style={{ 
+                            fontSize: 9, padding: "2px 6px", borderRadius: 3,
+                            backgroundColor: "#052e16", border: "1px solid #16a34a", color: "#4ade80",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Done
+                        </button>
+                        <button 
+                          onClick={() => handleDismissTask(task.id)}
+                          style={{ 
+                            fontSize: 9, padding: "2px 6px", borderRadius: 3,
+                            backgroundColor: "#422006", border: "1px solid #eab308", color: "#fbbf24",
+                            cursor: "pointer"
+                          }}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#fafafa" }}>CSM Queue</span>
             <span style={{ fontSize: 10, padding: "0 5px", borderRadius: 3, fontWeight: 600, backgroundColor: "#172554", color: "#60a5fa" }}>{filteredCsmQueue.length}</span>

@@ -58,6 +58,10 @@ interface TaskItem {
   priority: string | null;
   channel: string | null;
   status: string;
+  sla_id: string | null;
+  sla_breach_at: string | null;
+  sla_target_minutes: number | null;
+  actual_minutes: number | null;
   due_at: string | null;
   snoozed_until: string | null;
   completed_at: string | null;
@@ -65,6 +69,7 @@ interface TaskItem {
   contact_id: string | null;
   opportunity_id: string | null;
   assigned_to_id: string | null;
+  community_id: string | null;
   division_id: string | null;
   created_at: string;
   contacts: { first_name: string; last_name: string } | null;
@@ -1969,7 +1974,7 @@ export default function OscClient() {
     const now = new Date().toISOString();
     const taskQuery = supabase
       .from("tasks")
-      .select("id, title, description, priority, channel, status, due_at, snoozed_until, completed_at, ai_suggestion, contact_id, opportunity_id, assigned_to_id, division_id, created_at, contacts(first_name, last_name)")
+      .select("id, title, description, priority, channel, status, sla_id, sla_breach_at, sla_target_minutes, actual_minutes, due_at, snoozed_until, completed_at, ai_suggestion, contact_id, opportunity_id, assigned_to_id, community_id, division_id, created_at, contacts(first_name, last_name)")
       .eq("status", "pending")
       .or(`snoozed_until.is.null,snoozed_until.lte.${now}`)
       .order("priority", { ascending: true })
@@ -2013,6 +2018,15 @@ export default function OscClient() {
   const filteredTasks = teamFilter === "all"
     ? tasks
     : tasks.filter(t => t.assigned_to_id === teamFilter);
+
+  // OSC-relevant tasks: sla_breach channel, sla_id starting with 'osc_' or 'nr_'
+  const oscTasks = filteredTasks.filter(t => 
+    t.channel === 'sla_breach' && 
+    t.status === 'pending' && 
+    (t.sla_id?.startsWith('osc_') || t.sla_id?.startsWith('nr_'))
+  );
+  
+  const [tasksExpanded, setTasksExpanded] = useState(false);
 
   // ── Bucketed queue ──
   const bucketCounts: Record<QueueBucket, number> = {
@@ -2221,6 +2235,90 @@ export default function OscClient() {
                 />
               ) : (
               <>
+              {/* Tasks Section */}
+              <div style={{ marginBottom: 16 }}>
+                <div 
+                  onClick={() => setTasksExpanded(!tasksExpanded)}
+                  style={{ 
+                    display: "flex", alignItems: "center", justifyContent: "space-between", 
+                    cursor: "pointer", padding: "8px 12px", 
+                    backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6,
+                    marginBottom: tasksExpanded ? 8 : 0
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#fafafa" }}>Tasks</span>
+                    <span style={{ 
+                      fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 600,
+                      backgroundColor: oscTasks.length > 0 ? "#7f1d1d" : "#052e16",
+                      color: oscTasks.length > 0 ? "#fca5a5" : "#4ade80"
+                    }}>
+                      {oscTasks.length > 0 ? `${oscTasks.length} pending` : "0"}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 12, color: "#71717a" }}>{tasksExpanded ? "▼" : "▶"}</span>
+                </div>
+                
+                {tasksExpanded && oscTasks.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {oscTasks.slice(0, 5).map(task => {
+                      const age = task.sla_breach_at ? 
+                        relativeTime(task.sla_breach_at) : 
+                        relativeTime(task.created_at);
+                      
+                      return (
+                        <div 
+                          key={task.id} 
+                          style={{ 
+                            padding: "8px 12px", backgroundColor: "#09090b", border: "1px solid #27272a", 
+                            borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "space-between"
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ 
+                              fontSize: 11, fontWeight: 500, color: "#fafafa", 
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const
+                            }}>
+                              {task.title}
+                            </div>
+                            <div style={{ fontSize: 9, color: "#71717a", marginTop: 2 }}>
+                              {age}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 4, marginLeft: 8 }}>
+                            <button 
+                              onClick={() => handleCompleteTask(task.id)}
+                              style={{ 
+                                fontSize: 9, padding: "2px 6px", borderRadius: 3,
+                                backgroundColor: "#052e16", border: "1px solid #16a34a", color: "#4ade80",
+                                cursor: "pointer"
+                              }}
+                            >
+                              Done
+                            </button>
+                            <button 
+                              onClick={() => handleSnoozeTask(task.id, new Date(Date.now() + 60*60*1000).toISOString())}
+                              style={{ 
+                                fontSize: 9, padding: "2px 6px", borderRadius: 3,
+                                backgroundColor: "#422006", border: "1px solid #eab308", color: "#fbbf24",
+                                cursor: "pointer"
+                              }}
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {oscTasks.length > 5 && (
+                      <div style={{ textAlign: "center", padding: "4px 0" }}>
+                        <span style={{ fontSize: 10, color: "#71717a" }}>+{oscTasks.length - 5} more tasks</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
               {/* Bucket tabs */}
               <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #27272a", marginBottom: 12, overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"] }}>
                 {BUCKET_META.map(b => {
