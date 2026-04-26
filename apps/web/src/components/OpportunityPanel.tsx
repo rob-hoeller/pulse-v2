@@ -699,9 +699,33 @@ export default function OpportunityPanel({ open, onClose, opportunity }: Opportu
             <option value="deleted">Deleted</option>
           </select>
           <button
-            onClick={() => {
-              const name = `${opportunity.first_name} ${opportunity.last_name}`;
-              window.open(`https://zoom.us/meeting/schedule?topic=${encodeURIComponent(`Meeting with ${name}`)}&email=${encodeURIComponent(opportunity.email || '')}`, '_blank');
+            onClick={async () => {
+              const when = prompt("Meeting date/time (leave blank for tomorrow):", "");
+              const btn = document.activeElement as HTMLButtonElement;
+              if (btn) { btn.textContent = "Creating..."; btn.disabled = true; }
+              try {
+                const res = await fetch("/api/meetings", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    opportunity_id: opportunity.id,
+                    contact_id: opportunity.contact_id,
+                    topic: `Meeting with ${opportunity.first_name} ${opportunity.last_name}`,
+                    start_time: when ? new Date(when).toISOString() : undefined,
+                  }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                  alert(`Meeting created! Join URL:\n${data.join_url}`);
+                  if (btn) { btn.textContent = "Scheduled"; btn.style.backgroundColor = "#052e16"; btn.style.borderColor = "#166534"; btn.style.color = "#4ade80"; }
+                } else {
+                  alert(`Error: ${data.error}`);
+                  if (btn) { btn.textContent = "Schedule Meeting"; btn.disabled = false; }
+                }
+              } catch (e) {
+                alert(`Error creating meeting`);
+                if (btn) { btn.textContent = "Schedule Meeting"; btn.disabled = false; }
+              }
             }}
             style={{
               padding: "5px 10px", fontSize: 11, borderRadius: 4,
