@@ -27,6 +27,7 @@ interface CommunityBreakdown {
   lead_div: number;
   lead_com: number;
   queue: number;
+  csm_queue: number;
   prospect_a: number;
   prospect_b: number;
   prospect_c: number;
@@ -40,6 +41,7 @@ interface PipelineCounts {
   lead_div: number;
   lead_com: number;
   queue: number;
+  csm_queue: number;
   prospect_a: number;
   prospect_b: number;
   prospect_c: number;
@@ -142,12 +144,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // ─── MetricCard ───────────────────────────────────────────────────────────────
 
 function MetricCard({
-  label, value, subtitle, alert: isAlert,
+  label, value, subtitle, alert: isAlert, color,
 }: {
   label: string;
   value: string | number;
   subtitle?: string;
   alert?: boolean;
+  color?: string;
 }) {
   return (
     <div style={{
@@ -167,7 +170,7 @@ function MetricCard({
       }}>{label}</span>
       <span style={{
         fontSize: 24, fontWeight: 600, lineHeight: 1.2,
-        color: isAlert ? "#f87171" : "#fafafa",
+        color: isAlert ? "#f87171" : color ?? "#fafafa",
       }}>{value}</span>
       {subtitle && <span style={{ fontSize: 11, color: "#52525b" }}>{subtitle}</span>}
     </div>
@@ -393,7 +396,7 @@ export default function DsmClient() {
   // Division overview data
   const [communities, setCommunities] = useState<Community[]>([]);
   const [pipeline, setPipeline] = useState<PipelineCounts>({
-    lead_div: 0, lead_com: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
+    lead_div: 0, lead_com: 0, queue: 0, csm_queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
   });
   const [communityBreakdown, setCommunityBreakdown] = useState<CommunityBreakdown[]>([]);
   const [funnelRates, setFunnelRates] = useState<FunnelRates>({
@@ -435,7 +438,7 @@ export default function DsmClient() {
 
       // Pipeline counts
       const counts: PipelineCounts = {
-        lead_div: 0, lead_com: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
+        lead_div: 0, lead_com: 0, queue: 0, csm_queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
       };
       for (const o of oppList) {
         const stage = o.crm_stage as keyof PipelineCounts;
@@ -459,7 +462,7 @@ export default function DsmClient() {
       const breakdown: CommunityBreakdown[] = commList.map(comm => {
         const commOpps = oppList.filter(o => o.community_id === comm.id);
         const stages: Record<string, number> = {
-          lead_div: 0, lead_com: 0, queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
+          lead_div: 0, lead_com: 0, queue: 0, csm_queue: 0, prospect_a: 0, prospect_b: 0, prospect_c: 0, homeowner: 0,
         };
         let totalDays = 0;
         let countWithActivity = 0;
@@ -483,6 +486,7 @@ export default function DsmClient() {
           lead_div: stages.lead_div,
           lead_com: stages.lead_com,
           queue: stages.queue,
+          csm_queue: stages.csm_queue,
           prospect_a: stages.prospect_a,
           prospect_b: stages.prospect_b,
           prospect_c: stages.prospect_c,
@@ -633,27 +637,25 @@ export default function DsmClient() {
 
             {/* ── PIPELINE SUMMARY ── */}
             <Section title="Pipeline Summary">
-              <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <MetricCard label="Lead (Div)" value={pipeline.lead_div} />
                 <MetricCard label="Lead (Com)" value={pipeline.lead_com} />
                 <MetricCard
-                  label="Queue"
+                  label="OSC Queue"
                   value={pipeline.queue}
                   alert={pipeline.queue > 0}
                   subtitle={pipeline.queue > 0 ? "needs routing" : undefined}
                 />
                 <MetricCard
-                  label="Prospects"
-                  value={pipeline.prospect_a + pipeline.prospect_b + pipeline.prospect_c}
-                  subtitle={`A: ${pipeline.prospect_a} · B: ${pipeline.prospect_b} · C: ${pipeline.prospect_c}`}
+                  label="CSM Queue"
+                  value={pipeline.csm_queue}
+                  alert={pipeline.csm_queue > 0}
+                  subtitle={pipeline.csm_queue > 0 ? "needs ranking" : undefined}
                 />
-                <MetricCard label="Homeowners" value={pipeline.homeowner} />
+                <MetricCard label="Prospect A" value={pipeline.prospect_a} color="#4ade80" />
+                <MetricCard label="Prospect B" value={pipeline.prospect_b} color="#60a5fa" />
+                <MetricCard label="Prospect C" value={pipeline.prospect_c} color="#fbbf24" />
               </div>
-            </Section>
-
-            {/* ── CONVERSION FUNNEL ── */}
-            <Section title="Conversion Funnel">
-              <ConversionFunnel rates={funnelRates} />
             </Section>
 
             {/* ── COMMUNITY BREAKDOWN TABLE ── */}
@@ -662,7 +664,7 @@ export default function DsmClient() {
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
                   <thead>
                     <tr>
-                      {["Community", "L-Div", "L-Com", "Queue", "Pr-C", "Pr-B", "Pr-A", "HO", "Pipeline", "Avg Days", "Last Activity"].map(h => (
+                      {["Community", "L-Div", "L-Com", "OSC-Q", "CSM-Q", "Pr-C", "Pr-B", "Pr-A", "Pipeline", "Avg Days", "Last Activity"].map(h => (
                         <th key={h} style={{
                           padding: "8px 12px", textAlign: "left", fontSize: 11, color: "#71717a",
                           fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em",
@@ -701,10 +703,14 @@ export default function DsmClient() {
                           color: row.queue > 0 ? "#f87171" : "#a1a1aa",
                           fontWeight: row.queue > 0 ? 600 : 400,
                         }}>{row.queue}</td>
+                        <td style={{
+                          padding: "8px 12px", fontSize: 12, borderBottom: "1px solid #18181b",
+                          color: row.csm_queue > 0 ? "#c084fc" : "#a1a1aa",
+                          fontWeight: row.csm_queue > 0 ? 600 : 400,
+                        }}>{row.csm_queue}</td>
                         <td style={{ padding: "8px 12px", fontSize: 12, color: "#fbbf24", borderBottom: "1px solid #18181b" }}>{row.prospect_c}</td>
                         <td style={{ padding: "8px 12px", fontSize: 12, color: "#60a5fa", borderBottom: "1px solid #18181b" }}>{row.prospect_b}</td>
                         <td style={{ padding: "8px 12px", fontSize: 12, color: "#4ade80", borderBottom: "1px solid #18181b" }}>{row.prospect_a}</td>
-                        <td style={{ padding: "8px 12px", fontSize: 12, color: "#a1a1aa", borderBottom: "1px solid #18181b" }}>{row.homeowner}</td>
                         <td style={{ padding: "8px 12px", fontSize: 12, color: "#fafafa", fontWeight: 500, borderBottom: "1px solid #18181b" }}>{row.totalPipeline}</td>
                         <td style={{ padding: "8px 12px", fontSize: 12, color: "#a1a1aa", borderBottom: "1px solid #18181b" }}>{row.avgDaysInStage}d</td>
                         <td style={{ padding: "8px 12px", fontSize: 12, color: "#71717a", borderBottom: "1px solid #18181b" }}>{relativeTime(row.lastActivity)}</td>
