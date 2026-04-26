@@ -7,7 +7,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 interface WNode {
   id: string;
   label: string;
-  type: "trigger" | "process" | "store" | "ai" | "output" | "cron" | "webhook" | "mcp";
+  type: "trigger" | "process" | "store" | "ai" | "output" | "cron" | "webhook" | "mcp" | "sla" | "task";
   icon: string;
   desc: string;
   x: number;
@@ -16,6 +16,7 @@ interface WNode {
   script?: string;
   table?: string;
   mcp?: string;
+  sla?: { id: string; label: string; defaultMinutes: number; unit: string };
 }
 
 interface WEdge {
@@ -43,6 +44,8 @@ const STYLES: Record<string, { bg: string; border: string; text: string; icon_bg
   cron:     { bg: "#082f49", border: "#0369a1", text: "#38bdf8", icon_bg: "#0c4a6e" },
   webhook:  { bg: "#2d0a1a", border: "#9f1239", text: "#f9a8d4", icon_bg: "#500724" },
   mcp:      { bg: "#042f2e", border: "#0d9488", text: "#5eead4", icon_bg: "#134e4a" },
+  sla:      { bg: "#2d1207", border: "#b45309", text: "#fbbf24", icon_bg: "#451a03" },
+  task:     { bg: "#1a0a2e", border: "#7c3aed", text: "#c084fc", icon_bg: "#2e1065" },
 };
 
 const NODE_W = 160;
@@ -188,6 +191,65 @@ const WORKFLOWS: Workflow[] = [
       { from: "osc", to: "match", label: "phone" },
       { from: "match", to: "users", label: "role update" },
       { from: "match", to: "assign", label: "CSM links" },
+    ],
+  },
+  {
+    id: "sla-engine",
+    name: "SLA & Task Engine",
+    desc: "Watches all pipeline stages and communication. Triggers alerts and auto-creates tasks on SLA breach.",
+    nodes: [
+      // Watchers
+      { id: "watch-oscq", label: "Watch: OSC Queue", type: "sla", icon: "⏱", desc: "Monitor time items sit in OSC Queue", x: 40, y: 40,
+        sla: { id: "osc_acknowledge", label: "New Inbound → Acknowledge", defaultMinutes: 5, unit: "minutes" } },
+      { id: "watch-oscr", label: "Watch: OSC Route", type: "sla", icon: "⏱", desc: "Monitor time to route from OSC Queue", x: 40, y: 140,
+        sla: { id: "osc_route", label: "OSC Route to CSM", defaultMinutes: 15, unit: "minutes" } },
+      { id: "watch-csmq", label: "Watch: CSM Queue", type: "sla", icon: "⏱", desc: "Monitor time items sit in CSM Queue", x: 40, y: 240,
+        sla: { id: "csm_rank", label: "CSM Rank A/B/C", defaultMinutes: 1440, unit: "hours" } },
+      { id: "watch-sms", label: "Watch: SMS NR", type: "sla", icon: "⏱", desc: "Inbound SMS needs response", x: 40, y: 340,
+        sla: { id: "nr_sms", label: "SMS Response", defaultMinutes: 5, unit: "minutes" } },
+      { id: "watch-email", label: "Watch: Email NR", type: "sla", icon: "⏱", desc: "Inbound email needs response", x: 40, y: 440,
+        sla: { id: "nr_email", label: "Email Response", defaultMinutes: 60, unit: "minutes" } },
+      { id: "watch-call", label: "Watch: Missed Call", type: "sla", icon: "⏱", desc: "Missed call callback", x: 40, y: 540,
+        sla: { id: "nr_call", label: "Callback", defaultMinutes: 15, unit: "minutes" } },
+      { id: "watch-pa", label: "Watch: Prospect A", type: "sla", icon: "⏱", desc: "Days since last contact with A-rank", x: 40, y: 640,
+        sla: { id: "prospect_a_followup", label: "Prospect A Touch", defaultMinutes: 1440, unit: "days" } },
+      { id: "watch-pb", label: "Watch: Prospect B", type: "sla", icon: "⏱", desc: "Days since last contact with B-rank", x: 40, y: 740,
+        sla: { id: "prospect_b_followup", label: "Prospect B Touch", defaultMinutes: 4320, unit: "days" } },
+      { id: "watch-pc", label: "Watch: Prospect C", type: "sla", icon: "⏱", desc: "Days since last contact with C-rank", x: 40, y: 840,
+        sla: { id: "prospect_c_followup", label: "Prospect C Touch", defaultMinutes: 10080, unit: "days" } },
+
+      // Engine
+      { id: "evaluate", label: "SLA Evaluator", type: "process", icon: "⚙", desc: "Compare elapsed time vs SLA config. Runs every minute.", x: 340, y: 340 },
+      { id: "config", label: "sla_config", type: "store", icon: "💾", desc: "Admin-configured timers from Settings > SLA", x: 340, y: 140, table: "sla_config" },
+
+      // Outputs
+      { id: "warn", label: "Warning Badge", type: "output", icon: "🟡", desc: "Yellow badge on dashboard. Item approaching SLA.", x: 620, y: 140 },
+      { id: "breach", label: "SLA Breach", type: "output", icon: "🔴", desc: "Red badge + counter. SLA exceeded.", x: 620, y: 290 },
+      { id: "task", label: "Auto-Create Task", type: "task", icon: "📋", desc: "Task assigned to responsible user. Only on breach.", x: 620, y: 440 },
+      { id: "tasks", label: "tasks", type: "store", icon: "💾", desc: "title, assigned_to, opportunity_id, sla_id, breach_at", x: 870, y: 440, table: "tasks" },
+      { id: "notify", label: "DSM Notification", type: "output", icon: "📱", desc: "SMS or push to DSM when escalation threshold hit", x: 620, y: 590 },
+      { id: "perf", label: "Performance Score", type: "ai", icon: "📊", desc: "Tasks created / items handled = breach rate per user", x: 870, y: 590 },
+      { id: "dsm", label: "DSM Dashboard", type: "output", icon: "📈", desc: "Breach counts, response times, team rankings", x: 1100, y: 440 },
+    ],
+    edges: [
+      { from: "watch-oscq", to: "evaluate" },
+      { from: "watch-oscr", to: "evaluate" },
+      { from: "watch-csmq", to: "evaluate" },
+      { from: "watch-sms", to: "evaluate" },
+      { from: "watch-email", to: "evaluate" },
+      { from: "watch-call", to: "evaluate" },
+      { from: "watch-pa", to: "evaluate" },
+      { from: "watch-pb", to: "evaluate" },
+      { from: "watch-pc", to: "evaluate" },
+      { from: "config", to: "evaluate", label: "thresholds" },
+      { from: "evaluate", to: "warn", label: "warning" },
+      { from: "evaluate", to: "breach", label: "breached" },
+      { from: "breach", to: "task", label: "auto-create" },
+      { from: "task", to: "tasks", label: "persist" },
+      { from: "breach", to: "notify", label: "escalate" },
+      { from: "tasks", to: "perf", label: "aggregate" },
+      { from: "perf", to: "dsm" },
+      { from: "tasks", to: "dsm" },
     ],
   },
 ];
@@ -360,6 +422,31 @@ export default function WorkflowsPage() {
                 <div style={{ padding: "8px 12px", backgroundColor: "#111116", borderRadius: 8, marginBottom: 8 }}>
                   <div style={{ fontSize: 9, color: "#52525b", textTransform: "uppercase", marginBottom: 2 }}>MCP Tool</div>
                   <div style={{ fontSize: 11, color: "#5eead4", fontFamily: "monospace" }}>{selNode.mcp}</div>
+                </div>
+              )}
+              {selNode.sla && (
+                <div style={{ padding: "12px", backgroundColor: "#111116", borderRadius: 8, marginBottom: 8, border: "1px solid #451a03" }}>
+                  <div style={{ fontSize: 9, color: "#b45309", textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>SLA Timer</div>
+                  <div style={{ fontSize: 13, color: "#fbbf24", fontWeight: 600, marginBottom: 4 }}>{selNode.sla.label}</div>
+                  <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 9, color: "#52525b" }}>TARGET</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#f87171" }}>
+                        {selNode.sla.unit === "days" ? `${Math.round(selNode.sla.defaultMinutes / 1440)}d`
+                          : selNode.sla.unit === "hours" ? `${Math.round(selNode.sla.defaultMinutes / 60)}h`
+                          : `${selNode.sla.defaultMinutes}m`}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9, color: "#52525b" }}>WARNING</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#fbbf24" }}>
+                        {selNode.sla.unit === "days" ? `${Math.round(selNode.sla.defaultMinutes * 0.6 / 1440)}d`
+                          : selNode.sla.unit === "hours" ? `${Math.round(selNode.sla.defaultMinutes * 0.5 / 60)}h`
+                          : `${Math.round(selNode.sla.defaultMinutes * 0.6)}m`}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 10, color: "#71717a", marginTop: 8 }}>Configure in Settings → SLA Timers</div>
                 </div>
               )}
 
