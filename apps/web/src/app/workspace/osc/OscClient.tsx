@@ -2281,8 +2281,9 @@ export default function OscClient() {
                             }}>
                               {task.title}
                             </div>
-                            <div style={{ fontSize: 9, color: "#71717a", marginTop: 2 }}>
-                              {age}
+                            <div style={{ fontSize: 9, color: "#71717a", marginTop: 2, display: "flex", gap: 6 }}>
+                              {task.contacts && <span style={{ color: "#a1a1aa" }}>{(task.contacts as any)?.first_name} {(task.contacts as any)?.last_name}</span>}
+                              <span>{age}</span>
                             </div>
                           </div>
                           <div style={{ display: "flex", gap: 4, marginLeft: 8 }}>
