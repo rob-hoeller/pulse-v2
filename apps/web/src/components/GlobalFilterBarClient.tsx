@@ -183,7 +183,7 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
       setDivision(user.division_id);
     }
 
-    // If no community set, auto-set only if user has exactly one community
+    // Auto-set community only if user has exactly ONE community
     const userComms = userCommunities[userId] ?? [];
     if (!filter.communityId && userComms.length === 1) {
       const targetComm = userComms[0];
@@ -195,18 +195,17 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
         setTimeout(() => setCommunity(targetComm), 0);
       }
     } else if (!filter.communityId && userComms.length > 1) {
-      // Multiple communities — set division but let user pick community
-      // Find the common division (if all same) or use first
+      // Multiple communities — set division only, user picks community
       const commDivs = userComms.map(cid => communities.find(c => c.id === cid)?.division_id).filter(Boolean);
       const uniqueDivs = [...new Set(commDivs)];
       if (!filter.divisionId && uniqueDivs.length === 1 && uniqueDivs[0]) {
         setDivision(uniqueDivs[0]);
       }
-      // Don't auto-select community — show "N available" in dropdown
+      // Do NOT auto-select community
     }
 
-    // Set user after div is set
-    setTimeout(() => setUser(userId), 10);
+    // Set user immediately (don't delay)
+    setUser(userId);
   }, [allUsers, userCommunities, communities, filter.divisionId, filter.communityId, setDivision, setCommunity, setUser]);
 
   // Labels
@@ -222,8 +221,10 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
   // When user is selected, show only their assigned communities
   // When division is selected, show communities in that division
   // Otherwise show all
-  const userCommIds = filter.userId ? new Set(userCommunities[filter.userId] ?? []) : null;
-  const filteredCommunities = userCommIds
+  const userCommIds = filter.userId && userCommunities[filter.userId]?.length
+    ? new Set(userCommunities[filter.userId])
+    : null;
+  const filteredCommunities = userCommIds && userCommIds.size > 0
     ? communities.filter(c => userCommIds.has(c.id))
     : filter.divisionId
       ? communities.filter(c => c.division_id === filter.divisionId)
