@@ -108,15 +108,31 @@ function CsmOverview({ divisionId, userId, divisionLabel, userLabel }: {
           contacts: Array.isArray(o.contacts) ? o.contacts[0] : o.contacts,
           communities: Array.isArray(o.communities) ? o.communities[0] : o.communities,
         })));
-      } else if (divisionId) {
-        const { data: opps } = await supabase
+      } else {
+        // Division-only OR no filter at all — fetch prospects + queue
+        let prospQuery = supabase
           .from("opportunities")
           .select("id, contact_id, crm_stage, community_id, division_id, notes, last_activity_at, created_at, communities(name), contacts(first_name, last_name, email, phone)")
-          .eq("division_id", divisionId)
           .in("crm_stage", ["prospect_a", "prospect_b", "prospect_c"])
           .order("last_activity_at", { ascending: false })
-          .limit(200);
+          .limit(500);
+        if (divisionId) prospQuery = prospQuery.eq("division_id", divisionId);
+
+        let queueQuery = supabase
+          .from("opportunities")
+          .select("id, contact_id, crm_stage, community_id, division_id, notes, last_activity_at, created_at, communities(name), contacts(first_name, last_name, email, phone)")
+          .eq("crm_stage", "csm_queue")
+          .order("created_at", { ascending: false });
+        if (divisionId) queueQuery = queueQuery.eq("division_id", divisionId);
+
+        const [{ data: opps }, { data: queue }] = await Promise.all([prospQuery, queueQuery]);
+
         setProspects((opps ?? []).map((o: any) => ({
+          ...o,
+          contacts: Array.isArray(o.contacts) ? o.contacts[0] : o.contacts,
+          communities: Array.isArray(o.communities) ? o.communities[0] : o.communities,
+        })));
+        setCsmQueueItems((queue ?? []).map((o: any) => ({
           ...o,
           contacts: Array.isArray(o.contacts) ? o.contacts[0] : o.contacts,
           communities: Array.isArray(o.communities) ? o.communities[0] : o.communities,
