@@ -408,12 +408,44 @@ export default function SlaSettingsPage() {
                     )}
                   </div>
 
-                  {/* Warning threshold */}
-                  <div style={{ textAlign: "center", minWidth: 60 }}>
-                    <div style={{ fontSize: 11, color: "#fbbf24", fontWeight: 600 }}>
-                      {displayTime(warningMinutes, sla.unit)}
-                    </div>
-                    <div style={{ fontSize: 9, color: "#52525b" }}>WARNING</div>
+                  {/* Warning threshold — click to edit */}
+                  <div style={{ textAlign: "center", minWidth: 70 }}>
+                    {editingId === `${sla.id}_warn` ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <input
+                          type="number"
+                          value={editValue(warningMinutes, sla.unit)}
+                          onChange={e => {
+                            const warnVal = parseInt(e.target.value) || 0;
+                            const warnMins = toMinutes(warnVal, sla.unit);
+                            const pct = sla.currentMinutes > 0 ? Math.round(warnMins / sla.currentMinutes * 100) : 60;
+                            setSlas(prev => prev.map(s => s.id === sla.id ? { ...s, warningPct: pct } : s));
+                            setSaved(false);
+                          }}
+                          onBlur={() => setEditingId(null)}
+                          onKeyDown={e => e.key === "Enter" && setEditingId(null)}
+                          autoFocus
+                          style={{
+                            width: 40, padding: "2px 4px", backgroundColor: "#09090b",
+                            border: "1px solid #fbbf24", borderRadius: 4,
+                            color: "#fbbf24", fontSize: 12, fontWeight: 600, textAlign: "center",
+                            outline: "none",
+                          }}
+                        />
+                        <span style={{ fontSize: 9, color: "#71717a" }}>{sla.unit === "days" ? "d" : sla.unit === "hours" ? "h" : "m"}</span>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => setEditingId(`${sla.id}_warn`)}
+                        style={{ cursor: "pointer" }}
+                        title="Click to edit warning threshold"
+                      >
+                        <div style={{ fontSize: 11, color: "#fbbf24", fontWeight: 600 }}>
+                          {displayTime(warningMinutes, sla.unit)}
+                        </div>
+                        <div style={{ fontSize: 9, color: "#52525b" }}>WARNING</div>
+                      </div>
+                    )}
                   </div>
 
                   {/* SLA value */}
