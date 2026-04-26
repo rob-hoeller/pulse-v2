@@ -243,8 +243,17 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
         value={filter.communityId}
         displayValue={communities.find(c => c.id === filter.communityId)?.name ?? ""}
         count={filteredCommunities.length}
-        options={filteredCommunities.map(c => ({ id: c.id, name: c.name }))}
-        onChange={id => setCommunity(id)}
+        options={(filter.divisionId ? filteredCommunities : communities).map(c => ({ id: c.id, name: c.name }))}
+        onChange={id => {
+          if (id && !filter.divisionId) {
+            // Back-select division from community
+            const comm = communities.find(c => c.id === id);
+            if (comm?.division_id) setDivision(comm.division_id);
+            setTimeout(() => setCommunity(id), 0);
+          } else {
+            setCommunity(id);
+          }
+        }}
         compact={isMobile}
       />
       <CompoundFilter
