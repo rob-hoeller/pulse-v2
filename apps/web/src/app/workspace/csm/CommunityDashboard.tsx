@@ -80,7 +80,7 @@ interface TeamUser {
 
 type CsmBucket = "new_from_osc" | "stale" | "ai_hot" | "followup_due";
 
-type DrillPanel = null | "plans" | "lots" | "prospects" | "customers" | "qd";
+type DrillPanel = null | "plans" | "lots" | "prospects" | "prospects_a" | "prospects_b" | "prospects_c" | "customers" | "qd";
 
 type ActionType = "promote" | "demote" | null;
 
@@ -1126,9 +1126,9 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
           <MetricCard compact label="Avail Lots" value={availableLots.length} subtitle={`${lots.length} total`} onClick={() => toggleDrill("lots")} active={drill === "lots"} />
           <MetricCard compact label="Under Const" value={underConstruction.length} />
           <MetricCard compact label="QD/Spec" value={specHomes.length + qdLots.length} onClick={(specHomes.length + qdLots.length) > 0 ? () => toggleDrill("qd") : undefined} active={drill === "qd"} />
-          <MetricCard compact label="Prospect A" value={prospects.filter(p => p.crm_stage === "prospect_a").length} onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
-          <MetricCard compact label="Prospect B" value={prospects.filter(p => p.crm_stage === "prospect_b").length} onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
-          <MetricCard compact label="Prospect C" value={prospects.filter(p => p.crm_stage === "prospect_c").length} onClick={() => toggleDrill("prospects")} active={drill === "prospects"} />
+          <MetricCard compact label="Prospect A" value={prospects.filter(p => p.crm_stage === "prospect_a").length} onClick={() => toggleDrill("prospects_a")} active={drill === "prospects_a"} />
+          <MetricCard compact label="Prospect B" value={prospects.filter(p => p.crm_stage === "prospect_b").length} onClick={() => toggleDrill("prospects_b")} active={drill === "prospects_b"} />
+          <MetricCard compact label="Prospect C" value={prospects.filter(p => p.crm_stage === "prospect_c").length} onClick={() => toggleDrill("prospects_c")} active={drill === "prospects_c"} />
           <MetricCard compact label="Customers" value={customers.length} onClick={() => toggleDrill("customers")} active={drill === "customers"} />
           <MetricCard compact label="Tasks" value={tasks.length} subtitle={tasks.length > 0 ? "pending" : ""} />
         </div>
@@ -1165,11 +1165,15 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
               />
             </Section>
           )}
-          {drill === "prospects" && (
-            <Section title="Prospects" count={prospects.length}>
+          {(drill === "prospects" || drill === "prospects_a" || drill === "prospects_b" || drill === "prospects_c") && (() => {
+            const stageFilter = drill === "prospects_a" ? "prospect_a" : drill === "prospects_b" ? "prospect_b" : drill === "prospects_c" ? "prospect_c" : null;
+            const drillProspects = stageFilter ? prospects.filter(p => p.crm_stage === stageFilter) : prospects;
+            const drillTitle = stageFilter ? `Prospect ${STAGE_COLORS[stageFilter]?.label ?? ""}` : "All Prospects";
+            return (
+            <Section title={drillTitle} count={drillProspects.length}>
               <MiniTable
                 headers={["Name", "Stage", "Budget", "Phone", "Last Activity", "Created"]}
-                rows={prospects.map(p => [
+                rows={drillProspects.map(p => [
                   <span key="name" onClick={() => setPanelItem(prospectToPanelData(p, community.name, division?.name ?? null))} style={{ color: "#fafafa", fontWeight: 500, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#3f3f46", textUnderlineOffset: "2px" }}>{p.contacts?.first_name ?? "—"} {p.contacts?.last_name ?? ""}</span>,
                   <span key="stage" style={{
                     fontSize: 10, padding: "2px 8px", borderRadius: 4, fontWeight: 600,
@@ -1183,7 +1187,8 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
                 ])}
               />
             </Section>
-          )}
+            );
+          })()}
           {drill === "customers" && (
             <Section title="Customers" count={customers.length}>
               <MiniTable
