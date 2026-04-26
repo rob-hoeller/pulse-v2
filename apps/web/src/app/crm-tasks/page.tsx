@@ -41,7 +41,7 @@ interface CrmTask {
   divisions: { name: string } | null;
 }
 
-type TaskRow = CrmTask & {
+type TaskRow = CrmTask & Record<string, unknown> & {
   _contact: string;
   _assignee: string;
   _community: string;
@@ -237,18 +237,6 @@ export default function CrmTasksPage() {
           searchPlaceholder="Search tasks…"
           onExport={() => exportToCSV(tableRows as unknown as Record<string, unknown>[], "crm-tasks")}
           onExportAll={() => exportToCSV(tableRows as unknown as Record<string, unknown>[], "crm-tasks-all")}
-          extra={
-            <div style={{ display: "flex", gap: 4 }}>
-              {(["pending", "completed", "all"] as const).map(s => (
-                <button key={s} onClick={() => setStatusFilter(s)} style={{
-                  padding: "4px 10px", borderRadius: 4, fontSize: 11, cursor: "pointer",
-                  border: statusFilter === s ? "1px solid #80B602" : "1px solid #27272a",
-                  backgroundColor: statusFilter === s ? "#1a2a0a" : "#18181b",
-                  color: statusFilter === s ? "#80B602" : "#71717a",
-                }}>{s.charAt(0).toUpperCase() + s.slice(1)}</button>
-              ))}
-            </div>
-          }
         />
       }
     >

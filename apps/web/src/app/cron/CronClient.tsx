@@ -17,7 +17,7 @@ type FeedDef = {
   schedule: string;
   script: string;
   /** Column to filter on in sync_log */
-  filterCol: "source" | "feed";
+  filterCol: "source" | "feed" | "channel";
   filterVal: string;
   times: string[];
 };
