@@ -1887,6 +1887,15 @@ export default function OscClient() {
   const [drillBucket, setDrillBucket] = useState<QueueBucket | null>(null);
   const [mobileTab, setMobileTab] = useState<"queue" | "comm">("queue");
 
+  // Sync global userId filter to local teamFilter
+  useEffect(() => {
+    if (filter.userId) {
+      setTeamFilter(filter.userId);
+    } else {
+      setTeamFilter("all");
+    }
+  }, [filter.userId]);
+
   // ── Fetch queue + tasks (READ only — Supabase reads are fine) ──
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -1958,14 +1967,15 @@ export default function OscClient() {
 
     // Tasks (READ)
     const now = new Date().toISOString();
-    const { data: taskData } = await supabase
+    const taskQuery = supabase
       .from("tasks")
       .select("id, title, description, priority, channel, status, due_at, snoozed_until, completed_at, ai_suggestion, contact_id, opportunity_id, assigned_to_id, division_id, created_at, contacts(first_name, last_name)")
-      .eq("division_id", filter.divisionId)
       .eq("status", "pending")
       .or(`snoozed_until.is.null,snoozed_until.lte.${now}`)
       .order("priority", { ascending: true })
       .order("created_at", { ascending: false });
+    if (filter.divisionId) taskQuery.eq("division_id", filter.divisionId);
+    const { data: taskData } = await taskQuery;
 
     const flatTasks = (taskData ?? []).map((t: Record<string, unknown>) => ({
       ...t,
@@ -1979,20 +1989,16 @@ export default function OscClient() {
   useEffect(() => {
     fetchData();
 
+    const oppSub: Record<string, unknown> = { event: "*", schema: "public", table: "opportunities" };
+    const taskSub: Record<string, unknown> = { event: "*", schema: "public", table: "tasks" };
+    if (filter.divisionId) {
+      oppSub.filter = `division_id=eq.${filter.divisionId}`;
+      taskSub.filter = `division_id=eq.${filter.divisionId}`;
+    }
     const channel = supabase
       .channel("osc-queue-realtime")
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "opportunities",
-        filter: `division_id=eq.${filter.divisionId}`,
-      }, () => { fetchData(); })
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "tasks",
-        filter: `division_id=eq.${filter.divisionId}`,
-      }, () => { fetchData(); })
+      .on("postgres_changes" as any, oppSub, () => { fetchData(); })
+      .on("postgres_changes" as any, taskSub, () => { fetchData(); })
       .subscribe();
 
     return () => {
