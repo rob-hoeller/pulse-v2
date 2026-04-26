@@ -111,12 +111,14 @@ const BUCKET_META: { id: CsmBucket; icon: string; label: string; description: st
 ];
 
 const STAGE_COLORS: Record<string, { color: string; bg: string; label: string }> = {
+  csm_queue: { color: "#c084fc", bg: "#3b0764", label: "CSM Queue" },
   prospect_a: { color: "#4ade80", bg: "#052e16", label: "A" },
   prospect_b: { color: "#60a5fa", bg: "#172554", label: "B" },
   prospect_c: { color: "#fbbf24", bg: "#422006", label: "C" },
 };
 
 const PROMOTE_MAP: Record<string, string> = {
+  csm_queue: "prospect_c",
   prospect_c: "prospect_b",
   prospect_b: "prospect_a",
   prospect_a: "homeowner",
@@ -344,7 +346,8 @@ function ActionModal({
 }) {
   const currentStage = item.crm_stage;
   const promoteTarget = PROMOTE_MAP[currentStage] ?? "homeowner";
-  const [targetStage, setTargetStage] = useState(action === "promote" ? promoteTarget : "queue");
+  const defaultDemote = currentStage === "prospect_a" ? "prospect_b" : currentStage === "prospect_b" ? "prospect_c" : "queue";
+  const [targetStage, setTargetStage] = useState(action === "promote" ? promoteTarget : defaultDemote);
   const [reason, setReason] = useState("");
 
   const name = `${item.contacts?.first_name ?? "—"} ${item.contacts?.last_name ?? ""}`;
@@ -352,14 +355,41 @@ function ActionModal({
 
   const promoteOptions = action === "promote"
     ? [
+        ...(currentStage === "csm_queue" ? [
+          { value: "prospect_a", label: "Prospect A — Contract imminent" },
+          { value: "prospect_b", label: "Prospect B — Intent within 30 days" },
+          { value: "prospect_c", label: "Prospect C — Active interest, nurturing" },
+        ] : []),
         ...(currentStage === "prospect_c" ? [{ value: "prospect_b", label: "Prospect B — Intent within 30 days" }] : []),
-        ...(currentStage === "prospect_c" || currentStage === "prospect_b" ? [{ value: "prospect_a", label: "Prospect A — Contract this week" }] : []),
-        { value: "homeowner", label: "Homeowner — Sale closed" },
+        ...(currentStage === "prospect_c" || currentStage === "prospect_b" ? [{ value: "prospect_a", label: "Prospect A — Contract imminent" }] : []),
+        ...(currentStage === "prospect_a" ? [{ value: "homeowner", label: "Homeowner — Sale closed" }] : []),
       ]
     : [];
 
   const demoteOptions = [
-    { value: "queue", label: "Queue — Return to OSC for re-routing" },
+    ...(currentStage === "csm_queue" ? [
+      { value: "queue", label: "OSC Queue — Return to OSC" },
+      { value: "lead", label: "Lead: Division — Needs more nurturing" },
+      { value: "archived", label: "Archive — Not a fit" },
+      { value: "deleted", label: "Delete — Remove entirely" },
+    ] : []),
+    ...(currentStage === "prospect_c" ? [
+      { value: "csm_queue", label: "CSM Queue — Re-evaluate" },
+      { value: "queue", label: "OSC Queue — Return to OSC" },
+      { value: "lead", label: "Lead: Division — Needs more nurturing" },
+      { value: "archived", label: "Archive — Not a fit" },
+      { value: "deleted", label: "Delete — Remove entirely" },
+    ] : []),
+    ...(currentStage === "prospect_b" ? [
+      { value: "prospect_c", label: "Prospect C — Downgrade" },
+      { value: "queue", label: "OSC Queue — Return to OSC" },
+      { value: "archived", label: "Archive — Not a fit" },
+    ] : []),
+    ...(currentStage === "prospect_a" ? [
+      { value: "prospect_b", label: "Prospect B — Downgrade" },
+      { value: "prospect_c", label: "Prospect C — Downgrade" },
+      { value: "archived", label: "Archive — Not a fit" },
+    ] : []),
   ];
 
   const options = action === "promote" ? promoteOptions : demoteOptions;
