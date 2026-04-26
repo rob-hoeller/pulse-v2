@@ -1,10 +1,21 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { DivisionOption, CommunityOption } from "./GlobalFilterBar";
+
+type WorkspaceContext = "osc" | "csm" | "dsm" | "marketing" | "other";
+
+function getWorkspaceContext(pathname: string): WorkspaceContext {
+  if (pathname.startsWith("/workspace/osc")) return "osc";
+  if (pathname.startsWith("/workspace/csm")) return "csm";
+  if (pathname.startsWith("/workspace/dsm")) return "dsm";
+  if (pathname.startsWith("/workspace/marketing")) return "marketing";
+  return "other";
+}
 
 interface UserOption {
   id: string;
@@ -125,7 +136,15 @@ const sb = createClient(
 
 export default function GlobalFilterBarClient({ divisions, communities }: Props) {
   const isMobile = useIsMobile();
+  const pathname = usePathname();
+  const workspace = getWorkspaceContext(pathname);
   const { filter, setDivision, setCommunity, setUser, setLabels } = useGlobalFilter();
+
+  // Workspace-specific visibility
+  const showCommunity = workspace !== "osc"; // OSC: no community filter
+  const showUser = workspace !== "marketing"; // Marketing: no user filter
+  // User role filter: OSC page shows OSC users, CSM page shows CSM users
+  const userRoleFilter = workspace === "osc" ? "osc" : workspace === "csm" ? "csm" : null;
 
   // All users (for unfiltered dropdown + reverse lookup)
   const [allUsers, setAllUsers] = useState<UserOption[]>([]);
@@ -134,10 +153,14 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
   // Visible users in dropdown (filtered by div/community)
   const [visibleUsers, setVisibleUsers] = useState<UserOption[]>([]);
 
-  // Load all users + assignments once
+  // Load all users + assignments once (re-load when workspace changes for role filter)
   useEffect(() => {
+    let userQuery = sb.from("users").select("id, full_name, division_id, role").order("full_name");
+    if (userRoleFilter) {
+      userQuery = userQuery.eq("role", userRoleFilter);
+    }
     Promise.all([
-      sb.from("users").select("id, full_name, division_id").order("full_name"),
+      userQuery,
       sb.from("user_community_assignments").select("user_id, community_id"),
     ]).then(([usersRes, assignRes]) => {
       setAllUsers((usersRes.data ?? []) as UserOption[]);
@@ -149,7 +172,7 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
       }
       setUserCommunities(map);
     });
-  }, []);
+  }, [userRoleFilter]);
 
   // Update visible users when filter changes
   useEffect(() => {
@@ -250,33 +273,36 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
         onChange={id => setDivision(id)}
         compact={isMobile}
       />
-      <CompoundFilter
-        label="Community"
-        value={filter.communityId}
-        displayValue={communities.find(c => c.id === filter.communityId)?.name ?? ""}
-        count={filteredCommunities.length}
-        options={(filter.divisionId ? filteredCommunities : communities).map(c => ({ id: c.id, name: c.name }))}
-        onChange={id => {
-          if (id && !filter.divisionId) {
-            // Back-select division from community
-            const comm = communities.find(c => c.id === id);
-            if (comm?.division_id) setDivision(comm.division_id);
-            setTimeout(() => setCommunity(id), 0);
-          } else {
-            setCommunity(id);
-          }
-        }}
-        compact={isMobile}
-      />
-      <CompoundFilter
-        label="User"
-        value={filter.userId}
-        displayValue={allUsers.find(u => u.id === filter.userId)?.full_name ?? ""}
-        count={visibleUsers.length}
-        options={visibleUsers.map(u => ({ id: u.id, name: u.full_name }))}
-        onChange={handleUserSelect}
-        compact={isMobile}
-      />
+      {showCommunity && (
+        <CompoundFilter
+          label="Community"
+          value={filter.communityId}
+          displayValue={communities.find(c => c.id === filter.communityId)?.name ?? ""}
+          count={filteredCommunities.length}
+          options={(filter.divisionId ? filteredCommunities : communities).map(c => ({ id: c.id, name: c.name }))}
+          onChange={id => {
+            if (id && !filter.divisionId) {
+              const comm = communities.find(c => c.id === id);
+              if (comm?.division_id) setDivision(comm.division_id);
+              setTimeout(() => setCommunity(id), 0);
+            } else {
+              setCommunity(id);
+            }
+          }}
+          compact={isMobile}
+        />
+      )}
+      {showUser && (
+        <CompoundFilter
+          label="User"
+          value={filter.userId}
+          displayValue={allUsers.find(u => u.id === filter.userId)?.full_name ?? ""}
+          count={visibleUsers.length}
+          options={visibleUsers.map(u => ({ id: u.id, name: u.full_name }))}
+          onChange={handleUserSelect}
+          compact={isMobile}
+        />
+      )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />

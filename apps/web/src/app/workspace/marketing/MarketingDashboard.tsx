@@ -644,10 +644,7 @@ export default function MarketingDashboard() {
                 )}
               </div>
 
-              {/* ── RIGHT: Comm Hub (50%) ── */}
-              <div style={{ flex: "0 0 48%", minWidth: 0 }}>
-                <CommHub divisionId={filter.divisionId ?? undefined} communityId={filter.communityId ?? undefined} excludeChannel={["webform", "schellie"]} />
-              </div>
+              {/* RIGHT column removed — Marketing doesn't use Comm Hub */}
             </div>
 
             {/* ── Conversion Funnel ── */}
