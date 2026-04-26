@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import OpportunityPanel, { type OpportunityPanelData } from "@/components/OpportunityPanel";
 import PipelineDetailView, { type PipelineItem } from "@/components/PipelineDetailView";
 import CommHub from "@/components/CommHub";
@@ -943,7 +944,8 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
   const [activeBucket, setActiveBucket] = useState<CsmBucket>("new_from_osc");
   const [actionItem, setActionItem] = useState<ProspectItem | null>(null);
   const [actionType, setActionType] = useState<ActionType>(null);
-  const [teamFilter, setTeamFilter] = useState<string>("all");
+  const { filter: globalFilter } = useGlobalFilter();
+  const teamFilter = globalFilter.userId ?? "all";
   const [csmUsers, setCsmUsers] = useState<TeamUser[]>([]);
   const [drillBucket, setDrillBucket] = useState<CsmBucket | null>(null);
 
@@ -1163,20 +1165,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-      {/* ── Sales Goal Strip (top, right below global filters) ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 24px 0" }}>
-        <select
-          value={teamFilter}
-          onChange={e => setTeamFilter(e.target.value)}
-          style={{
-            backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6,
-            color: "#a1a1aa", fontSize: 11, padding: "4px 10px", outline: "none",
-          }}
-        >
-          <option value="all">All Team Members</option>
-          {csmUsers.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-        </select>
-      </div>
+      {/* Sales Goal Strip removed — team filter now in global header */}
       <SalesGoalStrip isMobile={isMobile} />
 
       {/* ── Metrics Strip (single compact row) ── */}

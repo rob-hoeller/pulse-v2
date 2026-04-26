@@ -2137,17 +2137,6 @@ export default function OscClient() {
               color: filteredQueueItems.length === 0 ? "#4ade80" : filteredQueueItems.length > 10 ? "#f87171" : "#fbbf24",
             }}>Q:{filteredQueueItems.length}</span>
           </div>
-          <select
-            value={teamFilter}
-            onChange={e => setTeamFilter(e.target.value)}
-            style={{
-              backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 4,
-              color: "#a1a1aa", fontSize: 10, padding: "4px 6px", outline: "none", maxWidth: 100,
-            }}
-          >
-            <option value="all">All</option>
-            {oscUsers.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-          </select>
         </div>
       ) : (
         <div style={{
@@ -2161,17 +2150,6 @@ export default function OscClient() {
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <select
-              value={teamFilter}
-              onChange={e => setTeamFilter(e.target.value)}
-              style={{
-                backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6,
-                color: "#a1a1aa", fontSize: 12, padding: "6px 12px", outline: "none",
-              }}
-            >
-              <option value="all">All Team Members</option>
-              {oscUsers.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-            </select>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 11, color: "#52525b" }}>Queue:</span>
               <span style={{

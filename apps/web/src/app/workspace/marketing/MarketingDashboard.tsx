@@ -540,16 +540,6 @@ export default function MarketingDashboard() {
           <span style={{ fontSize: 11, color: "#52525b" }}>{today}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <select
-            value="all"
-            onChange={() => {/* Team filter placeholder */}}
-            style={{
-              backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: 6,
-              color: "#a1a1aa", fontSize: 12, padding: "6px 12px", outline: "none",
-            }}
-          >
-            <option value="all">All Team Members</option>
-          </select>
           {communityFilter && (
             <button onClick={() => setCommunityFilter(null)} style={{
               padding: "4px 10px", borderRadius: 4, border: "1px solid #27272a",
