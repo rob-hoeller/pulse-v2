@@ -39,6 +39,12 @@ const SETTINGS_SECTIONS = [
     description: "Manage OSC and CSM team members, community assignments, and roles.",
     href: "/settings/team",
   },
+  {
+    icon: "",
+    title: "SLA Timers",
+    description: "Configure response time targets for queues, communications, and prospect follow-ups. Drives alerts and escalation.",
+    href: "/settings/sla",
+  },
 ];
 
 export default function SettingsPage() {
