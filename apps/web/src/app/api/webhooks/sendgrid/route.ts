@@ -81,16 +81,7 @@ export async function POST(request: Request) {
                 .update({ crm_stage: "deleted", is_active: false })
                 .eq("id", opp.id);
 
-              await supabase.from("stage_transitions").insert({
-                org_id: ORG_ID,
-                opportunity_id: opp.id,
-                contact_id: contactId,
-                from_stage: opp.crm_stage,
-                to_stage: "deleted",
-                triggered_by: "agent",
-                agent_name: "sendgrid_bounce_agent",
-                reason: `Email bounced: ${event.reason ?? event.type ?? "undeliverable"} (${email})`,
-              });
+              // stage_transitions logged automatically by DB trigger
             }
 
             // Log to action_log

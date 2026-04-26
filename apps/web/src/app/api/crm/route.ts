@@ -205,18 +205,8 @@ async function assignOpportunity(
   const { error } = await supabase.from("opportunities").update(update).eq("id", opportunity_id);
   if (error) return { success: false, error: error.message };
 
-  const { data: transition } = await supabase.from("stage_transitions").insert({
-    org_id: ORG_ID,
-    opportunity_id,
-    contact_id: opp.contact_id,
-    from_stage: opp.crm_stage,
-    to_stage: new_stage,
-    triggered_by: ctx.triggered_by,
-    triggered_by_user_id: ctx.user_id ?? null,
-    reason: reason || ctx.reasoning || null,
-    score_at_transition: ctx.confidence_score ?? null,
-    agent_name: ctx.agent_name ?? null,
-  }).select("id").single();
+  // stage_transitions logged automatically by DB trigger (trg_log_stage_transition)
+  const transition = { id: null }; // placeholder for return value
 
   await logAction("assign_opportunity", "opportunity", opportunity_id, ctx, {
     from_stage: opp.crm_stage, to_stage: new_stage, community_id, reason,
@@ -672,12 +662,7 @@ async function cleanseJunk(ctx: ActionContext) {
     if (opps && opps.length > 0) {
       for (const opp of opps) {
         await supabase.from("opportunities").update({ crm_stage: "deleted", is_active: false }).eq("id", opp.id);
-        await supabase.from("stage_transitions").insert({
-          org_id: ORG_ID, opportunity_id: opp.id, contact_id: j.id,
-          from_stage: opp.crm_stage, to_stage: "deleted",
-          triggered_by: ctx.triggered_by, agent_name: ctx.agent_name ?? "cleanse_agent",
-          reason: j.reason,
-        });
+        // stage_transitions logged automatically by DB trigger
         deleted++;
       }
     }
