@@ -1360,6 +1360,7 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
                   isMobile={isMobile}
                   onPromote={() => { setActionItem(item); setActionType("promote"); }}
                   onDemote={() => { setActionItem(item); setActionType("demote"); }}
+                  onNameClick={() => setPanelItem(prospectToPanelData(item, community.name, division?.name ?? null))}
                 />
               ))}
             </div>
