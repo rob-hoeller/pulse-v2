@@ -1128,17 +1128,8 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
     if (error) {
       console.error("Stage transition failed:", error);
       alert(`Error: ${error.message}`);
-    } else {
-      await supabase.from("stage_transitions").insert({
-        org_id: "00000000-0000-0000-0000-000000000001",
-        opportunity_id: oppId,
-        contact_id: item.contact_id,
-        from_stage: item.crm_stage,
-        to_stage: newStage,
-        triggered_by: "manual",
-        reason: reason || null,
-      });
     }
+    // Note: stage_transitions logged automatically by DB trigger (trg_log_stage_transition)
 
     setActionItem(null);
     setActionType(null);

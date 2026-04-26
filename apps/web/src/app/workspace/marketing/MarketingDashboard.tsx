@@ -473,18 +473,7 @@ export default function MarketingDashboard() {
       return;
     }
 
-    const item = leads.find(l => l.id === oppId);
-    if (item) {
-      await supabase.from("stage_transitions").insert({
-        org_id: "00000000-0000-0000-0000-000000000001",
-        opportunity_id: oppId,
-        contact_id: item.contact_id,
-        from_stage: item.crm_stage,
-        to_stage: "queue",
-        triggered_by: "manual",
-        reason: "Promoted from marketing pipeline",
-      });
-    }
+    // stage_transitions logged automatically by DB trigger
     fetchData();
   }
 
@@ -500,18 +489,7 @@ export default function MarketingDashboard() {
       return;
     }
 
-    const item = leads.find(l => l.id === oppId);
-    if (item && item.crm_stage === "lead_div") {
-      await supabase.from("stage_transitions").insert({
-        org_id: "00000000-0000-0000-0000-000000000001",
-        opportunity_id: oppId,
-        contact_id: item.contact_id,
-        from_stage: "lead_div",
-        to_stage: "lead_com",
-        triggered_by: "manual",
-        reason: "Community assigned from marketing pipeline",
-      });
-    }
+    // stage_transitions logged automatically by DB trigger
     fetchData();
   }
 
