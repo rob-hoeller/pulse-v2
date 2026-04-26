@@ -206,16 +206,15 @@ export default function GlobalFilterBarClient({ divisions, communities }: Props)
         onChange={id => setCommunity(id)}
         compact={isMobile}
       />
-      {!isMobile && (
-        <CompoundFilter
-          label="User"
-          value={filter.userId}
-          displayValue={users.find(u => u.id === filter.userId)?.full_name ?? ""}
-          count={users.length}
-          options={users.map(u => ({ id: u.id, name: u.full_name }))}
-          onChange={id => setUser(id)}
-        />
-      )}
+      <CompoundFilter
+        label="User"
+        value={filter.userId}
+        displayValue={users.find(u => u.id === filter.userId)?.full_name ?? ""}
+        count={users.length}
+        options={users.map(u => ({ id: u.id, name: u.full_name }))}
+        onChange={id => setUser(id)}
+        compact={isMobile}
+      />
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />

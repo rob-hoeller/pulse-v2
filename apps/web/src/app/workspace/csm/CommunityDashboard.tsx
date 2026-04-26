@@ -958,13 +958,20 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
     const cid = community.id;
     const now = new Date().toISOString();
 
-    // CSM team members
-    const { data: users } = await supabase
-      .from("users")
-      .select("id, full_name")
-      .eq("role", "csm")
-      .eq("is_active", true);
-    setCsmUsers((users as TeamUser[]) ?? []);
+    // CSM team members assigned to this community
+    const { data: assignments } = await supabase
+      .from("user_community_assignments")
+      .select("user_id, users(id, full_name)")
+      .eq("community_id", cid);
+    const teamUsers: TeamUser[] = (assignments ?? [])
+      .map((a: any) => {
+        const u = Array.isArray(a.users) ? a.users[0] : a.users;
+        return u ? { id: u.id, full_name: u.full_name } : null;
+      })
+      .filter(Boolean) as TeamUser[];
+    // Deduplicate
+    const seen = new Set<string>();
+    setCsmUsers(teamUsers.filter(u => { if (seen.has(u.id)) return false; seen.add(u.id); return true; }));
 
     const [oppRes, csmQueueRes, custRes, taskRes] = await Promise.all([
       supabase
