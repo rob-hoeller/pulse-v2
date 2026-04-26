@@ -1370,27 +1370,8 @@ function CommunityView({ community, plans, lots, modelHome, specHomes, divisions
                           {contactName} • {age}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 4, marginLeft: 8 }}>
-                        <button 
-                          onClick={() => handleCompleteTask(task.id)}
-                          style={{ 
-                            fontSize: 9, padding: "2px 6px", borderRadius: 3,
-                            backgroundColor: "#052e16", border: "1px solid #16a34a", color: "#4ade80",
-                            cursor: "pointer"
-                          }}
-                        >
-                          Done
-                        </button>
-                        <button 
-                          onClick={() => handleDismissTask(task.id)}
-                          style={{ 
-                            fontSize: 9, padding: "2px 6px", borderRadius: 3,
-                            backgroundColor: "#422006", border: "1px solid #eab308", color: "#fbbf24",
-                            cursor: "pointer"
-                          }}
-                        >
-                          Dismiss
-                        </button>
+                      <div style={{ marginLeft: 8 }}>
+                        <span style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, backgroundColor: "#7f1d1d", color: "#fca5a5", fontWeight: 600 }}>Active</span>
                       </div>
                     </div>
                   );

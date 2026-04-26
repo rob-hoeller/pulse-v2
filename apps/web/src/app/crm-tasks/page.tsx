@@ -201,20 +201,13 @@ export default function CrmTasksPage() {
     { key: "_age", label: "Created", sortable: true, render: (_v, row) => <span style={{ color: "#71717a", fontSize: 12 }}>{row._age}</span> },
     {
       key: "status", label: "Actions", sortable: false,
-      render: (_v, row) => row.status === "pending" ? (
-        <div style={{ display: "flex", gap: 4 }}>
-          <button onClick={(e) => { e.stopPropagation(); handleComplete(row.id); }} style={{
-            padding: "3px 8px", borderRadius: 4, border: "1px solid #166534",
-            backgroundColor: "#052e16", color: "#4ade80", fontSize: 10, cursor: "pointer",
-          }}>Done</button>
-          <button onClick={(e) => { e.stopPropagation(); handleDismiss(row.id); }} style={{
-            padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a",
-            backgroundColor: "#18181b", color: "#71717a", fontSize: 10, cursor: "pointer",
-          }}>Dismiss</button>
-        </div>
-      ) : (
-        <span style={{ fontSize: 10, color: row.status === "completed" ? "#4ade80" : "#71717a" }}>
-          {row.status === "completed" ? "Completed" : row.status}
+      render: (_v, row) => (
+        <span style={{
+          fontSize: 10, padding: "2px 8px", borderRadius: 3, fontWeight: 600,
+          backgroundColor: row.status === "pending" ? "#7f1d1d" : row.status === "completed" ? "#052e16" : "#18181b",
+          color: row.status === "pending" ? "#fca5a5" : row.status === "completed" ? "#4ade80" : "#71717a",
+        }}>
+          {row.status === "pending" ? "Active" : row.status === "completed" ? "Auto-completed" : row.status}
         </span>
       ),
     },
