@@ -17,6 +17,7 @@ export const NAV_ITEMS = [
   { icon: "⊕", label: "Leads",           href: "/leads",              group: "pipeline" },
   { icon: "⊙", label: "OSC Queue",       href: "/queue",              group: "pipeline" },
   { icon: "⊙", label: "CSM Queue",       href: "/csm-queue",          group: "pipeline" },
+  { icon: "🐚", label: "Schellie Live",   href: "/schellie-live",      group: "pipeline" },
   { icon: "◧", label: "Prospects",       href: "/prospects",          group: "pipeline" },
   { icon: "⊞", label: "Homeowners",      href: "/customers",          group: "pipeline" },
   // ── CRM: supporting data ──
