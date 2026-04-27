@@ -1887,6 +1887,7 @@ export default function OscClient() {
   const [panelItem, setPanelItem] = useState<QueueItem | null>(null);
   const [activeBucket, setActiveBucket] = useState<QueueBucket>("new_inbound");
   const [queueSearch, setQueueSearch] = useState("");
+  const [schellieActiveCount, setSchellieActiveCount] = useState(0);
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [oscUsers, setOscUsers] = useState<TeamUser[]>([]);
   const [drillBucket, setDrillBucket] = useState<QueueBucket | null>(null);
@@ -1900,6 +1901,25 @@ export default function OscClient() {
       setTeamFilter("all");
     }
   }, [filter.userId]);
+
+  // ── Schellie Live indicator ──
+  useEffect(() => {
+    async function fetchSchellieLive() {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const { data } = await supabase.from("schellie_sessions")
+        .select("id")
+        .in("status", ["active"])
+        .gte("last_message_at", new Date(Date.now() - 5 * 60 * 1000).toISOString());
+      setSchellieActiveCount(data?.length ?? 0);
+    }
+    fetchSchellieLive();
+    const channel = supabase.channel("osc-schellie-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "schellie_sessions" }, () => {
+        fetchSchellieLive();
+      }).subscribe();
+    const interval = setInterval(fetchSchellieLive, 30000);
+    return () => { channel.unsubscribe(); clearInterval(interval); };
+  }, []);
 
   // ── Fetch queue + tasks (READ only — Supabase reads are fine) ──
   const fetchData = useCallback(async () => {
@@ -2150,6 +2170,11 @@ export default function OscClient() {
               fontSize: 11, fontWeight: 700,
               color: filteredQueueItems.length === 0 ? "#4ade80" : filteredQueueItems.length > 10 ? "#f87171" : "#fbbf24",
             }}>Q:{filteredQueueItems.length}</span>
+            {schellieActiveCount > 0 && (
+              <span onClick={() => window.location.href = "/schellie-live"} style={{ fontSize: 10, color: "#c084fc", fontWeight: 600 }}>
+                🐚{schellieActiveCount}
+              </span>
+            )}
           </div>
         </div>
       ) : (
@@ -2174,6 +2199,19 @@ export default function OscClient() {
             <span style={{ fontSize: 11, color: "#52525b" }}>
               Goal: <strong style={{ color: filteredQueueItems.length === 0 ? "#4ade80" : "#fafafa" }}>0</strong>
             </span>
+            {/* Schellie Live indicator */}
+            <div
+              onClick={() => window.location.href = "/schellie-live"}
+              style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "4px 10px", borderRadius: 6, backgroundColor: schellieActiveCount > 0 ? "#1a0a2e" : "#18181b", border: `1px solid ${schellieActiveCount > 0 ? "#7c3aed" : "#27272a"}` }}
+            >
+              <span style={{ fontSize: 12 }}>🐚</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: schellieActiveCount > 0 ? "#c084fc" : "#52525b" }}>
+                {schellieActiveCount > 0 ? `${schellieActiveCount} active` : "0 chats"}
+              </span>
+              {schellieActiveCount > 0 && (
+                <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#4ade80", boxShadow: "0 0 6px #4ade80", animation: "pulse 2s infinite" }} />
+              )}
+            </div>
           </div>
         </div>
       )}
