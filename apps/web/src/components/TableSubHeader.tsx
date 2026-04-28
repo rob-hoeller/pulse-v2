@@ -5,7 +5,7 @@
 export function exportToCSV(rows: Record<string, unknown>[], filename: string) {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]).filter(
-    (k) => !k.startsWith("_") && typeof rows[0][k] !== "object"
+    (k) => !k.startsWith("_") && (rows[0][k] === null || typeof rows[0][k] !== "object")
   );
   const csv = [
     headers.join(","),
