@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import PageShell from "@/components/PageShell";
@@ -8,6 +9,13 @@ import TableSubHeader, { exportToCSV, type StatConfig } from "@/components/Table
 import OpportunityPanel from "@/components/OpportunityPanel";
 import type { OpportunityPanelData } from "@/components/OpportunityPanel";
 import DataTable, { type Column } from "@/components/DataTable";
+
+function resolveViolationRoute(slaId: string | null): string {
+  // CSM-related SLAs go to CSM workspace
+  if (slaId?.startsWith("csm_") || slaId?.startsWith("prospect_")) return "/workspace/csm";
+  // Everything else goes to OSC queue
+  return "/workspace/osc";
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://mrpxtbuezqrlxybnhyne.supabase.co",
@@ -108,6 +116,7 @@ function resolveViolationTab(slaId: string | null): "contact" | "activity" | und
 
 export default function ViolationsPage() {
   const { filter } = useGlobalFilter();
+  const router = useRouter();
   const [tasks, setTasks] = useState<CrmTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -272,38 +281,10 @@ export default function ViolationsPage() {
           controlledPage={page}
           controlledPageSize={pageSize}
           defaultPageSize={pageSize}
-          onRowClick={async (row) => {
+          onRowClick={(row) => {
             if (row.opportunity_id) {
-              // Fetch opportunity data and open panel
-              const { data: opp } = await supabase
-                .from("opportunities")
-                .select("id, contact_id, crm_stage, source, community_id, division_id, budget_min, budget_max, notes, last_activity_at, created_at, contacts(first_name, last_name, email, phone), communities(name), divisions(name)")
-                .eq("id", row.opportunity_id)
-                .single();
-              if (opp) {
-                const c = Array.isArray(opp.contacts) ? opp.contacts[0] : opp.contacts;
-                const comm = Array.isArray(opp.communities) ? opp.communities[0] : opp.communities;
-                const div = Array.isArray(opp.divisions) ? opp.divisions[0] : opp.divisions;
-                setPanelData({
-                  id: opp.id,
-                  contact_id: opp.contact_id,
-                  first_name: c?.first_name ?? "—",
-                  last_name: c?.last_name ?? "",
-                  email: c?.email ?? null,
-                  phone: c?.phone ?? null,
-                  stage: opp.crm_stage,
-                  source: opp.source ?? null,
-                  community_name: comm?.name ?? null,
-                  division_name: div?.name ?? null,
-                  budget_min: opp.budget_min ?? null,
-                  budget_max: opp.budget_max ?? null,
-                  floor_plan_name: null,
-                  notes: opp.notes ?? null,
-                  last_activity_at: opp.last_activity_at ?? null,
-                  created_at: opp.created_at,
-                });
-                setPanelTab(resolveViolationTab(row.sla_id) ?? undefined);
-              }
+              const route = resolveViolationRoute(row.sla_id);
+              router.push(`${route}?highlight=${row.opportunity_id}`);
             }
           }}
           emptyMessage={statusFilter === "pending" ? "No violations — all clear" : "No violations match the current filter"}

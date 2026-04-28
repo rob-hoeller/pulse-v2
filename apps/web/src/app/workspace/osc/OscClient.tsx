@@ -4,7 +4,8 @@ import dynamic from "next/dynamic";
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false, loading: () => <div style={{ height: 150, backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: 4 }} /> });
 import "react-quill-new/dist/quill.snow.css";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { useGlobalFilter } from "@/context/GlobalFilterContext";
 import OpportunityPanel, { type OpportunityPanelData } from "@/components/OpportunityPanel";
@@ -1882,6 +1883,8 @@ function RefLink({ label, href }: { label: string; href: string }) {
 export default function OscClient() {
   const { filter, labels } = useGlobalFilter();
   const isMobile = useIsMobile();
+  const searchParams = useSearchParams();
+  const highlightHandled = useRef(false);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [communities, setCommunities] = useState<CommunityRef[]>([]);
@@ -2035,6 +2038,17 @@ export default function OscClient() {
       supabase.removeChannel(channel);
     };
   }, [filter.divisionId, fetchData]);
+
+  // ── Auto-open item from ?highlight=<opportunity_id> (deep-link from violations) ──
+  useEffect(() => {
+    const highlightId = searchParams.get("highlight");
+    if (!highlightId || highlightHandled.current || loading || queueItems.length === 0) return;
+    const match = queueItems.find(q => q.id === highlightId);
+    if (match) {
+      setPanelItem(match);
+      highlightHandled.current = true;
+    }
+  }, [searchParams, queueItems, loading]);
 
   // ── Apply team filter ──
   const filteredQueueItems = teamFilter === "all"
